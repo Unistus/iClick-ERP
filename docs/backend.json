@@ -151,6 +151,26 @@
         "salariesPayableAccountId": { "type": "string" },
         "expenseClearingAccountId": { "type": "string" }
       }
+    },
+    "TaxReturn": {
+      "title": "TaxReturn",
+      "type": "object",
+      "description": "A generated tax filing for a specific period.",
+      "properties": {
+        "id": { "type": "string" },
+        "institutionId": { "type": "string" },
+        "periodId": { "type": "string" },
+        "periodName": { "type": "string" },
+        "taxType": { "type": "string", "enum": ["VAT", "Withholding", "Corporate Income Tax"] },
+        "grossSales": { "type": "number" },
+        "outputVat": { "type": "number" },
+        "inputVat": { "type": "number" },
+        "netTaxPayable": { "type": "number" },
+        "status": { "type": "string", "enum": ["Draft", "Filed", "Paid"] },
+        "filedAt": { "type": "string", "format": "date-time" },
+        "filedBy": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -169,6 +189,16 @@
             "$ref": "#/backend/entities/ExpenseRequisition"
           },
           "description": "Internal expense and reimbursement requests."
+        }
+      },
+      {
+        "path": "/institutions/{institutionId}/tax_returns/{returnId}",
+        "definition": {
+          "entityName": "TaxReturn",
+          "schema": {
+            "$ref": "#/backend/entities/TaxReturn"
+          },
+          "description": "Historical tax filings and generated reports."
         }
       },
       {

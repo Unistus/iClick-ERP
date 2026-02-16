@@ -50,6 +50,12 @@ service cloud.firestore {
         allow update: if isInstitutionMember(institutionId);
       }
 
+      match /tax_returns/{returnId} {
+        allow read: if isInstitutionMember(institutionId);
+        allow create: if isInstitutionMember(institutionId);
+        allow update: if isInstitutionMember(institutionId);
+      }
+
       match /settings/global {
         allow read: if isInstitutionMember(institutionId);
         allow write: if isInstitutionMember(institutionId);
@@ -78,6 +84,12 @@ service cloud.firestore {
       match /payables/{payableId} {
         allow read: if isInstitutionMember(institutionId);
         allow write: if isInstitutionMember(institutionId);
+      }
+
+      match /assets/{assetId} {
+        allow read: if isInstitutionMember(institutionId);
+        allow create: if isInstitutionMember(institutionId);
+        allow update: if isInstitutionMember(institutionId);
       }
 
       match /audit_logs/{logId} {
@@ -110,9 +122,13 @@ service cloud.firestore {
 
       match /branches/{branchId} {
         allow read, write: if isInstitutionMember(institutionId);
-        match /{allBranchData=**} {
+        match /departments/{deptId} {
           allow read, write: if isInstitutionMember(institutionId);
         }
+      }
+
+      match /fiscal_periods/{periodId} {
+        allow read, write: if isInstitutionMember(institutionId);
       }
     }
   }

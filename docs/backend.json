@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "InstitutionSettings": {
@@ -110,64 +109,26 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       }
     },
-    "FixedAsset": {
-      "title": "FixedAsset",
+    "ExpenseRequisition": {
+      "title": "ExpenseRequisition",
       "type": "object",
+      "description": "Internal employee expense request or reimbursement workflow.",
       "properties": {
         "id": { "type": "string" },
         "institutionId": { "type": "string" },
-        "name": { "type": "string" },
-        "code": { "type": "string" },
-        "category": { "type": "string", "enum": ["Furniture", "Equipment", "Vehicles", "Buildings", "Land", "Computers"] },
-        "purchaseDate": { "type": "string", "format": "date-time" },
-        "purchasePrice": { "type": "number" },
-        "salvageValue": { "type": "number" },
-        "usefulLifeYears": { "type": "number" },
-        "depreciationMethod": { "type": "string", "enum": ["Straight Line", "Reducing Balance"] },
-        "currentValue": { "type": "number" },
-        "accumulatedDepreciation": { "type": "number" },
-        "assetAccountId": { "type": "string" },
-        "status": { "type": "string", "enum": ["Active", "Disposed", "Fully Depreciated"] },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "institutionId", "name", "purchasePrice", "status"]
-    },
-    "Invoice": {
-      "title": "Invoice",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "institutionId": { "type": "string" },
-        "invoiceNumber": { "type": "string" },
-        "customerId": { "type": "string" },
-        "customerName": { "type": "string" },
-        "date": { "type": "string", "format": "date-time" },
-        "dueDate": { "type": "string", "format": "date-time" },
+        "requestedBy": { "type": "string" },
+        "employeeName": { "type": "string" },
         "amount": { "type": "number" },
-        "taxAmount": { "type": "number" },
-        "balance": { "type": "number" },
-        "status": { "type": "string", "enum": ["Unpaid", "Partial", "Paid", "Overdue"] },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "institutionId", "invoiceNumber", "amount", "balance", "status"]
-    },
-    "VendorInvoice": {
-      "title": "VendorInvoice",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "institutionId": { "type": "string" },
-        "vendorName": { "type": "string" },
-        "billNumber": { "type": "string" },
-        "date": { "type": "string", "format": "date-time" },
-        "dueDate": { "type": "string", "format": "date-time" },
-        "amount": { "type": "number" },
-        "balance": { "type": "number" },
-        "status": { "type": "string", "enum": ["Unpaid", "Partial", "Paid", "Overdue"] },
         "expenseAccountId": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["Draft", "Pending", "Approved", "Rejected", "Paid"] },
+        "approvalStage": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["Cash", "Bank", "Payroll Deduction"] },
+        "isPayrollRecoverable": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "institutionId", "vendorName", "amount", "balance", "status"]
+      "required": ["id", "institutionId", "requestedBy", "amount", "status"]
     },
     "AccountingSetup": {
       "title": "AccountingSetup",
@@ -183,82 +144,10 @@
         "mpesaClearingAccountId": { "type": "string" },
         "openingBalanceEquityAccountId": { "type": "string" },
         "accumulatedDepreciationAccountId": { "type": "string" },
-        "depreciationExpenseAccountId": { "type": "string" }
+        "depreciationExpenseAccountId": { "type": "string" },
+        "salariesPayableAccountId": { "type": "string" },
+        "expenseClearingAccountId": { "type": "string" }
       }
-    },
-    "NotificationTemplate": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "NotificationTemplate",
-      "type": "object",
-      "description": "Configures message templates for Email, SMS, and System notifications with support for dynamic placeholders.",
-      "properties": {
-        "id": { "type": "string" },
-        "institutionId": { "type": "string" },
-        "name": { "type": "string" },
-        "channel": { "type": "string", "enum": ["Email", "SMS", "System"] },
-        "trigger": { "type": "string", "description": "The event that triggers this notification." },
-        "subject": { "type": "string", "description": "Subject line (primarily for Email)." },
-        "content": { "type": "string", "description": "The message body containing placeholders like {{name}}." },
-        "tags": { "type": "array", "items": { "type": "string" }, "description": "Allowed dynamic tags for this template." },
-        "isActive": { "type": "boolean" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "institutionId", "name", "channel", "content"]
-    },
-    "ApiKey": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "ApiKey",
-      "type": "object",
-      "description": "Manages credentials for external integrations and mobile interfaces.",
-      "properties": {
-        "id": { "type": "string" },
-        "institutionId": { "type": "string" },
-        "name": { "type": "string", "description": "Display name for the key (e.g., 'Mobile POS')." },
-        "key": { "type": "string", "description": "The public part of the API key." },
-        "secret": { "type": "string", "description": "The secret/private part of the key (shown only once)." },
-        "scopes": { "type": "array", "items": { "type": "string" }, "description": "Permissions assigned to this key." },
-        "status": { "type": "string", "enum": ["Active", "Revoked"] },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "institutionId", "name", "key", "status"]
-    },
-    "AuditLog": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "AuditLog",
-      "type": "object",
-      "description": "Records sensitive system actions for compliance and security monitoring.",
-      "properties": {
-        "id": { "type": "string" },
-        "institutionId": { "type": "string" },
-        "userId": { "type": "string" },
-        "userEmail": { "type": "string" },
-        "action": { "type": "string", "description": "e.g., 'User Login', 'Invoice Created', 'Role Modified'" },
-        "module": { "type": "string", "description": "The system module where the event occurred (e.g., ADMIN, POS, HR)" },
-        "details": { "type": "string", "description": "A descriptive summary of the change or event." },
-        "status": { "type": "string", "enum": ["Success", "Failure"] },
-        "ipAddress": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "institutionId", "userId", "action", "module", "status", "timestamp"]
-    },
-    "DocumentSequence": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "DocumentSequence",
-      "type": "object",
-      "description": "Configures prefixes and incremental numbering for various system documents like invoices and receipts.",
-      "properties": {
-        "id": { "type": "string", "description": "Unique key for the sequence type (e.g., 'sales_invoice')." },
-        "institutionId": { "type": "string", "description": "Reference to the owner Institution." },
-        "title": { "type": "string", "description": "Display name of the document type." },
-        "prefix": { "type": "string", "description": "String prepended to the number (e.g., 'INV-')." },
-        "suffix": { "type": "string", "description": "String appended to the number (e.g., '/2024')." },
-        "nextNumber": { "type": "number", "description": "The next integer to be assigned." },
-        "padding": { "type": "number", "description": "Total length of the numeric part with leading zeros." },
-        "isActive": { "type": "boolean", "description": "Whether this sequence is currently used." },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "institutionId", "title", "prefix", "nextNumber", "padding"]
     }
   },
   "auth": {
@@ -269,6 +158,16 @@
   },
   "firestore": {
     "structure": [
+      {
+        "path": "/institutions/{institutionId}/expenses/{expenseId}",
+        "definition": {
+          "entityName": "ExpenseRequisition",
+          "schema": {
+            "$ref": "#/backend/entities/ExpenseRequisition"
+          },
+          "description": "Internal expense and reimbursement requests."
+        }
+      },
       {
         "path": "/institutions/{institutionId}/payables/{payableId}",
         "definition": {
@@ -327,16 +226,6 @@
             "$ref": "#/backend/entities/JournalEntry"
           },
           "description": "The primary double-entry financial log."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/invoices/{invoiceId}",
-        "definition": {
-          "entityName": "Invoice",
-          "schema": {
-            "$ref": "#/backend/entities/Invoice"
-          },
-          "description": "Accounts receivable invoices."
         }
       }
     ]

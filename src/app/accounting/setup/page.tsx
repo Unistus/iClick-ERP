@@ -150,14 +150,15 @@ export default function AccountingSetupPage() {
                     description="Liability account for vendor credit and bills."
                   />
                   <AccountSelect 
-                    name="cogsAccountId" 
-                    label="Cost of Goods Sold" 
-                    description="Expense account recorded when inventory is sold."
-                  />
-                  <AccountSelect 
                     name="vatPayableAccountId" 
                     label="VAT Payable" 
                     description="Liability account for collected taxes owed to KRA."
+                  />
+                  <AccountSelect 
+                    name="salariesPayableAccountId" 
+                    label="Salaries Payable" 
+                    description="Liability for accrued wages or payroll-recoverable claims."
+                    typeFilter={['Liability']}
                   />
                   <AccountSelect 
                     name="cashOnHandAccountId" 

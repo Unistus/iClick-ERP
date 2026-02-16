@@ -44,6 +44,12 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update: if isInstitutionMember(institutionId);
       
+      match /expenses/{expenseId} {
+        allow read: if isInstitutionMember(institutionId);
+        allow create: if isInstitutionMember(institutionId);
+        allow update: if isInstitutionMember(institutionId);
+      }
+
       match /settings/global {
         allow read: if isInstitutionMember(institutionId);
         allow write: if isInstitutionMember(institutionId);

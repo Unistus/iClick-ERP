@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
 import { collection, doc, serverTimestamp, query } from "firebase/firestore"
 import { addDocumentNonBlocking, updateDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase"
-import { Shield, Plus, Edit2, Lock, UserCog, Search, ChevronRight, ChevronDown } from "lucide-react"
+import { Shield, Plus, Edit2, Lock, UserCog, Search, ChevronRight, ChevronDown, Terminal } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { navConfig } from "@/lib/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -74,6 +74,26 @@ export default function RolesManagement() {
       setSelectedPermissions(prev => [...prev, rootReadPerm]);
       setExpandedModules(prev => [...prev, moduleId]);
     }
+  }
+
+  const grantAllPermissions = () => {
+    const allPerms: string[] = [];
+    navConfig.forEach(module => {
+      // Grant root read
+      allPerms.push(`${module.id}:root:read`);
+      // Grant root CRUD
+      PERMISSION_ACTIONS.forEach(action => {
+        allPerms.push(`${module.id}:root:${action}`);
+      });
+      // Grant submenus CRUD
+      module.submenus?.forEach(sub => {
+        PERMISSION_ACTIONS.forEach(action => {
+          allPerms.push(`${module.id}:${sub.id}:${action}`);
+        });
+      });
+    });
+    setSelectedPermissions(allPerms);
+    setExpandedModules(navConfig.map(m => m.id));
   }
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -147,99 +167,114 @@ export default function RolesManagement() {
                   <Plus className="size-4" /> New Role
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] flex flex-col p-0">
+              <DialogContent className="max-w-5xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden">
                 <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
-                  <DialogHeader className="p-4 md:p-6 pb-2 shrink-0">
-                    <DialogTitle className="text-lg md:text-xl">{editingRole ? 'Edit' : 'Create'} Role</DialogTitle>
+                  <DialogHeader className="p-4 md:p-6 pb-2 shrink-0 border-b">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <DialogTitle className="text-lg md:text-xl">{editingRole ? 'Edit' : 'Create'} Role</DialogTitle>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-[10px] font-bold h-8 gap-2 bg-primary/5 border-primary/20 hover:bg-primary/10"
+                        onClick={grantAllPermissions}
+                      >
+                        <Terminal className="size-3.5" /> Grant All (DevOps Mode)
+                      </Button>
+                    </div>
                   </DialogHeader>
                   
-                  <div className="p-4 md:p-6 pt-2 shrink-0">
+                  <div className="p-4 md:p-6 pt-4 shrink-0 bg-secondary/5">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="grid gap-1.5">
                         <Label htmlFor="name" className="text-[10px] uppercase font-bold text-muted-foreground">Role Name</Label>
-                        <Input id="name" name="name" defaultValue={editingRole?.name} className="h-9 text-xs" required />
+                        <Input id="name" name="name" defaultValue={editingRole?.name} placeholder="e.g. DevOps / Admin / Cashier" className="h-9 text-xs" required />
                       </div>
                       <div className="grid gap-1.5">
                         <Label htmlFor="description" className="text-[10px] uppercase font-bold text-muted-foreground">Description</Label>
-                        <Input id="description" name="description" defaultValue={editingRole?.description} className="h-9 text-xs" required />
+                        <Input id="description" name="description" defaultValue={editingRole?.description} placeholder="Define the scope of this role" className="h-9 text-xs" required />
                       </div>
                     </div>
                   </div>
 
-                  <ScrollArea className="flex-1 px-4 md:px-6 pb-6">
-                    <div className="border rounded-lg overflow-x-auto ring-1 ring-border bg-card">
-                      <Table className="min-w-[600px]">
-                        <TableHeader className="bg-secondary/30 sticky top-0 z-10 backdrop-blur-sm">
-                          <TableRow>
-                            <TableHead className="h-9 text-[10px] font-bold uppercase w-1/3">Module / Section</TableHead>
-                            <TableHead className="h-9 text-[10px] font-bold uppercase text-center">Module Access</TableHead>
-                            {PERMISSION_ACTIONS.map(action => (
-                              <TableHead key={action} className="h-9 text-[10px] font-bold uppercase text-center">{action}</TableHead>
-                            ))}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {navConfig.map(module => {
-                            const isExpanded = expandedModules.includes(module.id);
-                            const hasRootRead = selectedPermissions.includes(`${module.id}:root:read`);
+                  <div className="flex-1 overflow-hidden relative">
+                    <ScrollArea className="h-full px-4 md:px-6 py-4">
+                      <div className="border rounded-lg ring-1 ring-border bg-card overflow-hidden">
+                        <Table className="min-w-[700px] border-collapse">
+                          <TableHeader className="bg-secondary/30 sticky top-0 z-20 backdrop-blur-sm shadow-sm">
+                            <TableRow className="hover:bg-transparent">
+                              <TableHead className="h-10 text-[10px] font-bold uppercase w-1/3">Module / Section</TableHead>
+                              <TableHead className="h-10 text-[10px] font-bold uppercase text-center">Module Access</TableHead>
+                              {PERMISSION_ACTIONS.map(action => (
+                                <TableHead key={action} className="h-10 text-[10px] font-bold uppercase text-center">{action}</TableHead>
+                              ))}
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {navConfig.map(module => {
+                              const isExpanded = expandedModules.includes(module.id);
+                              const hasRootRead = selectedPermissions.includes(`${module.id}:root:read`);
 
-                            return (
-                              <React.Fragment key={module.id}>
-                                <TableRow className="bg-secondary/10 border-b-primary/10">
-                                  <TableCell className="font-bold text-xs flex items-center gap-2 py-3">
-                                    <module.icon className="size-3.5 text-primary" />
-                                    {module.title}
-                                    {module.submenus && module.submenus.length > 0 && (
-                                      isExpanded ? <ChevronDown className="size-3 opacity-50" /> : <ChevronRight className="size-3 opacity-50" />
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    <Checkbox 
-                                      checked={hasRootRead}
-                                      onCheckedChange={() => toggleModuleAccess(module.id)}
-                                    />
-                                  </TableCell>
-                                  {PERMISSION_ACTIONS.map(action => (
-                                    <TableCell key={action} className="text-center py-2">
+                              return (
+                                <React.Fragment key={module.id}>
+                                  <TableRow className="bg-secondary/10 border-b-primary/10">
+                                    <TableCell className="font-bold text-xs flex items-center gap-2 py-3">
+                                      <module.icon className="size-3.5 text-primary" />
+                                      {module.title}
+                                      {module.submenus && module.submenus.length > 0 && (
+                                        <div className="ml-auto opacity-50">
+                                          {isExpanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                                        </div>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-center">
                                       <Checkbox 
-                                        disabled={!hasRootRead && action !== 'read'}
-                                        checked={selectedPermissions.includes(`${module.id}:root:${action}`)}
-                                        onCheckedChange={() => togglePermission(module.id, null, action)}
+                                        checked={hasRootRead}
+                                        onCheckedChange={() => toggleModuleAccess(module.id)}
                                       />
                                     </TableCell>
-                                  ))}
-                                </TableRow>
-                                
-                                {isExpanded && module.submenus?.map(sub => (
-                                  <TableRow key={`${module.id}-${sub.id}`} className="bg-background/50 animate-in fade-in slide-in-from-top-1 duration-200">
-                                    <TableCell className="text-[11px] pl-10 text-muted-foreground py-2 border-l-2 border-l-primary/20">
-                                      <div className="flex items-center gap-2">
-                                        <sub.icon className="size-3 opacity-50" />
-                                        {sub.title}
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="text-center" />
                                     {PERMISSION_ACTIONS.map(action => (
-                                      <TableCell key={action} className="text-center py-1.5">
+                                      <TableCell key={action} className="text-center py-2">
                                         <Checkbox 
-                                          checked={selectedPermissions.includes(`${module.id}:${sub.id}:${action}`)}
-                                          onCheckedChange={() => togglePermission(module.id, sub.id, action)}
+                                          disabled={!hasRootRead && action !== 'read'}
+                                          checked={selectedPermissions.includes(`${module.id}:root:${action}`)}
+                                          onCheckedChange={() => togglePermission(module.id, null, action)}
                                         />
                                       </TableCell>
                                     ))}
                                   </TableRow>
-                                ))}
-                              </React.Fragment>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </ScrollArea>
+                                  
+                                  {isExpanded && module.submenus?.map(sub => (
+                                    <TableRow key={`${module.id}-${sub.id}`} className="bg-background/50 hover:bg-secondary/5 border-l-2 border-l-primary/20">
+                                      <TableCell className="text-[11px] pl-10 text-muted-foreground py-2">
+                                        <div className="flex items-center gap-2">
+                                          <sub.icon className="size-3 opacity-50" />
+                                          {sub.title}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="text-center" />
+                                      {PERMISSION_ACTIONS.map(action => (
+                                        <TableCell key={action} className="text-center py-1.5">
+                                          <Checkbox 
+                                            checked={selectedPermissions.includes(`${module.id}:${sub.id}:${action}`)}
+                                            onCheckedChange={() => togglePermission(module.id, sub.id, action)}
+                                          />
+                                        </TableCell>
+                                      ))}
+                                    </TableRow>
+                                  ))}
+                                </React.Fragment>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </ScrollArea>
+                  </div>
 
                   <DialogFooter className="p-4 md:p-6 border-t bg-secondary/5 shrink-0 flex flex-row justify-end gap-2">
                     <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs h-9">Cancel</Button>
-                    <Button type="submit" className="text-xs h-9">Save Role</Button>
+                    <Button type="submit" className="text-xs h-9 font-bold bg-primary hover:bg-primary/90">Save Configuration</Button>
                   </DialogFooter>
                 </form>
               </DialogContent>

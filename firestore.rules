@@ -47,57 +47,42 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update: if isInstitutionMember(institutionId);
       
+      // Operational Collections
       match /expenses/{expenseId} {
-        allow read: if isInstitutionMember(institutionId);
-        allow create: if isInstitutionMember(institutionId);
-        allow update: if isInstitutionMember(institutionId);
+        allow read, write: if isInstitutionMember(institutionId);
       }
 
       match /tax_returns/{returnId} {
-        allow read: if isInstitutionMember(institutionId);
-        allow create: if isInstitutionMember(institutionId);
-        allow update: if isInstitutionMember(institutionId);
-      }
-
-      match /settings/global {
-        allow read: if isInstitutionMember(institutionId);
-        allow write: if isInstitutionMember(institutionId);
-      }
-
-      match /settings/accounting {
-        allow read: if isInstitutionMember(institutionId);
-        allow write: if isInstitutionMember(institutionId);
+        allow read, write: if isInstitutionMember(institutionId);
       }
 
       match /coa/{accountId} {
-        allow read: if isInstitutionMember(institutionId);
-        allow write: if isInstitutionMember(institutionId);
+        allow read, write: if isInstitutionMember(institutionId);
       }
 
       match /journal_entries/{entryId} {
-        allow read: if isInstitutionMember(institutionId);
-        allow write: if isInstitutionMember(institutionId);
+        allow read, write: if isInstitutionMember(institutionId);
       }
 
       match /invoices/{invoiceId} {
-        allow read: if isInstitutionMember(institutionId);
-        allow write: if isInstitutionMember(institutionId);
+        allow read, write: if isInstitutionMember(institutionId);
       }
 
       match /payables/{payableId} {
-        allow read: if isInstitutionMember(institutionId);
-        allow write: if isInstitutionMember(institutionId);
+        allow read, write: if isInstitutionMember(institutionId);
       }
 
       match /assets/{assetId} {
-        allow read: if isInstitutionMember(institutionId);
-        allow create: if isInstitutionMember(institutionId);
-        allow update: if isInstitutionMember(institutionId);
+        allow read, write: if isInstitutionMember(institutionId);
+      }
+
+      // Admin & Config Collections
+      match /settings/{settingId} {
+        allow read, write: if isInstitutionMember(institutionId);
       }
 
       match /audit_logs/{logId} {
-        allow read: if isInstitutionMember(institutionId);
-        allow create: if isInstitutionMember(institutionId);
+        allow read, write: if isInstitutionMember(institutionId);
       }
 
       match /document_sequences/{sequenceId} {
@@ -131,6 +116,10 @@ service cloud.firestore {
       }
 
       match /fiscal_periods/{periodId} {
+        allow read, write: if isInstitutionMember(institutionId);
+      }
+
+      match /approval_workflows/{workflowId} {
         allow read, write: if isInstitutionMember(institutionId);
       }
     }

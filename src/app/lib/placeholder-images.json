@@ -1,0 +1,29 @@
+
+{
+  "placeholderImages": [
+    {
+      "id": "hero-dashboard",
+      "description": "Enterprise Dashboard Overview",
+      "imageUrl": "https://picsum.photos/seed/iclick1/1200/600",
+      "imageHint": "enterprise dashboard"
+    },
+    {
+      "id": "pos-pharmacy",
+      "description": "Pharmacy POS Interface",
+      "imageUrl": "https://picsum.photos/seed/iclick2/800/600",
+      "imageHint": "pharmacy medicine"
+    },
+    {
+      "id": "inventory-warehouse",
+      "description": "Inventory Management",
+      "imageUrl": "https://picsum.photos/seed/iclick3/800/600",
+      "imageHint": "warehouse logistics"
+    },
+    {
+      "id": "hr-team",
+      "description": "HR and Payroll",
+      "imageUrl": "https://picsum.photos/seed/iclick4/800/600",
+      "imageHint": "office team"
+    }
+  ]
+}

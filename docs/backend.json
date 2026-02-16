@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "InstitutionSettings": {
@@ -66,6 +67,60 @@
           }
         },
         "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ChartOfAccount": {
+      "title": "ChartOfAccount",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "institutionId": { "type": "string" },
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["Asset", "Liability", "Equity", "Income", "Expense"] },
+        "subtype": { "type": "string" },
+        "currencyId": { "type": "string" },
+        "balance": { "type": "number" },
+        "isActive": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "institutionId", "code", "name", "type"]
+    },
+    "JournalEntry": {
+      "title": "JournalEntry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "institutionId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "description": { "type": "string" },
+        "reference": { "type": "string" },
+        "status": { "type": "string", "enum": ["Draft", "Posted"] },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "accountId": { "type": "string" },
+              "amount": { "type": "number" },
+              "type": { "type": "string", "enum": ["Debit", "Credit"] }
+            }
+          }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "AccountingSetup": {
+      "title": "AccountingSetup",
+      "type": "object",
+      "properties": {
+        "salesRevenueAccountId": { "type": "string" },
+        "accountsReceivableAccountId": { "type": "string" },
+        "inventoryAssetAccountId": { "type": "string" },
+        "cogsAccountId": { "type": "string" },
+        "vatPayableAccountId": { "type": "string" },
+        "cashOnHandAccountId": { "type": "string" },
+        "mpesaClearingAccountId": { "type": "string" }
       }
     },
     "NotificationTemplate": {
@@ -587,6 +642,36 @@
             "$ref": "#/backend/entities/InstitutionSettings"
           },
           "description": "Unified settings document for the institution."
+        }
+      },
+      {
+        "path": "/institutions/{institutionId}/settings/accounting",
+        "definition": {
+          "entityName": "AccountingSetup",
+          "schema": {
+            "$ref": "#/backend/entities/AccountingSetup"
+          },
+          "description": "Accounting account mapping configuration."
+        }
+      },
+      {
+        "path": "/institutions/{institutionId}/coa/{accountId}",
+        "definition": {
+          "entityName": "ChartOfAccount",
+          "schema": {
+            "$ref": "#/backend/entities/ChartOfAccount"
+          },
+          "description": "The Chart of Accounts ledger nodes."
+        }
+      },
+      {
+        "path": "/institutions/{institutionId}/journal_entries/{entryId}",
+        "definition": {
+          "entityName": "JournalEntry",
+          "schema": {
+            "$ref": "#/backend/entities/JournalEntry"
+          },
+          "description": "The primary double-entry financial log."
         }
       },
       {

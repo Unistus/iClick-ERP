@@ -31,7 +31,14 @@ import {
   Sliders,
   BarChart3,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  BookOpen,
+  Receipt,
+  Wallet,
+  Building,
+  Gavel,
+  Landmark,
+  ArrowRightLeft
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -57,7 +64,6 @@ export const navConfig: NavItem[] = [
     url: "/", 
     pattern: /^\/($|dashboard)/,
     id: "dashboard"
-    // Submenus removed in favor of tabbed interface in /page.tsx
   },
   { 
     title: "iClick POS", 
@@ -86,10 +92,17 @@ export const navConfig: NavItem[] = [
     pattern: /^\/accounting/,
     id: "accounting",
     submenus: [
-      { title: "General Ledger", icon: History, url: "/accounting", id: "ledger" },
+      { title: "General Ledger", icon: BookOpen, url: "/accounting", id: "ledger" },
       { title: "Chart of Accounts", icon: Layers, url: "/accounting/coa", id: "coa" },
+      { title: "Journal Entries", icon: History, url: "/accounting/journal", id: "journal" },
+      { title: "Accounts Receivable", icon: Receipt, url: "/accounting/ar", id: "ar" },
+      { title: "Accounts Payable", icon: Gavel, url: "/accounting/ap", id: "ap" },
+      { title: "Cash & Bank", icon: Landmark, url: "/accounting/banking", id: "bank" },
+      { title: "Fixed Assets", icon: Building, url: "/accounting/assets", id: "assets" },
+      { title: "Expense Tracking", icon: ArrowRightLeft, url: "/accounting/expenses", id: "expenses" },
       { title: "Budgets", icon: PieChart, url: "/accounting/budgets", id: "budgets" },
       { title: "Tax Returns", icon: FileText, url: "/accounting/tax", id: "tax_returns" },
+      { title: "Financial Setup", icon: Settings, url: "/accounting/setup", id: "setup" },
     ]
   },
   { 

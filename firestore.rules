@@ -54,6 +54,21 @@ service cloud.firestore {
         allow write: if isInstitutionMember(institutionId);
       }
 
+      match /settings/accounting {
+        allow read: if isInstitutionMember(institutionId);
+        allow write: if isInstitutionMember(institutionId);
+      }
+
+      match /coa/{accountId} {
+        allow read: if isInstitutionMember(institutionId);
+        allow write: if isInstitutionMember(institutionId);
+      }
+
+      match /journal_entries/{entryId} {
+        allow read: if isInstitutionMember(institutionId);
+        allow write: if isInstitutionMember(institutionId);
+      }
+
       match /audit_logs/{logId} {
         allow read: if isInstitutionMember(institutionId);
         allow create: if isInstitutionMember(institutionId);

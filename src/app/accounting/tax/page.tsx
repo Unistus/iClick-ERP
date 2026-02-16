@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -7,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from "@/firebase";
 import { collection, query, orderBy, limit, doc, where } from "firebase/firestore";
 import { format } from "date-fns";
@@ -22,10 +22,13 @@ import {
   RefreshCw,
   Landmark,
   BadgeCent,
-  AlertCircle
+  AlertCircle,
+  CheckCircle2,
+  ExternalLink,
+  ChevronRight
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { generateTaxReturn } from "@/lib/accounting/tax.service";
+import { generateTaxReturn, updateTaxReturnStatus } from "@/lib/accounting/tax.service";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
 
@@ -34,6 +37,8 @@ export default function TaxReturnsPage() {
   const { user } = useUser();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedReturn, setSelectedReturn] = useState<any>(null);
+  const [isPreviewOpen, setIsReviewOpen] = useState(false);
 
   // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
@@ -91,12 +96,38 @@ export default function TaxReturnsPage() {
       }, user.uid);
 
       logSystemEvent(db, selectedInstId, user, 'TAX', 'Generate Return', `Filing generated for period ${periodName}.`);
-      toast({ title: "Tax Return Generated", description: "Report is available in the filing history." });
+      toast({ title: "Tax Return Generated", description: "Filing saved as Draft." });
     } catch (err: any) {
       toast({ variant: "destructive", title: "Generation Failed", description: err.message });
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleUpdateStatus = (id: string, status: any) => {
+    if (!selectedInstId) return;
+    updateTaxReturnStatus(db, selectedInstId, id, status).then(() => {
+      logSystemEvent(db, selectedInstId, user, 'TAX', 'Update Status', `Filing ${id} marked as ${status}.`);
+      toast({ title: `Status Updated to ${status}` });
+      setIsReviewOpen(false);
+    });
+  };
+
+  const handleDownloadReport = (ret: any) => {
+    // Generate CSV for Regulatory Submission
+    const headers = ["Period", "Tax Type", "Gross Sales", "Output VAT", "Input VAT", "Net Payable"];
+    const row = [ret.periodName, ret.taxType, ret.grossSales, ret.outputVat, ret.inputVat, ret.netTaxPayable];
+    const csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + row.join(",");
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `TaxReturn_${ret.periodName}_${ret.taxType}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({ title: "Report Exported", description: "CSV file ready for submission." });
   };
 
   return (
@@ -108,7 +139,7 @@ export default function TaxReturnsPage() {
               <Calculator className="size-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-headline font-bold">Tax & Regulatory</h1>
+              <h1 className="text-2xl font-headline font-bold text-foreground">Tax & Regulatory</h1>
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Returns & Compliance Filings</p>
             </div>
           </div>
@@ -137,7 +168,6 @@ export default function TaxReturnsPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Quick Pulse */}
             <div className="grid gap-4 md:grid-cols-3">
               <Card className="bg-card border-none ring-1 ring-border shadow-sm">
                 <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
@@ -166,13 +196,12 @@ export default function TaxReturnsPage() {
                 </CardHeader>
                 <CardContent className="pb-3">
                   <div className="text-xl font-bold">20th Prox.</div>
-                  <p className="text-[9px] text-muted-foreground mt-1 uppercase font-medium">Standard KRA Cycle</p>
+                  <p className="text-[9px] text-muted-foreground mt-1 uppercase font-medium">Standard Regulatory Cycle</p>
                 </CardContent>
               </Card>
             </div>
 
             <div className="grid gap-6 lg:grid-cols-3">
-              {/* Generation Form */}
               <Card className="lg:col-span-1 border-none ring-1 ring-border shadow-xl bg-card">
                 <CardHeader>
                   <CardTitle className="text-sm font-bold uppercase tracking-widest">Generate Filing</CardTitle>
@@ -204,20 +233,19 @@ export default function TaxReturnsPage() {
                     <div className="p-3 bg-secondary/20 rounded-lg border border-border/50">
                       <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-2">
                         <AlertCircle className="size-3 text-primary" />
-                        <span className="font-bold uppercase">Automated Capture</span>
+                        <span className="font-bold uppercase">Ledger Snapshot</span>
                       </div>
                       <p className="text-[10px] leading-relaxed">
-                        The system will aggregate all transactions within this period and populate the return using mapped tax accounts.
+                        The system will aggregate all transactions within this period and create a Draft filing using current ledger balances.
                       </p>
                     </div>
                     <Button type="submit" disabled={isGenerating} className="w-full h-10 font-bold uppercase text-xs gap-2">
-                      {isGenerating ? <RefreshCw className="size-3 animate-spin" /> : <Calculator className="size-3" />} Calculate Return
+                      {isGenerating ? <RefreshCw className="size-3 animate-spin" /> : <Calculator className="size-3" />} Generate Return
                     </Button>
                   </form>
                 </CardContent>
               </Card>
 
-              {/* History Table */}
               <Card className="lg:col-span-2 border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
                 <CardHeader className="bg-secondary/20 py-3 px-6 border-b">
                   <div className="flex items-center justify-between">
@@ -233,9 +261,9 @@ export default function TaxReturnsPage() {
                     <TableRow>
                       <TableHead className="h-9 text-[10px] uppercase font-bold pl-6">Period</TableHead>
                       <TableHead className="h-9 text-[10px] uppercase font-bold">Gross Sales</TableHead>
-                      <TableHead className="h-9 text-[10px] uppercase font-bold">Input/Output</TableHead>
-                      <TableHead className="h-9 text-[10px] uppercase font-bold text-right">Liability</TableHead>
-                      <TableHead className="h-9 text-[10px] uppercase font-bold text-right pr-6">Status</TableHead>
+                      <TableHead className="h-9 text-[10px] uppercase font-bold text-right">Net Liability</TableHead>
+                      <TableHead className="h-9 text-[10px] uppercase font-bold text-center">Status</TableHead>
+                      <TableHead className="h-9 text-right text-[10px] uppercase font-bold pr-6">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -259,25 +287,55 @@ export default function TaxReturnsPage() {
                         <TableCell className="text-[11px] font-mono font-medium">
                           {currency} {(ret.grossSales || 0).toLocaleString()}
                         </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col text-[9px] font-bold">
-                            <span className="text-emerald-500">OUT: {currency} {(ret.outputVat || 0).toLocaleString()}</span>
-                            <span className="text-destructive">IN: {currency} {(ret.inputVat || 0).toLocaleString()}</span>
-                          </div>
-                        </TableCell>
                         <TableCell className="text-right font-mono font-bold text-xs text-primary">
                           {currency} {(ret.netTaxPayable || 0).toLocaleString()}
                         </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={`text-[9px] h-4 uppercase font-bold ${
+                            ret.status === 'Paid' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
+                            ret.status === 'Filed' ? 'bg-primary/10 text-primary border-primary/20' :
+                            ret.status === 'Approved' ? 'bg-accent/10 text-accent border-accent/20' :
+                            'bg-secondary text-muted-foreground'
+                          }`}>
+                            {ret.status}
+                          </Badge>
+                        </TableCell>
                         <TableCell className="text-right pr-6">
-                          <div className="flex items-center justify-end gap-3">
-                            <Badge variant="outline" className={`text-[9px] h-4 uppercase font-bold ${
-                              ret.status === 'Paid' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
-                              ret.status === 'Filed' ? 'bg-primary/10 text-primary border-primary/20' :
-                              'bg-secondary text-muted-foreground'
-                            }`}>
-                              {ret.status}
-                            </Badge>
-                            <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100"><Download className="size-3.5" /></Button>
+                          <div className="flex items-center justify-end gap-2">
+                            {ret.status === 'Draft' ? (
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="h-7 text-[9px] font-bold uppercase gap-1.5 opacity-0 group-hover:opacity-100"
+                                onClick={() => {
+                                  setSelectedReturn(ret);
+                                  setIsReviewOpen(true);
+                                }}
+                              >
+                                <ChevronRight className="size-3" /> Review
+                              </Button>
+                            ) : (
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="size-7 text-primary" 
+                                  onClick={() => handleDownloadReport(ret)}
+                                >
+                                  <Download className="size-3.5" />
+                                </Button>
+                                {ret.status === 'Approved' && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="size-7 text-accent"
+                                    onClick={() => handleUpdateStatus(ret.id, 'Filed')}
+                                  >
+                                    <ExternalLink className="size-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -288,6 +346,53 @@ export default function TaxReturnsPage() {
             </div>
           </div>
         )}
+
+        {/* Review Modal */}
+        <Dialog open={isPreviewOpen} onOpenChange={setIsReviewOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Review Filing: {selectedReturn?.periodName}</DialogTitle>
+              <DialogDescription className="text-xs uppercase font-bold tracking-tight">Compliance Verification</DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-secondary/20 rounded-lg border">
+                  <p className="text-[9px] font-bold text-muted-foreground uppercase">Gross Sales (Base)</p>
+                  <p className="text-sm font-mono font-bold">{currency} {selectedReturn?.grossSales?.toLocaleString()}</p>
+                </div>
+                <div className="p-3 bg-primary/5 rounded-lg border border-primary/10">
+                  <p className="text-[9px] font-bold text-primary uppercase">Output VAT (Due)</p>
+                  <p className="text-sm font-mono font-bold">{currency} {selectedReturn?.outputVat?.toLocaleString()}</p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-accent/5 rounded-xl border border-accent/10 relative overflow-hidden">
+                <div className="flex justify-between items-end relative z-10">
+                  <div>
+                    <p className="text-[10px] font-bold text-accent uppercase tracking-[0.2em]">Net Regulatory Payable</p>
+                    <p className="text-2xl font-bold font-headline mt-1">{currency} {selectedReturn?.netTaxPayable?.toLocaleString()}</p>
+                  </div>
+                  <Calculator className="size-8 text-accent opacity-20" />
+                </div>
+              </div>
+
+              <div className="text-[10px] text-muted-foreground leading-relaxed italic border-l-2 pl-3">
+                Note: This calculation uses the real-time balance of your mapped VAT Payable account. Ensure all sales are finalized before approval.
+              </div>
+            </div>
+
+            <DialogFooter className="grid grid-cols-2 gap-2">
+              <Button variant="ghost" className="text-xs h-9 font-bold uppercase" onClick={() => setIsReviewOpen(false)}>Discard</Button>
+              <Button 
+                className="text-xs h-9 font-bold uppercase bg-primary shadow-lg shadow-primary/20" 
+                onClick={() => handleUpdateStatus(selectedReturn.id, 'Approved')}
+              >
+                <CheckCircle2 className="size-3 mr-2" /> Approve for Filing
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

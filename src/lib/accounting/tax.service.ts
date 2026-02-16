@@ -1,7 +1,6 @@
-
 'use client';
 
-import { Firestore, collection, doc, getDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { Firestore, collection, doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 
 export interface GenerateTaxReturnPayload {
@@ -29,8 +28,7 @@ export async function generateTaxReturn(db: Firestore, institutionId: string, pa
   const coaSnap = await getDoc(coaRef);
   const outputVat = coaSnap.exists() ? coaSnap.data().balance || 0 : 0;
 
-  // 3. Simulate Input VAT aggregation (In MVP, we pull from specific expense subtypes or manual journals)
-  // Industry practice: Usually a separate 'VAT Receivable' account for input tax.
+  // 3. Simulate Input VAT aggregation
   const inputVat = 0; // Placeholder for MVP input aggregation logic
 
   const grossSales = (outputVat / 0.16) + outputVat; // Back-calculation for MVP estimation
@@ -50,4 +48,15 @@ export async function generateTaxReturn(db: Firestore, institutionId: string, pa
 
   const returnsRef = collection(db, 'institutions', institutionId, 'tax_returns');
   return addDocumentNonBlocking(returnsRef, data);
+}
+
+/**
+ * Transitions a tax return status.
+ */
+export async function updateTaxReturnStatus(db: Firestore, institutionId: string, returnId: string, status: 'Approved' | 'Filed' | 'Paid') {
+  const ref = doc(db, 'institutions', institutionId, 'tax_returns', returnId);
+  return updateDoc(ref, {
+    status,
+    updatedAt: serverTimestamp()
+  });
 }

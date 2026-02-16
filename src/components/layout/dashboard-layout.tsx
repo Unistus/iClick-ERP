@@ -1,13 +1,35 @@
 
 "use client"
 
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "./app-sidebar"
-import { Bell, Search, User } from "lucide-react"
+import { Bell, Search, User, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useUser } from "@/firebase"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const { user, isUserLoading } = useUser()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/login')
+    }
+  }, [user, isUserLoading, router])
+
+  if (isUserLoading) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-background">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (!user) return null
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -32,7 +54,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="h-8 w-px bg-border mx-1" />
             <Button variant="ghost" size="sm" className="gap-2 font-medium">
               <User className="size-4" />
-              <span>John Doe</span>
+              <span>{user.email?.split('@')[0]}</span>
             </Button>
           </div>
         </header>

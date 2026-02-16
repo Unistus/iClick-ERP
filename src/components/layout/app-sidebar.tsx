@@ -14,7 +14,14 @@ import {
   ChevronRight,
   Sparkles,
   Building2,
-  Store
+  Store,
+  Shield,
+  Briefcase,
+  MapPin,
+  Percent,
+  Coins,
+  FileClock,
+  LogOut
 } from "lucide-react"
 
 import {
@@ -25,58 +32,44 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
   SidebarGroup,
   SidebarGroupLabel,
-  SidebarGroupContent,
   useSidebar,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { useAuth, useUser } from "@/firebase"
 
 const modules = [
-  {
-    title: "Command Center",
-    icon: LayoutDashboard,
-    url: "/",
-  },
-  {
-    title: "iClick POS",
-    icon: ShoppingCart,
-    url: "/pos",
-  },
-  {
-    title: "Stock Vault",
-    icon: Package,
-    url: "/inventory",
-  },
-  {
-    title: "Financial Suite",
-    icon: Calculator,
-    url: "/accounting",
-  },
-  {
-    title: "People Hub",
-    icon: Users,
-    url: "/hr",
-  },
-  {
-    title: "Client Care",
-    icon: HeartHandshake,
-    url: "/crm",
-  },
-  {
-    title: "AI Analysis",
-    icon: Sparkles,
-    url: "/ai-insights",
-  },
+  { title: "Command Center", icon: LayoutDashboard, url: "/" },
+  { title: "iClick POS", icon: ShoppingCart, url: "/pos" },
+  { title: "Stock Vault", icon: Package, url: "/inventory" },
+  { title: "Financial Suite", icon: Calculator, url: "/accounting" },
+  { title: "People Hub", icon: Users, url: "/hr" },
+  { title: "Client Care", icon: HeartHandshake, url: "/crm" },
+  { title: "AI Analysis", icon: Sparkles, url: "/ai-insights" },
+]
+
+const adminLinks = [
+  { title: "Institutions", icon: Store, url: "/admin/institutions" },
+  { title: "Branches", icon: MapPin, url: "/admin/branches" },
+  { title: "Departments", icon: Briefcase, url: "/admin/departments" },
+  { title: "Roles & Permissions", icon: Shield, url: "/admin/roles" },
+  { title: "Tax Config", icon: Percent, url: "/admin/tax" },
+  { title: "Currencies", icon: Coins, url: "/admin/currencies" },
+  { title: "Audit Logs", icon: FileClock, url: "/admin/audit-logs" },
 ]
 
 export function AppSidebar() {
   const pathname = usePathname()
-  const { toggleSidebar } = useSidebar()
+  const router = useRouter()
+  const auth = useAuth()
+  const { user } = useUser()
+
+  const handleLogout = async () => {
+    await auth.signOut()
+    router.push('/login')
+  }
 
   return (
     <Sidebar collapsible="icon">
@@ -96,11 +89,7 @@ export function AppSidebar() {
           <SidebarMenu>
             {modules.map((item) => (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === item.url}
-                  tooltip={item.title}
-                >
+                <SidebarMenuButton asChild isActive={pathname === item.url} tooltip={item.title}>
                   <Link href={item.url}>
                     <item.icon />
                     <span>{item.title}</span>
@@ -112,33 +101,41 @@ export function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Organization</SidebarGroupLabel>
+          <SidebarGroupLabel>Administration</SidebarGroupLabel>
           <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Switch Branch">
-                <Building2 />
-                <span>Nairobi HQ</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Admin Settings">
-                <Settings />
-                <span>Admin Panel</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            {adminLinks.map((item) => (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton asChild isActive={pathname === item.url} tooltip={item.title}>
+                  <Link href={item.url}>
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-4 border-t border-sidebar-border">
-        <div className="flex items-center gap-3 group-data-[collapsible=icon]:hidden">
-          <div className="size-8 rounded-full bg-accent flex items-center justify-center text-white font-bold text-xs">
-            JD
+        {user && (
+          <div className="flex items-center gap-3 group-data-[collapsible=icon]:hidden mb-4">
+            <div className="size-8 rounded-full bg-accent flex items-center justify-center text-white font-bold text-xs uppercase">
+              {user.email?.[0] || 'U'}
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-medium truncate">{user.email}</span>
+              <span className="text-xs text-muted-foreground">Authenticated</span>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">John Doe</span>
-            <span className="text-xs text-muted-foreground">Super Admin</span>
-          </div>
-        </div>
+        )}
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={handleLogout} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+              <LogOut />
+              <span>Logout</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
   )

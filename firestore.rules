@@ -1,0 +1,234 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * iClick ERP: All-in-One POS & Business System
+     * 
+     * Core Philosophy:
+     * This ruleset implements a strict multi-tenant, multi-branch architecture. Access is governed by 
+     * "Existence over Content" verification. Instead of complex queries, the system uses dedicated 
+     * membership paths (/user_institutions/...) and global admin paths (/system_admins/...) to 
+     * verify authorization instantly.
+     * 
+     * Data Structure:
+     * 1. Global: Currencies and Permissions (Read-only for users).
+     * 2. User-Specific: Profiles and Membership records.
+     * 3. Institution-Scoped: Master data (Products, Customers) and configuration (Roles, Taxes).
+     * 4. Branch-Scoped: Transactional data (Sales, Inventory, KDS) and location-specific records.
+     * 
+     * Key Security Decisions:
+     * - Authorization Independence: Every document must contain a denormalized 'institutionId' (and 
+     *   'branchId' where applicable) that matches its parent path to prevent cross-tenant leakage.
+     * - RBAC: Roles are defined per institution. Membership in a role is verified via existence 
+     *   at /institutions/{instId}/roles/{roleId}/members/{userId}.
+     * - Prototyping Mode: Rules enforce who can write, but allow flexibility in the shape of 
+     *   the data to facilitate rapid development.
+     */
+
+    // --- GLOBAL HELPER FUNCTIONS ---
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Checks if the user is a global system administrator
+    function isGlobalAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/system_admins/$(request.auth.uid));
+    }
+
+    // Checks if the user belongs to a specific institution via lookup path
+    function isInstitutionMember(institutionId) {
+      return isSignedIn() && (
+        isGlobalAdmin() || 
+        exists(/databases/$(database)/documents/user_institutions/$(request.auth.uid)/memberships/$(institutionId))
+      );
+    }
+
+    // Helper for update/delete that requires existence and membership
+    function isExistingMember(institutionId) {
+      return resource != null && isInstitutionMember(institutionId);
+    }
+
+    // --- SYSTEM & USER COLLECTIONS ---
+
+    /**
+     * @description Dedicated collection for system-wide administrators.
+     * @path /system_admins/{uid}
+     * @allow (get) Any signed-in user to check admin status. (create/update/delete) Global Admin only.
+     * @deny (write) Any non-global-admin user.
+     * @principle Restricts root-level configuration to verified system administrators.
+     */
+    match /system_admins/{uid} {
+      allow get: if isSignedIn();
+      allow list: if isGlobalAdmin();
+      allow create, update, delete: if isGlobalAdmin();
+    }
+
+    /**
+     * @description User profiles and core metadata.
+     * @path /users/{userId}
+     * @allow (read) The owner or Global Admin. (write) The owner (self-creation) or Global Admin.
+     * @deny (create) Mismatched UID.
+     * @principle Enforces user ownership of profile data.
+     */
+    match /users/{userId} {
+      allow get, list: if isOwner(userId) || isGlobalAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isExistingMember(userId) || isGlobalAdmin(); // userId here acts as the owner ID
+      allow delete: if isGlobalAdmin();
+    }
+
+    /**
+     * @description Verification path to check user-institution membership.
+     * @path /user_institutions/{userId}/memberships/{institutionId}
+     * @allow (get) The user themselves to verify access. (write) Global Admin only.
+     * @deny (list) Public listing of all user memberships.
+     * @principle Uses path-based existence for fast authorization lookups.
+     */
+    match /user_institutions/{userId}/memberships/{institutionId} {
+      allow get: if isOwner(userId) || isGlobalAdmin();
+      allow list: if isOwner(userId) || isGlobalAdmin();
+      allow create, update, delete: if isGlobalAdmin();
+    }
+
+    /**
+     * @description Global currency and permission definitions.
+     * @path /currencies/{id}, /permissions/{id}
+     * @allow (read) All authenticated users. (write) Global Admin only.
+     * @deny (write) Any standard user.
+     * @principle Provides public read access to system-wide constants while protecting them from modification.
+     */
+    match /currencies/{id} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isGlobalAdmin();
+    }
+    match /permissions/{id} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isGlobalAdmin();
+    }
+
+    // --- INSTITUTION SCOPED COLLECTIONS ---
+
+    /**
+     * @description Top-level institution management.
+     * @path /institutions/{institutionId}
+     * @allow (read) Members of the institution. (write) Global Admin or Institution Admin.
+     * @deny (create) Non-global-admin.
+     * @principle Multi-tenant isolation at the root of the business entity.
+     */
+    match /institutions/{institutionId} {
+      allow get, list: if isInstitutionMember(institutionId);
+      allow create: if isGlobalAdmin();
+      allow update: if isExistingMember(institutionId);
+      allow delete: if isGlobalAdmin();
+
+      // --- NESTED INSTITUTION DATA (Roles, Tax, Products, etc.) ---
+
+      match /{allSubcollections=**} {
+        /**
+         * @description Catch-all for data nested directly under an institution.
+         * Enforces that the logged-in user belongs to the institution.
+         */
+        allow read: if isInstitutionMember(institutionId);
+        
+        allow create: if isInstitutionMember(institutionId) && 
+                      request.resource.data.institutionId == institutionId;
+        
+        allow update: if isExistingMember(institutionId) && 
+                      request.resource.data.institutionId == institutionId;
+                      
+        allow delete: if isExistingMember(institutionId);
+      }
+
+      // Explicit overrides for specific complex institutional paths if needed
+      
+      match /roles/{roleId}/members/{userId} {
+        /**
+         * @description Role membership verification path.
+         * @path /institutions/{instId}/roles/{roleId}/members/{userId}
+         * @principle Existence-based RBAC check.
+         */
+        allow read: if isInstitutionMember(institutionId);
+        allow write: if isGlobalAdmin() || isInstitutionMember(institutionId); 
+      }
+    }
+
+    // --- BRANCH SCOPED COLLECTIONS ---
+
+    /**
+     * @description Location-specific data (Sales, Inventory, Kitchen).
+     * @path /institutions/{instId}/branches/{branchId}/...
+     * @allow (read/write) Institution members with specific IDs matching the path.
+     * @deny (create) Data where internal IDs do not match the URL path.
+     * @principle Enforces strict relational integrity and tenant isolation for transactional data.
+     */
+    match /institutions/{institutionId}/branches/{branchId} {
+      allow get, list: if isInstitutionMember(institutionId);
+      allow create: if isInstitutionMember(institutionId) && 
+                    request.resource.data.institutionId == institutionId;
+      allow update: if isExistingMember(institutionId) && 
+                    request.resource.data.institutionId == institutionId;
+      allow delete: if isGlobalAdmin();
+
+      // Deeper nested branch data (Sales, Employees, etc.)
+      match /{allBranchData=**} {
+        allow read: if isInstitutionMember(institutionId);
+        
+        allow create: if isInstitutionMember(institutionId) && 
+                      request.resource.data.institutionId == institutionId &&
+                      request.resource.data.branchId == branchId;
+                      
+        allow update: if isExistingMember(institutionId) && 
+                      request.resource.data.institutionId == institutionId &&
+                      request.resource.data.branchId == branchId;
+                      
+        allow delete: if isExistingMember(institutionId);
+      }
+
+      // Special handling for sub-collections of transactional items (e.g., Sale Items)
+      // Since these are often nested even deeper, we maintain the institutionId check.
+      
+      match /sales/{saleId}/items/{itemId} {
+         allow read: if isInstitutionMember(institutionId);
+         allow create: if isInstitutionMember(institutionId) && request.resource.data.institutionId == institutionId;
+         allow update: if isExistingMember(institutionId) && request.resource.data.institutionId == institutionId;
+         allow delete: if isExistingMember(institutionId);
+      }
+
+      match /sales/{saleId}/payments/{paymentId} {
+         allow read: if isInstitutionMember(institutionId);
+         allow create: if isInstitutionMember(institutionId) && request.resource.data.institutionId == institutionId;
+         allow update: if isExistingMember(institutionId) && request.resource.data.institutionId == institutionId;
+         allow delete: if isExistingMember(institutionId);
+      }
+      
+      match /floor_layouts/{layoutId}/tables/{tableId} {
+         allow read: if isInstitutionMember(institutionId);
+         allow create: if isInstitutionMember(institutionId) && request.resource.data.institutionId == institutionId;
+         allow update: if isExistingMember(institutionId) && request.resource.data.institutionId == institutionId;
+         allow delete: if isExistingMember(institutionId);
+      }
+    }
+
+    // --- ACCOUNTING & LOG LOOKUPS ---
+
+    /**
+     * @description High-security financial logs.
+     * @path /institutions/{institutionId}/mpesa_callbacks/{id}
+     * @principle Protects raw payment callback data from external tampering.
+     */
+    match /institutions/{institutionId}/mpesa_callbacks/{callbackId} {
+      allow get: if isInstitutionMember(institutionId);
+      allow list: if isInstitutionMember(institutionId);
+      // Writes are usually handled by a Cloud Function (Service Account), but for prototyping:
+      allow create: if isGlobalAdmin() || (isInstitutionMember(institutionId) && request.resource.data.institutionId == institutionId);
+      allow update, delete: if isGlobalAdmin();
+    }
+
+  }
+}

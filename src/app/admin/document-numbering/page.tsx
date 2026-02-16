@@ -18,20 +18,20 @@ import { toast } from "@/hooks/use-toast"
  * This can be expanded as new modules are added.
  */
 const SEQUENCE_DEFINITIONS = [
-  { id: "sales_invoice", title: "Sales Invoice", prefix: "INV-", next: 1001, padding: 4 },
-  { id: "purchase_order", title: "Purchase Order", prefix: "PO-", next: 500, padding: 4 },
-  { id: "grn", title: "Goods Received Note", prefix: "GRN-", next: 100, padding: 4 },
-  { id: "stock_transfer", title: "Stock Transfer", prefix: "TR-", next: 100, padding: 4 },
-  { id: "stock_adjustment", title: "Stock Adjustment", prefix: "ADJ-", next: 100, padding: 4 },
-  { id: "journal_entry", title: "Journal Entry", prefix: "JE-", next: 1000, padding: 5 },
-  { id: "payment_receipt", title: "Payment Receipt", prefix: "RCP-", next: 2500, padding: 5 },
-  { id: "payroll_run", title: "Payroll Run", prefix: "PAY-", next: 1, padding: 3 },
-  { id: "payslip", title: "Employee Payslip", prefix: "PS-", next: 1, padding: 6 },
-  { id: "prescription", title: "Medical Prescription", prefix: "RX-", next: 1000, padding: 6 },
-  { id: "delivery_order", title: "Delivery Order", prefix: "DEL-", next: 100, padding: 4 },
-  { id: "customer_id", title: "Customer Account", prefix: "CUST-", next: 1000, padding: 4 },
-  { id: "employee_id", title: "Employee Number", prefix: "EMP-", next: 100, padding: 3 },
-  { id: "approval_req", title: "Approval Request", prefix: "APR-", next: 1, padding: 4 },
+  { id: "sales_invoice", title: "Sales Invoice", prefix: "INV-", nextNumber: 1001, padding: 4 },
+  { id: "purchase_order", title: "Purchase Order", prefix: "PO-", nextNumber: 500, padding: 4 },
+  { id: "grn", title: "Goods Received Note", prefix: "GRN-", nextNumber: 100, padding: 4 },
+  { id: "stock_transfer", title: "Stock Transfer", prefix: "TR-", nextNumber: 100, padding: 4 },
+  { id: "stock_adjustment", title: "Stock Adjustment", prefix: "ADJ-", nextNumber: 100, padding: 4 },
+  { id: "journal_entry", title: "Journal Entry", prefix: "JE-", nextNumber: 1000, padding: 5 },
+  { id: "payment_receipt", title: "Payment Receipt", prefix: "RCP-", nextNumber: 2500, padding: 5 },
+  { id: "payroll_run", title: "Payroll Run", prefix: "PAY-", nextNumber: 1, padding: 3 },
+  { id: "payslip", title: "Employee Payslip", prefix: "PS-", nextNumber: 1, padding: 6 },
+  { id: "prescription", title: "Medical Prescription", prefix: "RX-", nextNumber: 1000, padding: 6 },
+  { id: "delivery_order", title: "Delivery Order", prefix: "DEL-", nextNumber: 100, padding: 4 },
+  { id: "customer_id", title: "Customer Account", prefix: "CUST-", nextNumber: 1000, padding: 4 },
+  { id: "employee_id", title: "Employee Number", prefix: "EMP-", nextNumber: 100, padding: 3 },
+  { id: "approval_req", title: "Approval Request", prefix: "APR-", nextNumber: 1, padding: 4 },
 ];
 
 export default function DocumentNumbering() {
@@ -49,8 +49,11 @@ export default function DocumentNumbering() {
   
   const { data: sequences, isLoading } = useCollection(sequencesQuery)
 
-  const formatPreview = (prefix: string, next: number, padding: number) => {
-    return `${prefix}${next.toString().padStart(padding, '0')}`
+  const formatPreview = (prefix: string | undefined, next: number | undefined, padding: number | undefined) => {
+    const p = prefix || "";
+    const n = next !== undefined ? next : 0;
+    const pad = padding || 1;
+    return `${p}${n.toString().padStart(pad, '0')}`
   }
 
   const handleInitialize = async () => {
@@ -122,16 +125,14 @@ export default function DocumentNumbering() {
                 ))}
               </SelectContent>
             </Select>
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="gap-2 h-9 text-xs border-primary/20 bg-primary/5 hover:bg-primary/10"
+            <button 
+              className="inline-flex items-center justify-center gap-2 rounded-md text-xs font-medium h-9 px-3 border border-primary/20 bg-primary/5 hover:bg-primary/10 disabled:opacity-50"
               disabled={!selectedInstitutionId || initializing}
               onClick={handleInitialize}
             >
               {initializing ? <RefreshCw className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5 text-primary" />}
               Sync Definitions
-            </Button>
+            </button>
           </div>
         </div>
 

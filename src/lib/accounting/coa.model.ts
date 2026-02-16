@@ -1,4 +1,3 @@
-
 /**
  * @fileOverview Standard account types and subtypes for the iClick ERP.
  */
@@ -23,7 +22,7 @@ export const ACCOUNT_TYPES: AccountType[] = ['Asset', 'Liability', 'Equity', 'In
 export const ACCOUNT_SUBTYPES: Record<AccountType, string[]> = {
   Asset: ['Cash & Bank', 'M-Pesa Clearing', 'Petty Cash', 'Accounts Receivable', 'Inventory', 'Fixed Assets', 'Current Assets'],
   Liability: ['Accounts Payable', 'VAT Payable', 'Loans', 'Accrued Liabilities'],
-  Equity: ['Owner Capital', 'Retained Earnings'],
+  Equity: ['Owner Capital', 'Retained Earnings', 'Opening Balance Equity'],
   Income: ['Sales Revenue', 'Service Income', 'Other Income'],
   Expense: ['COGS', 'Salaries', 'Rent', 'Utilities', 'Marketing', 'Taxes'],
 };

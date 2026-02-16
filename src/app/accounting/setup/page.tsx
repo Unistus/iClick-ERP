@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -60,7 +59,7 @@ export default function AccountingSetupPage() {
     }
   };
 
-  const AccountSelect = ({ name, label, description }: { name: string, label: string, description: string }) => (
+  const AccountSelect = ({ name, label, description, typeFilter }: { name: string, label: string, description: string, typeFilter?: string[] }) => (
     <div className="space-y-2">
       <Label className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
         {label} <Info className="size-3 opacity-30" />
@@ -71,7 +70,7 @@ export default function AccountingSetupPage() {
           <SelectValue placeholder="Select Ledger Account" />
         </SelectTrigger>
         <SelectContent>
-          {accounts?.map(acc => (
+          {accounts?.filter(acc => !typeFilter || typeFilter.includes(acc.type) || typeFilter.includes(acc.subtype)).map(acc => (
             <SelectItem key={acc.id} value={acc.id} className="text-xs">
               [{acc.code}] {acc.name}
             </SelectItem>
@@ -133,6 +132,12 @@ export default function AccountingSetupPage() {
                     name="inventoryAssetAccountId" 
                     label="Inventory Asset" 
                     description="Primary asset account tracking stock value."
+                  />
+                  <AccountSelect 
+                    name="openingBalanceEquityAccountId" 
+                    label="Opening Balance Equity" 
+                    description="Equity account used to offset initial account balances."
+                    typeFilter={['Equity', 'Opening Balance Equity']}
                   />
                 </div>
 

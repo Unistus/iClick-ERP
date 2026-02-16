@@ -2,28 +2,25 @@
 {
   "entities": {
     "InstitutionSettings": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "InstitutionSettings",
       "type": "object",
       "description": "Comprehensive configuration object for an institution, managing operational, financial, and branding parameters.",
       "properties": {
-        "id": { "type": "string", "description": "Matches the Institution ID." },
+        "id": { "type": "string" },
         "general": {
           "type": "object",
           "properties": {
             "timezone": { "type": "string" },
             "fiscalYearStart": { "type": "string" },
-            "language": { "type": "string", "default": "en" }
+            "language": { "type": "string" }
           }
         },
         "pos": {
           "type": "object",
           "properties": {
-            "defaultTaxId": { "type": "string" },
-            "receiptFooter": { "type": "string" },
-            "allowCustomDiscounts": { "type": "boolean" },
+            "requireCustomerForSale": { "type": "boolean" },
             "printReceiptOnComplete": { "type": "boolean" },
-            "requireCustomerForSale": { "type": "boolean" }
+            "allowCustomDiscounts": { "type": "boolean" }
           }
         },
         "gateways": {
@@ -31,42 +28,9 @@
           "properties": {
             "mpesaConsumerKey": { "type": "string" },
             "mpesaConsumerSecret": { "type": "string" },
-            "mpesaShortcode": { "type": "string" },
-            "stripePublicKey": { "type": "string" }
+            "mpesaShortcode": { "type": "string" }
           }
-        },
-        "comms": {
-          "type": "object",
-          "properties": {
-            "smsProvider": { "type": "string", "enum": ["AfricasTalking", "Twilio"] },
-            "smsApiKey": { "type": "string" },
-            "emailProvider": { "type": "string", "enum": ["SMTP", "SendGrid", "Resend"] },
-            "emailFromAddress": { "type": "string" },
-            "smtpHost": { "type": "string" },
-            "smtpPort": { "type": "number" },
-            "smtpUser": { "type": "string" },
-            "smtpPass": { "type": "string" },
-            "smtpSecure": { "type": "boolean" }
-          }
-        },
-        "branding": {
-          "type": "object",
-          "properties": {
-            "primaryColor": { "type": "string" },
-            "accentColor": { "type": "string" },
-            "customFont": { "type": "string" },
-            "compactMode": { "type": "boolean" }
-          }
-        },
-        "maintenance": {
-          "type": "object",
-          "properties": {
-            "autoBackup": { "type": "boolean" },
-            "backupFrequency": { "type": "string", "enum": ["Daily", "Weekly"] },
-            "retentionPeriodDays": { "type": "number" }
-          }
-        },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        }
       }
     },
     "ChartOfAccount": {
@@ -74,30 +38,24 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "institutionId": { "type": "string" },
         "code": { "type": "string" },
         "name": { "type": "string" },
         "type": { "type": "string", "enum": ["Asset", "Liability", "Equity", "Income", "Expense"] },
         "subtype": { "type": "string" },
-        "currencyId": { "type": "string" },
         "balance": { "type": "number" },
         "isActive": { "type": "boolean" },
-        "isTrackedForBudget": { "type": "boolean", "description": "Whether this expense account is monitored in the budget module." },
-        "monthlyLimit": { "type": "number", "description": "The spending limit for this account per budget period." },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "institutionId", "code", "name", "type"]
+        "isTrackedForBudget": { "type": "boolean" },
+        "monthlyLimit": { "type": "number" }
+      }
     },
     "JournalEntry": {
       "title": "JournalEntry",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "institutionId": { "type": "string" },
         "date": { "type": "string", "format": "date-time" },
         "description": { "type": "string" },
         "reference": { "type": "string" },
-        "status": { "type": "string", "enum": ["Draft", "Posted"] },
         "items": {
           "type": "array",
           "items": {
@@ -108,157 +66,94 @@
               "type": { "type": "string", "enum": ["Debit", "Credit"] }
             }
           }
-        },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        }
       }
     },
     "ExpenseRequisition": {
       "title": "ExpenseRequisition",
       "type": "object",
-      "description": "Internal employee expense request or reimbursement workflow.",
       "properties": {
         "id": { "type": "string" },
-        "institutionId": { "type": "string" },
         "requestedBy": { "type": "string" },
-        "employeeName": { "type": "string" },
         "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Paid", "Rejected"] },
         "expenseAccountId": { "type": "string" },
-        "description": { "type": "string" },
-        "status": { "type": "string", "enum": ["Draft", "Pending", "Approved", "Rejected", "Paid"] },
-        "approvalStage": { "type": "number" },
-        "paymentMethod": { "type": "string", "enum": ["Cash", "Bank", "Payroll Deduction"] },
-        "isPayrollRecoverable": { "type": "boolean" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["id", "institutionId", "requestedBy", "amount", "status"]
-    },
-    "AccountingSetup": {
-      "title": "AccountingSetup",
-      "type": "object",
-      "properties": {
-        "salesRevenueAccountId": { "type": "string" },
-        "accountsReceivableAccountId": { "type": "string" },
-        "accountsPayableAccountId": { "type": "string" },
-        "inventoryAssetAccountId": { "type": "string" },
-        "cogsAccountId": { "type": "string" },
-        "vatPayableAccountId": { "type": "string" },
-        "cashOnHandAccountId": { "type": "string" },
-        "mpesaClearingAccountId": { "type": "string" },
-        "openingBalanceEquityAccountId": { "type": "string" },
-        "accumulatedDepreciationAccountId": { "type": "string" },
-        "depreciationExpenseAccountId": { "type": "string" },
-        "salariesPayableAccountId": { "type": "string" },
-        "expenseClearingAccountId": { "type": "string" }
+        "description": { "type": "string" }
       }
     },
     "TaxReturn": {
       "title": "TaxReturn",
       "type": "object",
-      "description": "A generated tax filing for a specific period.",
       "properties": {
         "id": { "type": "string" },
-        "institutionId": { "type": "string" },
         "periodId": { "type": "string" },
         "periodName": { "type": "string" },
-        "taxType": { "type": "string", "enum": ["VAT", "Withholding", "Corporate Income Tax"] },
         "grossSales": { "type": "number" },
         "outputVat": { "type": "number" },
         "inputVat": { "type": "number" },
         "netTaxPayable": { "type": "number" },
-        "status": { "type": "string", "enum": ["Draft", "Filed", "Paid"] },
-        "filedAt": { "type": "string", "format": "date-time" },
-        "filedBy": { "type": "string" },
-        "updatedAt": { "type": "string", "format": "date-time" }
+        "status": { "type": "string" }
+      }
+    },
+    "FiscalPeriod": {
+      "title": "FiscalPeriod",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["Open", "Closed"] }
+      }
+    },
+    "FixedAsset": {
+      "title": "FixedAsset",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "purchasePrice": { "type": "number" },
+        "currentValue": { "type": "number" },
+        "status": { "type": "string" }
       }
     }
   },
   "auth": {
-    "providers": [
-      "password",
-      "anonymous"
-    ]
+    "providers": ["password"]
   },
   "firestore": {
     "structure": [
       {
-        "path": "/institutions/{institutionId}/expenses/{expenseId}",
+        "path": "/institutions/{institutionId}/coa/{accountId}",
         "definition": {
-          "entityName": "ExpenseRequisition",
-          "schema": {
-            "$ref": "#/backend/entities/ExpenseRequisition"
-          },
-          "description": "Internal expense and reimbursement requests."
+          "entityName": "ChartOfAccount",
+          "schema": { "$ref": "#/backend/entities/ChartOfAccount" },
+          "description": "Chart of Accounts ledger nodes."
+        }
+      },
+      {
+        "path": "/institutions/{institutionId}/fiscal_periods/{periodId}",
+        "definition": {
+          "entityName": "FiscalPeriod",
+          "schema": { "$ref": "#/backend/entities/FiscalPeriod" },
+          "description": "Accounting cycles."
         }
       },
       {
         "path": "/institutions/{institutionId}/tax_returns/{returnId}",
         "definition": {
           "entityName": "TaxReturn",
-          "schema": {
-            "$ref": "#/backend/entities/TaxReturn"
-          },
-          "description": "Historical tax filings and generated reports."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/payables/{payableId}",
-        "definition": {
-          "entityName": "VendorInvoice",
-          "schema": {
-            "$ref": "#/backend/entities/VendorInvoice"
-          },
-          "description": "Accounts payable vendor bills."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/assets/{assetId}",
-        "definition": {
-          "entityName": "FixedAsset",
-          "schema": {
-            "$ref": "#/backend/entities/FixedAsset"
-          },
-          "description": "Fixed asset registry nodes."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/settings/global",
-        "definition": {
-          "entityName": "InstitutionSettings",
-          "schema": {
-            "$ref": "#/backend/entities/InstitutionSettings"
-          },
-          "description": "Unified settings document for the institution."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/settings/accounting",
-        "definition": {
-          "entityName": "AccountingSetup",
-          "schema": {
-            "$ref": "#/backend/entities/AccountingSetup"
-          },
-          "description": "Accounting account mapping configuration."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/coa/{accountId}",
-        "definition": {
-          "entityName": "ChartOfAccount",
-          "schema": {
-            "$ref": "#/backend/entities/ChartOfAccount"
-          },
-          "description": "The Chart of Accounts ledger nodes."
+          "schema": { "$ref": "#/backend/entities/TaxReturn" },
+          "description": "Historical tax filings."
         }
       },
       {
         "path": "/institutions/{institutionId}/journal_entries/{entryId}",
         "definition": {
           "entityName": "JournalEntry",
-          "schema": {
-            "$ref": "#/backend/entities/JournalEntry"
-          },
-          "description": "The primary double-entry financial log."
+          "schema": { "$ref": "#/backend/entities/JournalEntry" },
+          "description": "Double-entry logs."
         }
       }
     ]

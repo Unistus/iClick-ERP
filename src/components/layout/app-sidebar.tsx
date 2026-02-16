@@ -5,7 +5,6 @@ import * as React from "react"
 import {
   LogOut,
   Command,
-  ChevronRight
 } from "lucide-react"
 
 import {
@@ -16,16 +15,13 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarGroupContent,
   useSidebar,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase"
 import { cn } from "@/lib/utils"
-import { navConfig, NavItem } from "@/lib/navigation"
+import { navConfig } from "@/lib/navigation"
 import { doc } from "firebase/firestore"
 import { useIsMobile } from "@/hooks/use-mobile"
 
@@ -35,7 +31,7 @@ export function AppSidebar() {
   const auth = useAuth()
   const db = useFirestore()
   const { user } = useUser()
-  const { setOpen, state, openMobile } = useSidebar()
+  const { setOpen, state } = useSidebar()
   const isMobile = useIsMobile()
   
   // For prototype logic, we'll try to find institution ID from pathname or default
@@ -61,8 +57,11 @@ export function AppSidebar() {
 
   // Permission check helper
   const hasAccess = (moduleId: string, submenuId: string | null = null) => {
-    // If no role is assigned yet (development), allow access
-    if (!roleData && userData) return true;
+    // DEV OVERRIDE: enquiry@unistus.co.ke is always a DevOps superuser
+    if (user?.email === 'enquiry@unistus.co.ke') return true;
+    
+    // If no role is assigned yet (initial development), allow access to prevent locking out
+    if (!roleData && userData && (!userData.rolesByInstitution || Object.keys(userData.rolesByInstitution).length === 0)) return true;
     
     const permKey = `${moduleId}:${submenuId || 'root'}:read`;
     return permissions.includes(permKey);
@@ -100,7 +99,7 @@ export function AppSidebar() {
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar 
-        collapsible="icon" // Persistent icon mode for all devices
+        collapsible="icon" 
         className="z-30 border-r border-border/50 shrink-0"
         onMouseEnter={() => !isMobile && setOpen(true)}
         onMouseLeave={() => !isMobile && setOpen(false)}
@@ -165,7 +164,6 @@ export function AppSidebar() {
         </SidebarFooter>
       </Sidebar>
 
-      {/* Secondary Sidebar - Persistent if activeModule has submenus */}
       {hasSubmenus && (
         <div 
           className={cn(

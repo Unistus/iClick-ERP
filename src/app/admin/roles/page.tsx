@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -12,19 +12,21 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
-import { collection, doc, serverTimestamp, query } from "firebase/firestore"
-import { addDocumentNonBlocking, updateDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase"
-import { Shield, Plus, Edit2, Lock, UserCog, Search, ChevronRight, ChevronDown, Terminal } from "lucide-react"
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase"
+import { collection, doc, serverTimestamp, query, addDoc } from "firebase/firestore"
+import { updateDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase"
+import { Shield, Plus, Edit2, Lock, UserCog, Search, ChevronRight, ChevronDown, Terminal, Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { navConfig } from "@/lib/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { toast } from '@/hooks/use-toast';
 
 const PERMISSION_ACTIONS = ['create', 'read', 'update', 'delete'] as const;
 
 export default function RolesManagement() {
   const db = useFirestore()
+  const { user } = useUser()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [editingRole, setEditingRole] = useState<any>(null)
   const [selectedInstitutionId, setSelectedInstitutionId] = useState<string>("")
@@ -41,7 +43,6 @@ export default function RolesManagement() {
   
   const { data: roles, isLoading: isRolesLoading } = useCollection(rolesQuery)
 
-  // Fetch all users to display in the Staff Assignment tab
   const usersQuery = useMemoFirebase(() => {
     return query(collection(db, 'users'))
   }, [db])
@@ -50,7 +51,6 @@ export default function RolesManagement() {
   const handleEdit = (role: any) => {
     setEditingRole(role)
     setSelectedPermissions(role.permissionIds || [])
-    // Auto-expand modules that have active permissions
     const activeModules = navConfig
       .filter(m => role.permissionIds?.some((p: string) => p.startsWith(`${m.id}:`)))
       .map(m => m.id)
@@ -70,34 +70,58 @@ export default function RolesManagement() {
     const isCurrentlyChecked = selectedPermissions.includes(rootReadPerm);
 
     if (isCurrentlyChecked) {
-      // Remove all permissions for this module
       setSelectedPermissions(prev => prev.filter(p => !p.startsWith(`${moduleId}:`)));
       setExpandedModules(prev => prev.filter(id => id !== moduleId));
     } else {
-      // Grant root read and expand
       setSelectedPermissions(prev => [...prev, rootReadPerm]);
       setExpandedModules(prev => [...prev, moduleId]);
     }
   }
 
-  const grantAllPermissions = () => {
+  const getAllPermissions = () => {
     const allPerms: string[] = [];
     navConfig.forEach(module => {
-      // Grant root read
       allPerms.push(`${module.id}:root:read`);
-      // Grant root CRUD
       PERMISSION_ACTIONS.forEach(action => {
         allPerms.push(`${module.id}:root:${action}`);
       });
-      // Grant submenus CRUD
       module.submenus?.forEach(sub => {
         PERMISSION_ACTIONS.forEach(action => {
           allPerms.push(`${module.id}:${sub.id}:${action}`);
         });
       });
     });
-    setSelectedPermissions(allPerms);
+    return allPerms;
+  }
+
+  const grantAllPermissions = () => {
+    setSelectedPermissions(getAllPermissions());
     setExpandedModules(navConfig.map(m => m.id));
+  }
+
+  const bootstrapDevOps = async () => {
+    if (!selectedInstitutionId || !user) {
+      toast({ variant: "destructive", title: "Select an institution first" });
+      return;
+    }
+
+    const data = {
+      name: "DevOps",
+      description: "Root superuser with access to all modules and configurations.",
+      institutionId: selectedInstitutionId,
+      permissionIds: getAllPermissions(),
+      updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+    };
+
+    try {
+      const rolesColRef = collection(db, 'institutions', selectedInstitutionId, 'roles');
+      const docRef = await addDoc(rolesColRef, data);
+      assignRoleToUser(user.uid, docRef.id);
+      toast({ title: "DevOps Role Created & Assigned", description: `User ${user.email} is now a superuser.` });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Bootstrap Failed", description: "Check your permissions." });
+    }
   }
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -118,7 +142,7 @@ export default function RolesManagement() {
     if (editingRole) {
       updateDocumentNonBlocking(doc(rolesColRef, editingRole.id), data)
     } else {
-      addDocumentNonBlocking(rolesColRef, { ...data, createdAt: serverTimestamp() })
+      setDocumentNonBlocking(doc(rolesColRef), { ...data, createdAt: serverTimestamp() }, { merge: true })
     }
     setIsCreateOpen(false)
     setEditingRole(null)
@@ -129,14 +153,12 @@ export default function RolesManagement() {
   const assignRoleToUser = (userId: string, roleId: string) => {
     if (!selectedInstitutionId) return;
     
-    // 1. Update the institution's role membership (for Security Rules)
     setDocumentNonBlocking(
       doc(db, 'institutions', selectedInstitutionId, 'roles', roleId, 'members', userId),
       { active: true, assignedAt: serverTimestamp() },
       { merge: true }
     );
 
-    // 2. Update the user's profile with the role mapping (for UI filtering)
     setDocumentNonBlocking(
       doc(db, 'users', userId),
       { 
@@ -163,128 +185,141 @@ export default function RolesManagement() {
                 ))}
               </SelectContent>
             </Select>
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="gap-2 h-9 text-xs" disabled={!selectedInstitutionId} onClick={() => {
-                  setEditingRole(null);
-                  setSelectedPermissions([]);
-                  setExpandedModules([]);
-                }}>
-                  <Plus className="size-4" /> New Role
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-5xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden">
-                <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
-                  <DialogHeader className="p-4 md:p-6 pb-2 shrink-0 border-b">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <DialogTitle className="text-lg md:text-xl">{editingRole ? 'Edit' : 'Create'} Role</DialogTitle>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm" 
-                        className="text-[10px] font-bold h-8 gap-2 bg-primary/5 border-primary/20 hover:bg-primary/10"
-                        onClick={grantAllPermissions}
-                      >
-                        <Terminal className="size-3.5" /> Grant All (DevOps Mode)
-                      </Button>
-                    </div>
-                  </DialogHeader>
-                  
-                  <div className="p-4 md:p-6 pt-4 shrink-0 bg-secondary/5">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="grid gap-1.5">
-                        <Label htmlFor="name" className="text-[10px] uppercase font-bold text-muted-foreground">Role Name</Label>
-                        <Input id="name" name="name" defaultValue={editingRole?.name} placeholder="e.g. DevOps / Admin / Cashier" className="h-9 text-xs" required />
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-2 h-9 text-xs border-primary/20 bg-primary/5 hover:bg-primary/10" 
+                disabled={!selectedInstitutionId}
+                onClick={bootstrapDevOps}
+              >
+                <Sparkles className="size-4 text-primary" /> Bootstrap DevOps
+              </Button>
+              <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="gap-2 h-9 text-xs" disabled={!selectedInstitutionId} onClick={() => {
+                    setEditingRole(null);
+                    setSelectedPermissions([]);
+                    setExpandedModules([]);
+                  }}>
+                    <Plus className="size-4" /> New Role
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-5xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden shadow-2xl">
+                  <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
+                    <DialogHeader className="p-4 md:p-6 pb-2 shrink-0 border-b">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <DialogTitle className="text-lg md:text-xl font-headline">{editingRole ? 'Edit' : 'Create'} Role</DialogTitle>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm" 
+                          className="text-[10px] font-bold h-8 gap-2 bg-primary/5 border-primary/20 hover:bg-primary/10"
+                          onClick={grantAllPermissions}
+                        >
+                          <Terminal className="size-3.5" /> Grant All (DevOps Mode)
+                        </Button>
                       </div>
-                      <div className="grid gap-1.5">
-                        <Label htmlFor="description" className="text-[10px] uppercase font-bold text-muted-foreground">Description</Label>
-                        <Input id="description" name="description" defaultValue={editingRole?.description} placeholder="Define the scope of this role" className="h-9 text-xs" required />
+                    </DialogHeader>
+                    
+                    <div className="p-4 md:p-6 pt-4 shrink-0 bg-secondary/5 border-b">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid gap-1.5">
+                          <Label htmlFor="name" className="text-[10px] uppercase font-bold text-muted-foreground">Role Name</Label>
+                          <Input id="name" name="name" defaultValue={editingRole?.name} placeholder="e.g. DevOps / Admin / Cashier" className="h-9 text-xs bg-background" required />
+                        </div>
+                        <div className="grid gap-1.5">
+                          <Label htmlFor="description" className="text-[10px] uppercase font-bold text-muted-foreground">Description</Label>
+                          <Input id="description" name="description" defaultValue={editingRole?.description} placeholder="Define the scope of this role" className="h-9 text-xs bg-background" required />
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex-1 overflow-hidden relative">
-                    <ScrollArea className="h-full px-4 md:px-6 py-4">
-                      <div className="border rounded-lg ring-1 ring-border bg-card overflow-hidden">
-                        <Table className="min-w-[700px] border-collapse">
-                          <TableHeader className="bg-secondary/30 sticky top-0 z-20 backdrop-blur-sm shadow-sm">
-                            <TableRow className="hover:bg-transparent">
-                              <TableHead className="h-10 text-[10px] font-bold uppercase w-1/3">Module / Section</TableHead>
-                              <TableHead className="h-10 text-[10px] font-bold uppercase text-center">Module Access</TableHead>
-                              {PERMISSION_ACTIONS.map(action => (
-                                <TableHead key={action} className="h-10 text-[10px] font-bold uppercase text-center">{action}</TableHead>
-                              ))}
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {navConfig.map(module => {
-                              const isExpanded = expandedModules.includes(module.id);
-                              const hasRootRead = selectedPermissions.includes(`${module.id}:root:read`);
+                    <div className="flex-1 overflow-hidden relative">
+                      <ScrollArea className="h-full">
+                        <div className="px-4 md:px-6 py-4">
+                          <div className="border rounded-lg ring-1 ring-border bg-card overflow-hidden">
+                            <Table className="min-w-[700px] border-collapse">
+                              <TableHeader className="bg-secondary/30 sticky top-0 z-20 backdrop-blur-md shadow-sm">
+                                <TableRow className="hover:bg-transparent">
+                                  <TableHead className="h-10 text-[10px] font-bold uppercase w-1/3">Module / Section</TableHead>
+                                  <TableHead className="h-10 text-[10px] font-bold uppercase text-center">Module Access</TableHead>
+                                  {PERMISSION_ACTIONS.map(action => (
+                                    <TableHead key={action} className="h-10 text-[10px] font-bold uppercase text-center">{action}</TableHead>
+                                  ))}
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {navConfig.map(module => {
+                                  const isExpanded = expandedModules.includes(module.id);
+                                  const hasRootRead = selectedPermissions.includes(`${module.id}:root:read`);
 
-                              return (
-                                <React.Fragment key={module.id}>
-                                  <TableRow className="bg-secondary/10 border-b-primary/10">
-                                    <TableCell className="font-bold text-xs flex items-center gap-2 py-3">
-                                      <module.icon className="size-3.5 text-primary" />
-                                      {module.title}
-                                      {module.submenus && module.submenus.length > 0 && (
-                                        <div className="ml-auto opacity-50">
-                                          {isExpanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-                                        </div>
-                                      )}
-                                    </TableCell>
-                                    <TableCell className="text-center">
-                                      <Checkbox 
-                                        checked={hasRootRead}
-                                        onCheckedChange={() => toggleModuleAccess(module.id)}
-                                      />
-                                    </TableCell>
-                                    {PERMISSION_ACTIONS.map(action => (
-                                      <TableCell key={action} className="text-center py-2">
-                                        <Checkbox 
-                                          disabled={!hasRootRead && action !== 'read'}
-                                          checked={selectedPermissions.includes(`${module.id}:root:${action}`)}
-                                          onCheckedChange={() => togglePermission(module.id, null, action)}
-                                        />
-                                      </TableCell>
-                                    ))}
-                                  </TableRow>
-                                  
-                                  {isExpanded && module.submenus?.map(sub => (
-                                    <TableRow key={`${module.id}-${sub.id}`} className="bg-background/50 hover:bg-secondary/5 border-l-2 border-l-primary/20">
-                                      <TableCell className="text-[11px] pl-10 text-muted-foreground py-2">
-                                        <div className="flex items-center gap-2">
-                                          <sub.icon className="size-3 opacity-50" />
-                                          {sub.title}
-                                        </div>
-                                      </TableCell>
-                                      <TableCell className="text-center" />
-                                      {PERMISSION_ACTIONS.map(action => (
-                                        <TableCell key={action} className="text-center py-1.5">
+                                  return (
+                                    <React.Fragment key={module.id}>
+                                      <TableRow className="bg-secondary/10 border-b-primary/10">
+                                        <TableCell className="font-bold text-xs flex items-center gap-2 py-3">
+                                          <module.icon className="size-3.5 text-primary" />
+                                          {module.title}
+                                          {module.submenus && module.submenus.length > 0 && (
+                                            <div className="ml-auto opacity-50">
+                                              {isExpanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                                            </div>
+                                          )}
+                                        </TableCell>
+                                        <TableCell className="text-center">
                                           <Checkbox 
-                                            checked={selectedPermissions.includes(`${module.id}:${sub.id}:${action}`)}
-                                            onCheckedChange={() => togglePermission(module.id, sub.id, action)}
+                                            checked={hasRootRead}
+                                            onCheckedChange={() => toggleModuleAccess(module.id)}
                                           />
                                         </TableCell>
+                                        {PERMISSION_ACTIONS.map(action => (
+                                          <TableCell key={action} className="text-center py-2">
+                                            <Checkbox 
+                                              disabled={!hasRootRead && action !== 'read'}
+                                              checked={selectedPermissions.includes(`${module.id}:root:${action}`)}
+                                              onCheckedChange={() => togglePermission(module.id, null, action)}
+                                            />
+                                          </TableCell>
+                                        ))}
+                                      </TableRow>
+                                      
+                                      {isExpanded && module.submenus?.map(sub => (
+                                        <TableRow key={`${module.id}-${sub.id}`} className="bg-background/50 hover:bg-secondary/5 border-l-2 border-l-primary/20">
+                                          <TableCell className="text-[11px] pl-10 text-muted-foreground py-2">
+                                            <div className="flex items-center gap-2">
+                                              <sub.icon className="size-3 opacity-50" />
+                                              {sub.title}
+                                            </div>
+                                          </TableCell>
+                                          <TableCell className="text-center" />
+                                          {PERMISSION_ACTIONS.map(action => (
+                                            <TableCell key={action} className="text-center py-1.5">
+                                              <Checkbox 
+                                                checked={selectedPermissions.includes(`${module.id}:${sub.id}:${action}`)}
+                                                onCheckedChange={() => togglePermission(module.id, sub.id, action)}
+                                              />
+                                            </TableCell>
+                                          ))}
+                                        </TableRow>
                                       ))}
-                                    </TableRow>
-                                  ))}
-                                </React.Fragment>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </ScrollArea>
-                  </div>
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
+                      </ScrollArea>
+                    </div>
 
-                  <DialogFooter className="p-4 md:p-6 border-t bg-secondary/5 shrink-0 flex flex-row justify-end gap-2">
-                    <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs h-9">Cancel</Button>
-                    <Button type="submit" className="text-xs h-9 font-bold bg-primary hover:bg-primary/90">Save Configuration</Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+                    <DialogFooter className="p-4 md:p-6 border-t bg-secondary/5 shrink-0 flex flex-row justify-end gap-2">
+                      <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs h-9">Cancel</Button>
+                      <Button type="submit" className="text-xs h-9 font-bold bg-primary hover:bg-primary/90 px-6">Save Changes</Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
         </div>
 

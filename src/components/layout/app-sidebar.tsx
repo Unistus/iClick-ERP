@@ -10,34 +10,30 @@ import {
   Users,
   HeartHandshake,
   Settings,
-  ShieldCheck,
-  ChevronRight,
-  Sparkles,
-  Building2,
-  Store,
-  Shield,
-  Briefcase,
-  MapPin,
-  Percent,
-  Coins,
-  FileClock,
   LogOut,
-  GitPullRequest,
-  CalendarDays,
-  Hash,
-  Activity,
-  Key,
-  BellRing,
   Command,
   Box,
   Truck,
   Layers,
   History,
-  UserCheck,
-  CreditCard,
-  FileText,
   PieChart,
-  UserPlus
+  FileText,
+  UserPlus,
+  CalendarDays,
+  Hash,
+  Activity,
+  Key,
+  BellRing,
+  Percent,
+  Coins,
+  FileClock,
+  Shield,
+  Briefcase,
+  MapPin,
+  Store,
+  GitPullRequest,
+  UserCheck,
+  CreditCard
 } from "lucide-react"
 
 import {
@@ -121,12 +117,6 @@ const navConfig: NavItem[] = [
     pattern: /^\/crm/ 
   },
   { 
-    title: "AI Analysis", 
-    icon: Sparkles, 
-    url: "/ai-insights", 
-    pattern: /^\/ai-insights/ 
-  },
-  { 
     title: "Administration", 
     icon: Settings, 
     url: "/admin/institutions", 
@@ -154,9 +144,8 @@ export function AppSidebar() {
   const router = useRouter()
   const auth = useAuth()
   const { user } = useUser()
-  const { setOpen } = useSidebar()
+  const { setOpen, state } = useSidebar()
   
-  // Find the active main module based on URL pattern
   const activeModule = navConfig.find(item => item.pattern.test(pathname))
   const hasSubmenus = activeModule && activeModule.submenus && activeModule.submenus.length > 0
 
@@ -165,8 +154,12 @@ export function AppSidebar() {
     router.push('/login')
   }
 
+  const handleItemClick = () => {
+    setOpen(false) // Collapse main menu on item click
+  }
+
   return (
-    <div className="flex h-full">
+    <div className="flex h-screen overflow-hidden">
       {/* PERSISTENT ICON SIDEBAR (Primary) */}
       <Sidebar 
         collapsible="icon" 
@@ -174,9 +167,9 @@ export function AppSidebar() {
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
       >
-        <SidebarHeader className="h-16 flex items-center justify-center p-0">
-          <div className="size-9 rounded-lg bg-primary flex items-center justify-center text-white">
-            <Command className="size-5" />
+        <SidebarHeader className="h-14 flex items-center justify-center p-0">
+          <div className="size-8 rounded-lg bg-primary flex items-center justify-center text-white">
+            <Command className="size-4" />
           </div>
         </SidebarHeader>
         <SidebarContent className="p-2 gap-4">
@@ -189,9 +182,10 @@ export function AppSidebar() {
                     asChild 
                     isActive={isActive} 
                     tooltip={item.title}
+                    onClick={handleItemClick}
                     className={cn(
                       "transition-all duration-200",
-                      isActive ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-110" : "hover:bg-secondary"
+                      isActive ? "bg-primary text-primary-foreground shadow-md" : "hover:bg-secondary"
                     )}
                   >
                     <Link href={item.url}>
@@ -204,7 +198,7 @@ export function AppSidebar() {
             })}
           </SidebarMenu>
         </SidebarContent>
-        <SidebarFooter className="p-2 border-t border-border/50 gap-4">
+        <SidebarFooter className="p-2 border-t border-border/50">
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton 
@@ -224,16 +218,16 @@ export function AppSidebar() {
       {hasSubmenus && (
         <Sidebar 
           collapsible="none" 
-          className="z-20 !w-64 border-r border-border/50 bg-sidebar/50 backdrop-blur-md animate-in slide-in-from-left duration-300 shrink-0"
+          className="z-20 !w-64 border-r border-border/50 bg-sidebar/30 backdrop-blur-md shrink-0 h-screen"
         >
-          <SidebarHeader className="h-16 flex items-center px-6 border-b border-border/50">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+          <SidebarHeader className="h-14 flex items-center px-6 border-b border-border/50">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-primary/80">
               {activeModule.title}
             </h2>
           </SidebarHeader>
-          <SidebarContent className="p-4">
+          <SidebarContent className="p-4 independent-scroll">
             <SidebarGroup>
-              <SidebarGroupLabel className="px-2 mb-2">Module Navigation</SidebarGroupLabel>
+              <SidebarGroupLabel className="px-2 mb-2 text-[10px] font-bold uppercase text-muted-foreground/50">Navigation</SidebarGroupLabel>
               <SidebarMenu className="gap-1">
                 {activeModule.submenus?.map((sub) => (
                   <SidebarMenuItem key={sub.title}>
@@ -241,13 +235,13 @@ export function AppSidebar() {
                       asChild 
                       isActive={pathname === sub.url}
                       className={cn(
-                        "h-10 px-3 rounded-lg transition-colors",
+                        "h-9 px-3 rounded-lg transition-colors",
                         pathname === sub.url ? "bg-primary/10 text-primary font-bold" : "hover:bg-secondary/50"
                       )}
                     >
                       <Link href={sub.url} className="flex items-center gap-3">
                         <sub.icon className={cn("size-4", pathname === sub.url ? "text-primary" : "text-muted-foreground")} />
-                        <span className="text-sm">{sub.title}</span>
+                        <span className="text-xs">{sub.title}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -255,19 +249,6 @@ export function AppSidebar() {
               </SidebarMenu>
             </SidebarGroup>
           </SidebarContent>
-          <SidebarFooter className="p-4 border-t border-border/50">
-            {user && (
-              <div className="flex items-center gap-3">
-                <div className="size-8 rounded-lg bg-accent flex items-center justify-center text-white font-bold text-xs">
-                  {user.email?.[0].toUpperCase()}
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-bold truncate">{user.email?.split('@')[0]}</span>
-                  <span className="text-[10px] text-muted-foreground">Operator</span>
-                </div>
-              </div>
-            )}
-          </SidebarFooter>
         </Sidebar>
       )}
     </div>

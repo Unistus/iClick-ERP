@@ -46,18 +46,11 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-body antialiased;
+    @apply bg-background text-foreground font-body antialiased overflow-hidden;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-headline;
   }
-}
-
-.pos-grid {
-  display: grid;
-  grid-template-columns: 1fr 350px;
-  gap: 1rem;
-  height: calc(100vh - 4rem);
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -71,4 +64,9 @@
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   @apply bg-primary/50;
+}
+
+.independent-scroll {
+  @apply overflow-y-auto custom-scrollbar;
+  height: calc(100vh - 3.5rem - 2rem); /* Header (14) + Footer (8) */
 }

@@ -69,6 +69,11 @@ service cloud.firestore {
         allow write: if isInstitutionMember(institutionId);
       }
 
+      match /invoices/{invoiceId} {
+        allow read: if isInstitutionMember(institutionId);
+        allow write: if isInstitutionMember(institutionId);
+      }
+
       match /audit_logs/{logId} {
         allow read: if isInstitutionMember(institutionId);
         allow create: if isInstitutionMember(institutionId);

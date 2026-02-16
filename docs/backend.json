@@ -110,6 +110,25 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       }
     },
+    "Invoice": {
+      "title": "Invoice",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "institutionId": { "type": "string" },
+        "invoiceNumber": { "type": "string" },
+        "customerId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "amount": { "type": "number" },
+        "taxAmount": { "type": "number" },
+        "balance": { "type": "number" },
+        "status": { "type": "string", "enum": ["Unpaid", "Partial", "Paid", "Overdue"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "institutionId", "invoiceNumber", "amount", "balance", "status"]
+    },
     "AccountingSetup": {
       "title": "AccountingSetup",
       "type": "object",
@@ -672,6 +691,16 @@
             "$ref": "#/backend/entities/JournalEntry"
           },
           "description": "The primary double-entry financial log."
+        }
+      },
+      {
+        "path": "/institutions/{institutionId}/invoices/{invoiceId}",
+        "definition": {
+          "entityName": "Invoice",
+          "schema": {
+            "$ref": "#/backend/entities/Invoice"
+          },
+          "description": "Accounts receivable invoices."
         }
       },
       {

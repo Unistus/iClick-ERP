@@ -25,8 +25,22 @@ import {
   History,
   PlusCircle,
   Store,
-  Coins
+  Coins,
+  MoreHorizontal,
+  FileText,
+  TrendingUp,
+  Settings2,
+  Trash2,
+  ArrowUpRight
 } from "lucide-react";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { postJournalEntry } from "@/lib/accounting/journal.service";
 import { registerFinancialAccount } from "@/lib/accounting/banking.service";
@@ -39,6 +53,8 @@ export default function BankingPage() {
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
+  const [isAdjustOpen, setIsAdjustOpen] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Data Fetching
@@ -60,6 +76,12 @@ export default function BankingPage() {
     return doc(db, 'institutions', selectedInstId, 'settings', 'global');
   }, [db, selectedInstId]);
   const { data: settings } = useDoc(settingsRef);
+
+  const setupRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return doc(db, 'institutions', selectedInstId, 'settings', 'accounting');
+  }, [db, selectedInstId]);
+  const { data: accountingSetup } = useDoc(setupRef);
 
   const currenciesRef = useMemoFirebase(() => collection(db, 'currencies'), [db]);
   const { data: currencies } = useCollection(currenciesRef);
@@ -111,6 +133,64 @@ export default function BankingPage() {
       setIsTransferOpen(false);
     } catch (err: any) {
       toast({ variant: "destructive", title: "Transfer Failed", description: err.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleAdjustBalance = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedInstId || !selectedAccount || isProcessing) return;
+    setIsProcessing(true);
+
+    const formData = new FormData(e.currentTarget);
+    const targetBalance = parseFloat(formData.get('targetBalance') as string);
+    const currentBalance = selectedAccount.balance || 0;
+    const difference = targetBalance - currentBalance;
+
+    if (difference === 0) {
+      toast({ title: "No change detected." });
+      setIsAdjustOpen(false);
+      setIsProcessing(false);
+      return;
+    }
+
+    if (!accountingSetup?.openingBalanceEquityAccountId) {
+      toast({ variant: "destructive", title: "Setup Required", description: "Opening Balance Equity account must be mapped in Accounting Setup." });
+      setIsProcessing(false);
+      return;
+    }
+
+    try {
+      // Post Correction Journal
+      // If diff > 0: DR Asset (Selected), CR Equity
+      // If diff < 0: DR Equity, CR Asset (Selected)
+      const isPositive = difference > 0;
+      const absAmount = Math.abs(difference);
+
+      await postJournalEntry(db, selectedInstId, {
+        date: new Date(),
+        description: `Balance Correction for ${selectedAccount.name}`,
+        reference: `CORR-${Date.now()}`,
+        items: [
+          { 
+            accountId: selectedAccount.id, 
+            amount: absAmount, 
+            type: isPositive ? 'Debit' : 'Credit' 
+          },
+          { 
+            accountId: accountingSetup.openingBalanceEquityAccountId, 
+            amount: absAmount, 
+            type: isPositive ? 'Credit' : 'Debit' 
+          },
+        ]
+      });
+
+      logSystemEvent(db, selectedInstId, user, 'BANKING', 'Adjust Balance', `Adjusted balance for '${selectedAccount.name}' to ${targetBalance}.`);
+      toast({ title: "Balance Corrected", description: "Ledger has been adjusted to match physical records." });
+      setIsAdjustOpen(false);
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Adjustment Failed", description: err.message });
     } finally {
       setIsProcessing(false);
     }
@@ -355,8 +435,8 @@ export default function BankingPage() {
                       <TableHead className="h-10 text-[10px] uppercase font-bold pl-6">Code</TableHead>
                       <TableHead className="h-10 text-[10px] uppercase font-bold">Account Name</TableHead>
                       <TableHead className="h-10 text-[10px] uppercase font-bold">Subtype</TableHead>
-                      <TableHead className="h-10 text-[10px] uppercase font-bold text-right">Last Movement</TableHead>
-                      <TableHead className="h-10 text-[10px] uppercase font-bold text-right pr-6">Balance</TableHead>
+                      <TableHead className="h-10 text-[10px] uppercase font-bold text-right">Balance</TableHead>
+                      <TableHead className="h-10 text-[10px] uppercase font-bold text-right pr-6">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -379,11 +459,42 @@ export default function BankingPage() {
                             {acc.subtype}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
-                          <span className="text-[10px] text-muted-foreground">Active</span>
-                        </TableCell>
-                        <TableCell className="text-right pr-6 font-mono font-bold text-sm text-primary">
+                        <TableCell className="text-right font-mono font-bold text-sm text-primary">
                           {currency} {acc.balance?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="text-right pr-6">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="size-8">
+                                <MoreHorizontal className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuLabel className="text-[10px] font-bold uppercase text-muted-foreground">Operations</DropdownMenuLabel>
+                              <DropdownMenuItem 
+                                className="text-xs gap-2"
+                                onClick={() => {
+                                  setSelectedAccount(acc);
+                                  setIsAdjustOpen(true);
+                                }}
+                              >
+                                <TrendingUp className="size-3.5 text-emerald-500" /> Adjust Balance
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-xs gap-2">
+                                <History className="size-3.5 text-primary" /> View History
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-xs gap-2">
+                                <FileText className="size-3.5 text-accent" /> Account Statement
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-xs gap-2">
+                                <Settings2 className="size-3.5" /> Modify Node
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-xs gap-2 text-destructive">
+                                <Trash2 className="size-3.5" /> Deactivate
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -393,6 +504,54 @@ export default function BankingPage() {
             </Card>
           </div>
         )}
+
+        {/* Adjust Balance Dialog */}
+        <Dialog open={isAdjustOpen} onOpenChange={setIsAdjustOpen}>
+          <DialogContent className="max-w-md">
+            <form onSubmit={handleAdjustBalance}>
+              <DialogHeader>
+                <DialogTitle>Balance Correction</DialogTitle>
+                <CardDescription>Update the ledger to match the physical account status for {selectedAccount?.name}.</CardDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4 text-xs">
+                <div className="p-4 bg-secondary/20 rounded-lg border flex justify-between items-center">
+                  <div>
+                    <p className="text-[9px] font-bold uppercase text-muted-foreground">Current Ledger Balance</p>
+                    <p className="text-lg font-mono font-bold">{currency} {selectedAccount?.balance?.toLocaleString()}</p>
+                  </div>
+                  <ArrowRightLeft className="size-4 text-muted-foreground opacity-30" />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>True Physical Balance ({currency})</Label>
+                  <p className="text-[10px] text-muted-foreground">Enter the actual amount currently in the bank or till.</p>
+                  <Input 
+                    name="targetBalance" 
+                    type="number" 
+                    step="0.01" 
+                    placeholder="0.00" 
+                    required 
+                    className="h-10 font-mono text-lg"
+                  />
+                </div>
+
+                <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg">
+                  <p className="text-[10px] text-amber-600 font-bold uppercase flex items-center gap-1.5">
+                    <AlertCircle className="size-3" /> Audit Warning
+                  </p>
+                  <p className="text-[9px] text-muted-foreground mt-1 leading-tight">
+                    This action will auto-post an adjustment journal entry against your Opening Balance Equity account to preserve double-entry integrity.
+                  </p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="submit" disabled={isProcessing} className="w-full h-10 font-bold uppercase text-xs shadow-lg shadow-primary/20">
+                  {isProcessing ? "Processing Audit..." : "Commit Correction"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

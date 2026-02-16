@@ -3,37 +3,8 @@
 
 import * as React from "react"
 import {
-  LayoutDashboard,
-  ShoppingCart,
-  Package,
-  Calculator,
-  Users,
-  HeartHandshake,
-  Settings,
   LogOut,
-  Command,
-  Box,
-  Truck,
-  Layers,
-  History,
-  PieChart,
-  FileText,
-  UserPlus,
-  CalendarDays,
-  Hash,
-  Activity,
-  Key,
-  BellRing,
-  Percent,
-  Coins,
-  FileClock,
-  Shield,
-  Briefcase,
-  MapPin,
-  Store,
-  GitPullRequest,
-  UserCheck,
-  CreditCard
+  Command
 } from "lucide-react"
 
 import {
@@ -44,108 +15,72 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarGroup,
-  SidebarGroupLabel,
   useSidebar,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useAuth, useUser } from "@/firebase"
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from "@/firebase"
 import { cn } from "@/lib/utils"
-
-interface NavItem {
-  title: string
-  icon: any
-  url: string
-  pattern: RegExp
-  submenus?: { title: string; icon: any; url: string }[]
-}
-
-const navConfig: NavItem[] = [
-  { 
-    title: "Command Center", 
-    icon: LayoutDashboard, 
-    url: "/", 
-    pattern: /^\/$/ 
-  },
-  { 
-    title: "iClick POS", 
-    icon: ShoppingCart, 
-    url: "/pos", 
-    pattern: /^\/pos/ 
-  },
-  { 
-    title: "Stock Vault", 
-    icon: Package, 
-    url: "/inventory", 
-    pattern: /^\/inventory/,
-    submenus: [
-      { title: "Products", icon: Box, url: "/inventory" },
-      { title: "Stock Transfers", icon: Truck, url: "/inventory/transfers" },
-      { title: "Adjustments", icon: Layers, url: "/inventory/adjustments" },
-      { title: "Categories", icon: Hash, url: "/inventory/categories" },
-    ]
-  },
-  { 
-    title: "Financial Suite", 
-    icon: Calculator, 
-    url: "/accounting", 
-    pattern: /^\/accounting/,
-    submenus: [
-      { title: "General Ledger", icon: History, url: "/accounting" },
-      { title: "Chart of Accounts", icon: Layers, url: "/accounting/coa" },
-      { title: "Budgets", icon: PieChart, url: "/accounting/budgets" },
-      { title: "Tax Returns", icon: FileText, url: "/accounting/tax" },
-    ]
-  },
-  { 
-    title: "People Hub", 
-    icon: Users, 
-    url: "/hr", 
-    pattern: /^\/hr/,
-    submenus: [
-      { title: "Employee List", icon: Users, url: "/hr" },
-      { title: "Payroll Runs", icon: CreditCard, url: "/hr/payroll" },
-      { title: "Leave Requests", icon: CalendarDays, url: "/hr/leave" },
-      { title: "Recruitment", icon: UserPlus, url: "/hr/recruitment" },
-    ]
-  },
-  { 
-    title: "Client Care", 
-    icon: HeartHandshake, 
-    url: "/crm", 
-    pattern: /^\/crm/ 
-  },
-  { 
-    title: "Administration", 
-    icon: Settings, 
-    url: "/admin/institutions", 
-    pattern: /^\/admin/,
-    submenus: [
-      { title: "Institutions", icon: Store, url: "/admin/institutions" },
-      { title: "Branches", icon: MapPin, url: "/admin/branches" },
-      { title: "Departments", icon: Briefcase, url: "/admin/departments" },
-      { title: "Roles & Permissions", icon: Shield, url: "/admin/roles" },
-      { title: "Approval Workflows", icon: GitPullRequest, url: "/admin/approval-workflows" },
-      { title: "Tax Config", icon: Percent, url: "/admin/tax" },
-      { title: "Currencies", icon: Coins, url: "/admin/currencies" },
-      { title: "Fiscal Periods", icon: CalendarDays, url: "/admin/fiscal-periods" },
-      { title: "Doc Numbering", icon: Hash, url: "/admin/document-numbering" },
-      { title: "Audit Logs", icon: FileClock, url: "/admin/audit-logs" },
-      { title: "Notification Templates", icon: BellRing, url: "/admin/notifications" },
-      { title: "System Health", icon: Activity, url: "/admin/system-health" },
-      { title: "API Management", icon: Key, url: "/admin/api-management" },
-    ]
-  },
-]
+import { navConfig, NavItem } from "@/lib/navigation"
+import { doc } from "firebase/firestore"
 
 export function AppSidebar() {
   const pathname = usePathname()
   const router = useRouter()
   const auth = useAuth()
+  const db = useFirestore()
   const { user } = useUser()
   const { setOpen, state } = useSidebar()
   
+  // Current active institution ID (this would ideally be from a context or session)
+  // For now, we'll try to find it from the path or a fallback
+  const institutionId = pathname.split('/')[2] || "SYSTEM"; // Simplified logic
+
+  const userRef = useMemoFirebase(() => {
+    if (!user) return null;
+    return doc(db, 'users', user.uid);
+  }, [db, user]);
+
+  const { data: userData } = useDoc(userRef);
+
+  // Fetch the role details to get permission IDs
+  const userRoleId = userData?.rolesByInstitution?.[institutionId];
+  const roleRef = useMemoFirebase(() => {
+    if (!userRoleId || !institutionId) return null;
+    return doc(db, 'institutions', institutionId, 'roles', userRoleId);
+  }, [db, institutionId, userRoleId]);
+
+  const { data: roleData } = useDoc(roleRef);
+  const permissions = roleData?.permissionIds || [];
+
+  const hasAccess = (moduleId: string, submenuId: string | null = null) => {
+    // If no roles are set up yet (initial dev), show everything
+    if (!roleData && userData) return true;
+    
+    // Check for "read" permission on this specific module/submenu
+    const permKey = `${moduleId}:${submenuId || 'root'}:read`;
+    return permissions.includes(permKey);
+  }
+
+  // Filter modules based on access
+  const filteredNav = navConfig.filter(item => {
+    if (item.submenus) {
+      // Show module if any submenu is readable
+      const accessibleSubs = item.submenus.filter(sub => hasAccess(item.id, sub.id));
+      return accessibleSubs.length > 0;
+    }
+    return hasAccess(item.id);
+  }).map(item => {
+    // Also filter submenus within modules
+    if (item.submenus) {
+      return {
+        ...item,
+        submenus: item.submenus.filter(sub => hasAccess(item.id, sub.id))
+      };
+    }
+    return item;
+  });
+
   const activeModule = navConfig.find(item => item.pattern.test(pathname))
   const hasSubmenus = activeModule && activeModule.submenus && activeModule.submenus.length > 0
 
@@ -155,13 +90,11 @@ export function AppSidebar() {
   }
 
   const handleItemClick = () => {
-    // Selection collapses the main sidebar
     setOpen(false)
   }
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* PRIMARY SIDEBAR: Collapsed icon-only bar that expands on hover */}
       <Sidebar 
         collapsible="icon" 
         className="z-30 border-r border-border/50 shrink-0"
@@ -175,7 +108,7 @@ export function AppSidebar() {
         </SidebarHeader>
         <SidebarContent className="p-2 gap-4">
           <SidebarMenu>
-            {navConfig.map((item) => {
+            {filteredNav.map((item) => {
               const isActive = item.pattern.test(pathname)
               return (
                 <SidebarMenuItem key={item.title}>
@@ -225,7 +158,6 @@ export function AppSidebar() {
         </SidebarFooter>
       </Sidebar>
 
-      {/* SECONDARY SIDEBAR: Persistent submenu drawer when main module is active */}
       {hasSubmenus && (
         <div 
           className="z-20 w-64 border-r border-border/50 bg-sidebar/30 backdrop-blur-md shrink-0 h-screen flex flex-col"
@@ -241,7 +173,7 @@ export function AppSidebar() {
                 <span className="text-[10px] font-bold uppercase text-muted-foreground/50 tracking-wider">Navigation</span>
               </div>
               <nav className="space-y-1">
-                {activeModule.submenus?.map((sub) => (
+                {activeModule.submenus?.filter(sub => hasAccess(activeModule.id, sub.id)).map((sub) => (
                   <Link 
                     key={sub.title} 
                     href={sub.url}

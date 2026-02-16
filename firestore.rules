@@ -127,6 +127,13 @@ service cloud.firestore {
         allow read: if isInstitutionMember(institutionId);
         allow write: if isInstitutionMember(institutionId);
       }
+
+      // Explicit match for audit logs - IMMUTABLE
+      match /audit_logs/{logId} {
+        allow read: if isInstitutionMember(institutionId);
+        allow create: if isInstitutionMember(institutionId);
+        allow update, delete: if false; 
+      }
     }
 
     // --- BRANCH SCOPED COLLECTIONS ---

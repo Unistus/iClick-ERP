@@ -1,6 +1,25 @@
 
 {
   "entities": {
+    "AuditLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AuditLog",
+      "type": "object",
+      "description": "Records sensitive system actions for compliance and security monitoring.",
+      "properties": {
+        "id": { "type": "string" },
+        "institutionId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "action": { "type": "string", "description": "e.g., 'User Login', 'Invoice Created', 'Role Modified'" },
+        "module": { "type": "string", "description": "The system module where the event occurred (e.g., ADMIN, POS, HR)" },
+        "details": { "type": "string", "description": "A descriptive summary of the change or event." },
+        "status": { "type": "string", "enum": ["Success", "Failure"] },
+        "ipAddress": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "institutionId", "userId", "action", "module", "status", "timestamp"]
+    },
     "DocumentSequence": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "DocumentSequence",
@@ -3372,6 +3391,16 @@
             "$ref": "#/backend/entities/Institution"
           },
           "description": "Top-level collection for each business organization. Access controlled by institution members/admins."
+        }
+      },
+      {
+        "path": "/institutions/{institutionId}/audit_logs/{logId}",
+        "definition": {
+          "entityName": "AuditLog",
+          "schema": {
+            "$ref": "#/backend/entities/AuditLog"
+          },
+          "description": "High-fidelity audit trail for all system activities within an institution."
         }
       },
       {

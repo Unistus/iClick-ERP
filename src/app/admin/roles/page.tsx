@@ -49,7 +49,6 @@ export default function RolesManagement() {
   const handleEdit = (role: any) => {
     setEditingRole(role)
     setSelectedPermissions(role.permissionIds || [])
-    // Automatically expand modules that have permissions
     const activeModules = navConfig
       .filter(m => role.permissionIds?.some((p: string) => p.startsWith(`${m.id}:`)))
       .map(m => m.id)
@@ -69,11 +68,9 @@ export default function RolesManagement() {
     const isCurrentlyChecked = selectedPermissions.includes(rootReadPerm);
 
     if (isCurrentlyChecked) {
-      // Unchecking module: remove all its permissions and collapse
       setSelectedPermissions(prev => prev.filter(p => !p.startsWith(`${moduleId}:`)));
       setExpandedModules(prev => prev.filter(id => id !== moduleId));
     } else {
-      // Checking module: add root read and expand
       setSelectedPermissions(prev => [...prev, rootReadPerm]);
       setExpandedModules(prev => [...prev, moduleId]);
     }
@@ -129,9 +126,9 @@ export default function RolesManagement() {
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <h1 className="text-2xl font-headline font-bold">Roles & Permissions</h1>
-          <div className="flex gap-2 w-full md:w-auto">
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
             <Select value={selectedInstitutionId} onValueChange={setSelectedInstitutionId}>
-              <SelectTrigger className="w-[200px] h-9 bg-card border-none ring-1 ring-border text-xs">
+              <SelectTrigger className="w-full sm:w-[200px] h-9 bg-card border-none ring-1 ring-border text-xs">
                 <SelectValue placeholder="Select Institution" />
               </SelectTrigger>
               <SelectContent>
@@ -150,14 +147,14 @@ export default function RolesManagement() {
                   <Plus className="size-4" /> New Role
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
+              <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] flex flex-col p-0">
                 <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
-                  <DialogHeader className="p-6 pb-2 shrink-0">
-                    <DialogTitle>{editingRole ? 'Edit' : 'Create'} Role</DialogTitle>
+                  <DialogHeader className="p-4 md:p-6 pb-2 shrink-0">
+                    <DialogTitle className="text-lg md:text-xl">{editingRole ? 'Edit' : 'Create'} Role</DialogTitle>
                   </DialogHeader>
                   
-                  <div className="p-6 pt-2 shrink-0">
-                    <div className="grid md:grid-cols-2 gap-4">
+                  <div className="p-4 md:p-6 pt-2 shrink-0">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="grid gap-1.5">
                         <Label htmlFor="name" className="text-[10px] uppercase font-bold text-muted-foreground">Role Name</Label>
                         <Input id="name" name="name" defaultValue={editingRole?.name} className="h-9 text-xs" required />
@@ -169,9 +166,9 @@ export default function RolesManagement() {
                     </div>
                   </div>
 
-                  <ScrollArea className="flex-1 px-6 pb-6">
-                    <div className="border rounded-lg overflow-hidden ring-1 ring-border bg-card">
-                      <Table>
+                  <ScrollArea className="flex-1 px-4 md:px-6 pb-6">
+                    <div className="border rounded-lg overflow-x-auto ring-1 ring-border bg-card">
+                      <Table className="min-w-[600px]">
                         <TableHeader className="bg-secondary/30 sticky top-0 z-10 backdrop-blur-sm">
                           <TableRow>
                             <TableHead className="h-9 text-[10px] font-bold uppercase w-1/3">Module / Section</TableHead>
@@ -240,9 +237,9 @@ export default function RolesManagement() {
                     </div>
                   </ScrollArea>
 
-                  <DialogFooter className="p-6 border-t bg-secondary/5 shrink-0">
-                    <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs">Cancel</Button>
-                    <Button type="submit" className="text-xs">Save Role Configuration</Button>
+                  <DialogFooter className="p-4 md:p-6 border-t bg-secondary/5 shrink-0 flex flex-row justify-end gap-2">
+                    <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs h-9">Cancel</Button>
+                    <Button type="submit" className="text-xs h-9">Save Role</Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
@@ -253,26 +250,26 @@ export default function RolesManagement() {
         {!selectedInstitutionId ? (
           <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed rounded-2xl bg-secondary/5">
             <Lock className="size-12 text-muted-foreground opacity-20 mb-3" />
-            <p className="text-sm font-medium text-muted-foreground">Select an institution to configure security policies.</p>
+            <p className="text-sm font-medium text-muted-foreground px-4 text-center">Select an institution to configure security policies.</p>
           </div>
         ) : (
           <Tabs defaultValue="roles" className="w-full">
-            <TabsList className="bg-secondary/30 h-10 mb-4">
-              <TabsTrigger value="roles" className="text-xs gap-2 px-4 h-8">
+            <TabsList className="bg-secondary/30 h-10 mb-4 w-full justify-start overflow-x-auto overflow-y-hidden">
+              <TabsTrigger value="roles" className="text-xs gap-2 px-4 h-8 shrink-0">
                 <Shield className="size-3.5" /> Defined Roles
               </TabsTrigger>
-              <TabsTrigger value="assignment" className="text-xs gap-2 px-4 h-8">
+              <TabsTrigger value="assignment" className="text-xs gap-2 px-4 h-8 shrink-0">
                 <UserCog className="size-3.5" /> Staff Assignment
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="roles">
               <Card className="border-none ring-1 ring-border shadow-xl overflow-hidden">
-                <CardContent className="p-0">
-                  <Table>
+                <CardContent className="p-0 overflow-x-auto">
+                  <Table className="min-w-[600px]">
                     <TableHeader className="bg-secondary/20">
                       <TableRow>
-                        <TableHead className="h-10 text-[10px] uppercase font-bold">Role Title</TableHead>
+                        <TableHead className="h-10 text-[10px] uppercase font-bold pl-6">Role Title</TableHead>
                         <TableHead className="h-10 text-[10px] uppercase font-bold">Scope Description</TableHead>
                         <TableHead className="h-10 text-[10px] uppercase font-bold text-center">Perms Count</TableHead>
                         <TableHead className="h-10 text-right text-[10px] uppercase font-bold pr-6">Actions</TableHead>
@@ -300,7 +297,7 @@ export default function RolesManagement() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right pr-6">
-                            <Button variant="ghost" size="icon" className="size-8 group-hover:bg-background" onClick={() => handleEdit(role)}>
+                            <Button variant="ghost" size="icon" className="size-8" onClick={() => handleEdit(role)}>
                               <Edit2 className="size-3.5" />
                             </Button>
                           </TableCell>
@@ -314,14 +311,14 @@ export default function RolesManagement() {
 
             <TabsContent value="assignment">
               <Card className="border-none ring-1 ring-border shadow-xl">
-                <CardHeader className="py-3 px-6 border-b">
+                <CardHeader className="py-3 px-4 md:px-6 border-b">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
                     <Input placeholder="Search staff members..." className="pl-9 h-9 bg-secondary/20 border-none text-xs" />
                   </div>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <Table>
+                <CardContent className="p-0 overflow-x-auto">
+                  <Table className="min-w-[600px]">
                     <TableHeader className="bg-secondary/20">
                       <TableRow>
                         <TableHead className="h-10 text-[10px] uppercase font-bold pl-6">Staff Member</TableHead>
@@ -338,8 +335,8 @@ export default function RolesManagement() {
                           <TableRow key={member.id} className="h-14">
                             <TableCell className="pl-6">
                               <div className="flex flex-col">
-                                <span className="font-bold text-xs">{member.firstName} {member.lastName}</span>
-                                <span className="text-[10px] text-muted-foreground font-mono">{member.email}</span>
+                                <span className="font-bold text-xs">{member.firstName || 'User'} {member.lastName || member.id.slice(0, 4)}</span>
+                                <span className="text-[10px] text-muted-foreground font-mono truncate max-w-[150px]">{member.email}</span>
                               </div>
                             </TableCell>
                             <TableCell>
@@ -356,7 +353,7 @@ export default function RolesManagement() {
                                 value={currentRoleId || ""} 
                                 onValueChange={(val) => assignRoleToUser(member.id, val)}
                               >
-                                <SelectTrigger className="w-[160px] h-8 text-[10px] ml-auto">
+                                <SelectTrigger className="w-[140px] h-8 text-[10px] ml-auto">
                                   <SelectValue placeholder="Assign Role" />
                                 </SelectTrigger>
                                 <SelectContent>

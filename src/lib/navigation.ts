@@ -56,17 +56,8 @@ export const navConfig: NavItem[] = [
     icon: LayoutDashboard, 
     url: "/", 
     pattern: /^\/($|dashboard)/,
-    id: "dashboard",
-    submenus: [
-      { title: "Executive Overview", icon: LayoutDashboard, url: "/", id: "executive" },
-      { title: "Sales Analytics", icon: BarChart3, url: "/dashboard/sales", id: "sales_analytics" },
-      { title: "Inventory Snapshot", icon: Package, url: "/dashboard/inventory", id: "inventory_snapshot" },
-      { title: "Cash Flow", icon: History, url: "/dashboard/cashflow", id: "cashflow" },
-      { title: "Tax Summary", icon: FileText, url: "/dashboard/tax", id: "tax_summary" },
-      { title: "Branch Performance", icon: MapPin, url: "/dashboard/branches", id: "branch_performance" },
-      { title: "Staff Performance", icon: Users, url: "/dashboard/staff", id: "staff_performance" },
-      { title: "Real-Time Alerts", icon: BellRing, url: "/dashboard/alerts", id: "alerts" },
-    ]
+    id: "dashboard"
+    // Submenus removed in favor of tabbed interface in /page.tsx
   },
   { 
     title: "iClick POS", 

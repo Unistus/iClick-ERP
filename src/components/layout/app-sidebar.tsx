@@ -21,7 +21,13 @@ import {
   Percent,
   Coins,
   FileClock,
-  LogOut
+  LogOut,
+  GitPullRequest,
+  CalendarDays,
+  Hash,
+  Activity,
+  Key,
+  BellRing
 } from "lucide-react"
 
 import {
@@ -55,9 +61,15 @@ const adminLinks = [
   { title: "Branches", icon: MapPin, url: "/admin/branches" },
   { title: "Departments", icon: Briefcase, url: "/admin/departments" },
   { title: "Roles & Permissions", icon: Shield, url: "/admin/roles" },
+  { title: "Approval Workflows", icon: GitPullRequest, url: "/admin/approval-workflows" },
   { title: "Tax Config", icon: Percent, url: "/admin/tax" },
   { title: "Currencies", icon: Coins, url: "/admin/currencies" },
+  { title: "Fiscal Periods", icon: CalendarDays, url: "/admin/fiscal-periods" },
+  { title: "Doc Numbering", icon: Hash, url: "/admin/document-numbering" },
   { title: "Audit Logs", icon: FileClock, url: "/admin/audit-logs" },
+  { title: "Notification Templates", icon: BellRing, url: "/admin/notifications" },
+  { title: "System Health", icon: Activity, url: "/admin/system-health" },
+  { title: "API Management", icon: Key, url: "/admin/api-management" },
 ]
 
 export function AppSidebar() {

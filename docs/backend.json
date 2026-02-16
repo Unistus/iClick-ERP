@@ -1,5 +1,24 @@
+
 {
   "entities": {
+    "DocumentSequence": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "DocumentSequence",
+      "type": "object",
+      "description": "Configures prefixes and incremental numbering for various system documents like invoices and receipts.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique key for the sequence type (e.g., 'sales_invoice')." },
+        "institutionId": { "type": "string", "description": "Reference to the owner Institution." },
+        "title": { "type": "string", "description": "Display name of the document type." },
+        "prefix": { "type": "string", "description": "String prepended to the number (e.g., 'INV-')." },
+        "suffix": { "type": "string", "description": "String appended to the number (e.g., '/2024')." },
+        "nextNumber": { "type": "number", "description": "The next integer to be assigned." },
+        "padding": { "type": "number", "description": "Total length of the numeric part with leading zeros." },
+        "isActive": { "type": "boolean", "description": "Whether this sequence is currently used." },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "institutionId", "title", "prefix", "nextNumber", "padding"]
+    },
     "Institution": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Institution",
@@ -3353,6 +3372,16 @@
             "$ref": "#/backend/entities/Institution"
           },
           "description": "Top-level collection for each business organization. Access controlled by institution members/admins."
+        }
+      },
+      {
+        "path": "/institutions/{institutionId}/document_sequences/{sequenceId}",
+        "definition": {
+          "entityName": "DocumentSequence",
+          "schema": {
+            "$ref": "#/backend/entities/DocumentSequence"
+          },
+          "description": "Institutional settings for document numbering sequences."
         }
       },
       {

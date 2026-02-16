@@ -27,7 +27,11 @@ import {
   MapPin,
   Store,
   GitPullRequest,
-  CreditCard
+  CreditCard,
+  Sliders,
+  Palette,
+  Globe,
+  Database
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -110,10 +114,11 @@ export const navConfig: NavItem[] = [
   { 
     title: "Administration", 
     icon: Settings, 
-    url: "/admin/institutions", 
+    url: "/admin/settings", 
     pattern: /^\/admin/,
     id: "admin",
     submenus: [
+      { title: "System Settings", icon: Sliders, url: "/admin/settings", id: "settings" },
       { title: "Institutions", icon: Store, url: "/admin/institutions", id: "institutions" },
       { title: "Branches", icon: MapPin, url: "/admin/branches", id: "branches" },
       { title: "Departments", icon: Briefcase, url: "/admin/departments", id: "departments" },

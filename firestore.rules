@@ -3,34 +3,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * iClick ERP: All-in-One POS & Business System
-     * 
-     * Core Philosophy:
-     * This ruleset implements a strict multi-tenant, multi-branch architecture. Access is governed by 
-     * "Existence over Content" verification. Instead of complex queries, the system uses dedicated 
-     * membership paths (/user_institutions/...) and global admin paths (/system_admins/...) to 
-     * verify authorization instantly.
-     */
-
-    // --- GLOBAL HELPER FUNCTIONS ---
-
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    // Checks if the user is a global system administrator
     function isGlobalAdmin() {
-      return isSignedIn() && (
-        exists(/databases/$(database)/documents/system_admins/$(request.auth.uid))
-      );
+      return isSignedIn() && exists(/databases/$(database)/documents/system_admins/$(request.auth.uid));
     }
 
-    // Checks if the user belongs to a specific institution via lookup path
     function isInstitutionMember(institutionId) {
       return isSignedIn() && (
         isGlobalAdmin() || 
@@ -38,158 +18,76 @@ service cloud.firestore {
       );
     }
 
-    // Helper for update/delete that requires existence and membership
-    function isExistingMember(institutionId) {
-      return resource != null && isInstitutionMember(institutionId);
-    }
-
-    // --- SYSTEM & USER COLLECTIONS ---
-
-    /**
-     * @description Dedicated collection for system-wide administrators.
-     */
     match /system_admins/{uid} {
-      allow get: if isSignedIn();
-      allow list: if isGlobalAdmin();
-      // Allow the first admin to be created or allow creation during initial setup
-      allow create: if isOwner(uid); 
-      allow update, delete: if isGlobalAdmin();
+      allow read: if isSignedIn();
+      allow write: if isGlobalAdmin() || (isSignedIn() && !exists(/databases/$(database)/documents/system_admins/$(request.auth.uid)));
     }
 
-    /**
-     * @description User profiles and core metadata.
-     */
     match /users/{userId} {
-      allow get, list: if isOwner(userId) || isGlobalAdmin() || isInstitutionMember(resource.data.institutionId);
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || isGlobalAdmin();
-      allow delete: if isGlobalAdmin();
-    }
-
-    /**
-     * @description Verification path to check user-institution membership.
-     */
-    match /user_institutions/{userId}/memberships/{institutionId} {
-      allow get: if isOwner(userId) || isGlobalAdmin() || isInstitutionMember(institutionId);
-      allow list: if isOwner(userId) || isGlobalAdmin();
+      allow get, list: if isSignedIn();
       allow create: if isSignedIn();
-      allow update, delete: if isGlobalAdmin();
+      allow update: if request.auth.uid == userId || isGlobalAdmin();
     }
 
-    /**
-     * @description Global currency and permission definitions.
-     */
+    match /user_institutions/{userId}/memberships/{institutionId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
     match /currencies/{id} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isGlobalAdmin();
+      allow read: if isSignedIn();
+      allow write: if isGlobalAdmin();
     }
+
     match /permissions/{id} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isGlobalAdmin();
+      allow read: if isSignedIn();
+      allow write: if isGlobalAdmin();
     }
 
-    // --- INSTITUTION SCOPED COLLECTIONS ---
-
-    /**
-     * @description Top-level institution management.
-     */
     match /institutions/{institutionId} {
-      // allow list and get for authenticated users for prototype fluidity
-      allow list, get: if isSignedIn();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isInstitutionMember(institutionId);
       
-      // Allow creation for authenticated users during initial development
-      allow create: if isSignedIn(); 
-      allow update: if isExistingMember(institutionId);
-      allow delete: if isGlobalAdmin();
-
-      // --- NESTED INSTITUTION DATA ---
-
-      match /{allSubcollections=**} {
-        // Relaxed read for prototype; write remains protected
-        allow read: if isSignedIn();
-        
-        allow create: if isInstitutionMember(institutionId) && 
-                      request.resource.data.institutionId == institutionId;
-        
-        allow update: if isExistingMember(institutionId) && 
-                      request.resource.data.institutionId == institutionId;
-                      
-        allow delete: if isExistingMember(institutionId);
-      }
-
-      match /roles/{roleId}/members/{userId} {
-        allow read: if isInstitutionMember(institutionId);
-        allow write: if isInstitutionMember(institutionId) || isGlobalAdmin(); 
-      }
-
-      // Explicit match for document sequences
-      match /document_sequences/{sequenceId} {
+      match /settings/global {
         allow read: if isInstitutionMember(institutionId);
         allow write: if isInstitutionMember(institutionId);
       }
 
-      // Explicit match for API keys
-      match /api_keys/{keyId} {
-        allow read: if isInstitutionMember(institutionId);
-        allow write: if isInstitutionMember(institutionId);
-      }
-
-      // Explicit match for audit logs - IMMUTABLE
       match /audit_logs/{logId} {
         allow read: if isInstitutionMember(institutionId);
         allow create: if isInstitutionMember(institutionId);
-        allow update, delete: if false; 
-      }
-    }
-
-    // --- BRANCH SCOPED COLLECTIONS ---
-
-    match /institutions/{institutionId}/branches/{branchId} {
-      allow get, list: if isSignedIn();
-      allow create: if isInstitutionMember(institutionId) && 
-                    request.resource.data.institutionId == institutionId;
-      allow update: if isExistingMember(institutionId) && 
-                    request.resource.data.institutionId == institutionId;
-      allow delete: if isGlobalAdmin() || isInstitutionMember(institutionId);
-
-      match /{allBranchData=**} {
-        allow read: if isSignedIn();
-        
-        allow create: if isInstitutionMember(institutionId) && 
-                      request.resource.data.institutionId == institutionId &&
-                      request.resource.data.branchId == branchId;
-                      
-        allow update: if isExistingMember(institutionId) && 
-                      request.resource.data.institutionId == institutionId &&
-                      request.resource.data.branchId == branchId;
-                      
-        allow delete: if isExistingMember(institutionId);
-      }
-      
-      // Explicit overrides for sub-collections of transactional items
-      match /sales/{saleId}/items/{itemId} {
-         allow read: if isSignedIn();
-         allow create: if isInstitutionMember(institutionId) && request.resource.data.institutionId == institutionId;
-         allow update: if isExistingMember(institutionId) && request.resource.data.institutionId == institutionId;
-         allow delete: if isExistingMember(institutionId);
       }
 
-      match /sales/{saleId}/payments/{paymentId} {
-         allow read: if isSignedIn();
-         allow create: if isInstitutionMember(institutionId) && request.resource.data.institutionId == institutionId;
-         allow update: if isExistingMember(institutionId) && request.resource.data.institutionId == institutionId;
-         allow delete: if isExistingMember(institutionId);
+      match /document_sequences/{sequenceId} {
+        allow read, write: if isInstitutionMember(institutionId);
       }
-    }
 
-    /**
-     * @description High-security financial logs.
-     */
-    match /institutions/{institutionId}/mpesa_callbacks/{callbackId} {
-      allow get: if isInstitutionMember(institutionId);
-      allow list: if isInstitutionMember(institutionId);
-      allow create: if isSignedIn();
-      allow update, delete: if isGlobalAdmin();
+      match /api_keys/{keyId} {
+        allow read, write: if isInstitutionMember(institutionId);
+      }
+
+      match /notification_templates/{templateId} {
+        allow read, write: if isInstitutionMember(institutionId);
+      }
+
+      match /roles/{roleId} {
+        allow read, write: if isInstitutionMember(institutionId);
+        match /members/{userId} {
+          allow read, write: if isInstitutionMember(institutionId);
+        }
+      }
+
+      match /tax_settings/{taxSettingId} {
+        allow read, write: if isInstitutionMember(institutionId);
+      }
+
+      match /branches/{branchId} {
+        allow read, write: if isInstitutionMember(institutionId);
+        match /{allBranchData=**} {
+          allow read, write: if isInstitutionMember(institutionId);
+        }
+      }
     }
   }
 }

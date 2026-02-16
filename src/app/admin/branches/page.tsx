@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
 import { collection, doc, serverTimestamp, query } from "firebase/firestore"
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates"
-import { MapPin, Edit2, Store } from "lucide-react"
+import { MapPin, Edit2, Store, Plus } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 
 export default function BranchManagement() {

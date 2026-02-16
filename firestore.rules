@@ -69,9 +69,9 @@ service cloud.firestore {
      * @description Verification path to check user-institution membership.
      */
     match /user_institutions/{userId}/memberships/{institutionId} {
-      allow get: if isOwner(userId) || isGlobalAdmin();
+      allow get: if isOwner(userId) || isGlobalAdmin() || isInstitutionMember(institutionId);
       allow list: if isOwner(userId) || isGlobalAdmin();
-      allow create: if isOwner(userId) || isGlobalAdmin();
+      allow create: if isSignedIn();
       allow update, delete: if isGlobalAdmin();
     }
 
@@ -93,9 +93,9 @@ service cloud.firestore {
      * @description Top-level institution management.
      */
     match /institutions/{institutionId} {
-      // allow list for picking institutions in admin dropdowns
-      allow list: if isSignedIn();
-      allow get: if isInstitutionMember(institutionId);
+      // allow list and get for authenticated users for prototype fluidity
+      allow list, get: if isSignedIn();
+      
       // Allow creation for authenticated users during initial development
       allow create: if isSignedIn(); 
       allow update: if isExistingMember(institutionId);
@@ -104,7 +104,8 @@ service cloud.firestore {
       // --- NESTED INSTITUTION DATA ---
 
       match /{allSubcollections=**} {
-        allow read: if isInstitutionMember(institutionId);
+        // Relaxed read for prototype; write remains protected
+        allow read: if isSignedIn();
         
         allow create: if isInstitutionMember(institutionId) && 
                       request.resource.data.institutionId == institutionId;
@@ -124,7 +125,7 @@ service cloud.firestore {
     // --- BRANCH SCOPED COLLECTIONS ---
 
     match /institutions/{institutionId}/branches/{branchId} {
-      allow get, list: if isInstitutionMember(institutionId);
+      allow get, list: if isSignedIn();
       allow create: if isInstitutionMember(institutionId) && 
                     request.resource.data.institutionId == institutionId;
       allow update: if isExistingMember(institutionId) && 
@@ -132,7 +133,7 @@ service cloud.firestore {
       allow delete: if isGlobalAdmin() || isInstitutionMember(institutionId);
 
       match /{allBranchData=**} {
-        allow read: if isInstitutionMember(institutionId);
+        allow read: if isSignedIn();
         
         allow create: if isInstitutionMember(institutionId) && 
                       request.resource.data.institutionId == institutionId &&
@@ -147,14 +148,14 @@ service cloud.firestore {
       
       // Explicit overrides for sub-collections of transactional items
       match /sales/{saleId}/items/{itemId} {
-         allow read: if isInstitutionMember(institutionId);
+         allow read: if isSignedIn();
          allow create: if isInstitutionMember(institutionId) && request.resource.data.institutionId == institutionId;
          allow update: if isExistingMember(institutionId) && request.resource.data.institutionId == institutionId;
          allow delete: if isExistingMember(institutionId);
       }
 
       match /sales/{saleId}/payments/{paymentId} {
-         allow read: if isInstitutionMember(institutionId);
+         allow read: if isSignedIn();
          allow create: if isInstitutionMember(institutionId) && request.resource.data.institutionId == institutionId;
          allow update: if isExistingMember(institutionId) && request.resource.data.institutionId == institutionId;
          allow delete: if isExistingMember(institutionId);

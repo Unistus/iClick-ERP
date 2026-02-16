@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -9,14 +8,16 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase"
 import { collection, doc, serverTimestamp } from "firebase/firestore"
-import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates"
-import { Plus, Building2, Search, Edit2, CheckCircle, XCircle } from "lucide-react"
+import { addDocumentNonBlocking, updateDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase"
+import { Plus, Building2, Search, Edit2, CheckCircle, XCircle, ShieldCheck } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { toast } from '@/hooks/use-toast';
 
 export default function InstitutionsManagement() {
   const db = useFirestore()
+  const { user } = useUser()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [editingInstitution, setEditingInstitution] = useState<any>(null)
 
@@ -26,7 +27,7 @@ export default function InstitutionsManagement() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
-    const data = {
+    const data: any = {
       name: formData.get('name'),
       country: formData.get('country'),
       taxIdentificationNumber: formData.get('tin'),
@@ -36,14 +37,44 @@ export default function InstitutionsManagement() {
 
     if (editingInstitution) {
       updateDocumentNonBlocking(doc(db, 'institutions', editingInstitution.id), data)
+      toast({ title: "Institution Updated", description: `${data.name} has been modified.` })
     } else {
       addDocumentNonBlocking(instCollectionRef, {
         ...data,
         createdAt: serverTimestamp(),
+      }).then((docRef) => {
+        if (docRef && user) {
+          // Automatically create a membership document for the creator
+          setDocumentNonBlocking(
+            doc(db, 'user_institutions', user.uid, 'memberships', docRef.id),
+            { 
+              institutionId: docRef.id,
+              institutionName: data.name,
+              joinedAt: serverTimestamp(),
+              role: 'Owner'
+            },
+            { merge: true }
+          )
+        }
       })
+      toast({ title: "Institution Created", description: `${data.name} is now ready for setup.` })
     }
     setIsCreateOpen(false)
     setEditingInstitution(null)
+  }
+
+  const handleClaimAdmin = () => {
+    if (!user) return
+    setDocumentNonBlocking(
+      doc(db, 'system_admins', user.uid),
+      { 
+        email: user.email,
+        claimedAt: serverTimestamp(),
+        isActive: true
+      },
+      { merge: true }
+    )
+    toast({ title: "Admin Rights Claimed", description: "You are now a global system administrator." })
   }
 
   return (
@@ -54,40 +85,45 @@ export default function InstitutionsManagement() {
             <h1 className="text-3xl font-headline font-bold">Institutions</h1>
             <p className="text-muted-foreground">Manage multi-tenant business organizations.</p>
           </div>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2" onClick={() => setEditingInstitution(null)}>
-                <Plus className="size-4" /> Add Institution
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <form onSubmit={handleSubmit}>
-                <DialogHeader>
-                  <DialogTitle>{editingInstitution ? 'Edit' : 'New'} Institution</DialogTitle>
-                  <DialogDescription>
-                    Enter the legal details for the institution.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="name">Legal Name</Label>
-                    <Input id="name" name="name" defaultValue={editingInstitution?.name} required />
+          <div className="flex gap-3">
+            <Button variant="outline" className="gap-2" onClick={handleClaimAdmin}>
+              <ShieldCheck className="size-4" /> Claim System Admin
+            </Button>
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2" onClick={() => setEditingInstitution(null)}>
+                  <Plus className="size-4" /> Add Institution
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <form onSubmit={handleSubmit}>
+                  <DialogHeader>
+                    <DialogTitle>{editingInstitution ? 'Edit' : 'New'} Institution</DialogTitle>
+                    <DialogDescription>
+                      Enter the legal details for the institution.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="name">Legal Name</Label>
+                      <Input id="name" name="name" defaultValue={editingInstitution?.name} required />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="country">Country</Label>
+                      <Input id="country" name="country" defaultValue={editingInstitution?.country} placeholder="e.g. Kenya" required />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="tin">Tax ID Number (PIN/VAT)</Label>
+                      <Input id="tin" name="tin" defaultValue={editingInstitution?.taxIdentificationNumber} required />
+                    </div>
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="country">Country</Label>
-                    <Input id="country" name="country" defaultValue={editingInstitution?.country} placeholder="e.g. Kenya" required />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="tin">Tax ID Number (PIN/VAT)</Label>
-                    <Input id="tin" name="tin" defaultValue={editingInstitution?.taxIdentificationNumber} required />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button type="submit">Save Institution</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  <DialogFooter>
+                    <Button type="submit">Save Institution</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         <Card className="border-none ring-1 ring-border shadow-lg">

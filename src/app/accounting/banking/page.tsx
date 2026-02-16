@@ -313,7 +313,8 @@ export default function BankingPage() {
                   <div className="text-lg font-bold">{currency} {clearingBalances.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                   <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold">M-Pesa / Card Pending</p>
                 </CardContent>
-              </div>
+              </Card>
+            </div>
 
             <Card className="border-none ring-1 ring-border shadow-xl bg-card">
               <CardHeader className="py-3 px-6 border-b border-border/50 flex flex-row items-center justify-between">

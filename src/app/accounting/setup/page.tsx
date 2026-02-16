@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -164,9 +165,16 @@ export default function AccountingSetupPage() {
                     description="Asset account for physical branch till collections."
                   />
                   <AccountSelect 
-                    name="mpesaClearingAccountId" 
-                    label="M-Pesa Clearing" 
-                    description="Temporary asset account for mobile payments awaiting bank settlement."
+                    name="accumulatedDepreciationAccountId" 
+                    label="Accumulated Depreciation" 
+                    description="Contra-asset account tracking total value loss."
+                    typeFilter={['Asset', 'Accumulated Depreciation']}
+                  />
+                  <AccountSelect 
+                    name="depreciationExpenseAccountId" 
+                    label="Depreciation Expense" 
+                    description="Profit & Loss account for periodic asset write-offs."
+                    typeFilter={['Expense']}
                   />
                 </div>
               </CardContent>

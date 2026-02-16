@@ -110,6 +110,28 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       }
     },
+    "FixedAsset": {
+      "title": "FixedAsset",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "institutionId": { "type": "string" },
+        "name": { "type": "string" },
+        "code": { "type": "string" },
+        "category": { "type": "string", "enum": ["Furniture", "Equipment", "Vehicles", "Buildings", "Land", "Computers"] },
+        "purchaseDate": { "type": "string", "format": "date-time" },
+        "purchasePrice": { "type": "number" },
+        "salvageValue": { "type": "number" },
+        "usefulLifeYears": { "type": "number" },
+        "depreciationMethod": { "type": "string", "enum": ["Straight Line", "Reducing Balance"] },
+        "currentValue": { "type": "number" },
+        "accumulatedDepreciation": { "type": "number" },
+        "assetAccountId": { "type": "string" },
+        "status": { "type": "string", "enum": ["Active", "Disposed", "Fully Depreciated"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "institutionId", "name", "purchasePrice", "status"]
+    },
     "Invoice": {
       "title": "Invoice",
       "type": "object",
@@ -158,7 +180,10 @@
         "cogsAccountId": { "type": "string" },
         "vatPayableAccountId": { "type": "string" },
         "cashOnHandAccountId": { "type": "string" },
-        "mpesaClearingAccountId": { "type": "string" }
+        "mpesaClearingAccountId": { "type": "string" },
+        "openingBalanceEquityAccountId": { "type": "string" },
+        "accumulatedDepreciationAccountId": { "type": "string" },
+        "depreciationExpenseAccountId": { "type": "string" }
       }
     },
     "NotificationTemplate": {
@@ -252,6 +277,16 @@
             "$ref": "#/backend/entities/VendorInvoice"
           },
           "description": "Accounts payable vendor bills."
+        }
+      },
+      {
+        "path": "/institutions/{institutionId}/assets/{assetId}",
+        "definition": {
+          "entityName": "FixedAsset",
+          "schema": {
+            "$ref": "#/backend/entities/FixedAsset"
+          },
+          "description": "Fixed asset registry nodes."
         }
       },
       {

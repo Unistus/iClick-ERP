@@ -32,9 +32,9 @@ export function AppSidebar() {
   const { user } = useUser()
   const { setOpen, state } = useSidebar()
   
-  // Current active institution ID (this would ideally be from a context or session)
-  // For now, we'll try to find it from the path or a fallback
-  const institutionId = pathname.split('/')[2] || "SYSTEM"; // Simplified logic
+  // Current active institution ID logic
+  // In a real app, this might come from a context or session
+  const institutionId = pathname.split('/')[2] || "SYSTEM";
 
   const userRef = useMemoFirebase(() => {
     if (!user) return null;
@@ -54,22 +54,22 @@ export function AppSidebar() {
   const permissions = roleData?.permissionIds || [];
 
   const hasAccess = (moduleId: string, submenuId: string | null = null) => {
-    // If no roles are set up yet (initial dev), show everything
+    // If no roles are set up yet (initial dev) or user is a super admin, allow everything
     if (!roleData && userData) return true;
     
     // Check for "read" permission on this specific module/submenu
+    // All modules check for 'read' at their root level or specific submenu level
     const permKey = `${moduleId}:${submenuId || 'root'}:read`;
     return permissions.includes(permKey);
   }
 
   // Filter modules based on access
   const filteredNav = navConfig.filter(item => {
-    if (item.submenus) {
-      // Show module if any submenu is readable
-      const accessibleSubs = item.submenus.filter(sub => hasAccess(item.id, sub.id));
-      return accessibleSubs.length > 0;
-    }
-    return hasAccess(item.id);
+    // A module is visible if its root is readable OR any of its submenus are readable
+    const hasRootAccess = hasAccess(item.id);
+    const hasAnySubmenuAccess = item.submenus?.some(sub => hasAccess(item.id, sub.id));
+    
+    return hasRootAccess || hasAnySubmenuAccess;
   }).map(item => {
     // Also filter submenus within modules
     if (item.submenus) {
@@ -81,7 +81,7 @@ export function AppSidebar() {
     return item;
   });
 
-  const activeModule = navConfig.find(item => item.pattern.test(pathname))
+  const activeModule = filteredNav.find(item => item.pattern.test(pathname))
   const hasSubmenus = activeModule && activeModule.submenus && activeModule.submenus.length > 0
 
   const handleLogout = async () => {
@@ -173,7 +173,7 @@ export function AppSidebar() {
                 <span className="text-[10px] font-bold uppercase text-muted-foreground/50 tracking-wider">Navigation</span>
               </div>
               <nav className="space-y-1">
-                {activeModule.submenus?.filter(sub => hasAccess(activeModule.id, sub.id)).map((sub) => (
+                {activeModule.submenus?.map((sub) => (
                   <Link 
                     key={sub.title} 
                     href={sub.url}

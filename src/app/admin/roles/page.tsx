@@ -18,6 +18,7 @@ import { Shield, Plus, Edit2, Check, Lock, UserCog, Search } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { navConfig } from "@/lib/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 const PERMISSION_ACTIONS = ['create', 'read', 'update', 'delete'] as const;
 
@@ -84,14 +85,12 @@ export default function RolesManagement() {
   const assignRoleToUser = (userId: string, roleId: string) => {
     if (!selectedInstitutionId) return;
     
-    // Update membership path for security rules
     setDocumentNonBlocking(
       doc(db, 'institutions', selectedInstitutionId, 'roles', roleId, 'members', userId),
       { active: true, assignedAt: serverTimestamp() },
       { merge: true }
     );
 
-    // Update user profile for UI filtering
     setDocumentNonBlocking(
       doc(db, 'users', userId),
       { 
@@ -124,13 +123,13 @@ export default function RolesManagement() {
                   <Plus className="size-4" /> New Role
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0">
-                <form onSubmit={handleSubmit} className="flex flex-col h-full">
-                  <DialogHeader className="p-6 pb-2">
+              <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
+                <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
+                  <DialogHeader className="p-6 pb-2 shrink-0">
                     <DialogTitle>{editingRole ? 'Edit' : 'Create'} Role</DialogTitle>
                   </DialogHeader>
                   
-                  <div className="flex-1 overflow-y-auto custom-scrollbar p-6 pt-2 space-y-6">
+                  <div className="p-6 pt-2 shrink-0">
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="grid gap-1.5">
                         <Label htmlFor="name" className="text-[10px] uppercase font-bold text-muted-foreground">Role Name</Label>
@@ -141,10 +140,12 @@ export default function RolesManagement() {
                         <Input id="description" name="description" defaultValue={editingRole?.description} className="h-9 text-xs" required />
                       </div>
                     </div>
+                  </div>
 
-                    <div className="border rounded-lg overflow-hidden ring-1 ring-border">
+                  <ScrollArea className="flex-1 px-6 pb-6">
+                    <div className="border rounded-lg overflow-hidden ring-1 ring-border bg-card">
                       <Table>
-                        <TableHeader className="bg-secondary/30">
+                        <TableHeader className="bg-secondary/30 sticky top-0 z-10 backdrop-blur-sm">
                           <TableRow>
                             <TableHead className="h-9 text-[10px] font-bold uppercase w-1/3">Module / Section</TableHead>
                             {PERMISSION_ACTIONS.map(action => (
@@ -154,8 +155,8 @@ export default function RolesManagement() {
                         </TableHeader>
                         <TableBody>
                           {navConfig.map(module => (
-                            <>
-                              <TableRow key={module.id} className="bg-secondary/10">
+                            <React.Fragment key={module.id}>
+                              <TableRow className="bg-secondary/10">
                                 <TableCell className="font-bold text-xs flex items-center gap-2 py-2">
                                   <module.icon className="size-3.5 text-primary" />
                                   {module.title}
@@ -184,14 +185,14 @@ export default function RolesManagement() {
                                   ))}
                                 </TableRow>
                               ))}
-                            </>
+                            </React.Fragment>
                           ))}
                         </TableBody>
                       </Table>
                     </div>
-                  </div>
+                  </ScrollArea>
 
-                  <DialogFooter className="p-6 pt-2 border-t bg-secondary/5">
+                  <DialogFooter className="p-6 border-t bg-secondary/5 shrink-0">
                     <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs">Cancel</Button>
                     <Button type="submit" className="text-xs">Save Configuration</Button>
                   </DialogFooter>

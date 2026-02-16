@@ -39,11 +39,6 @@ service cloud.firestore {
       allow write: if isGlobalAdmin();
     }
 
-    match /permissions/{id} {
-      allow read: if isSignedIn();
-      allow write: if isGlobalAdmin();
-    }
-
     match /institutions/{institutionId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
@@ -70,6 +65,11 @@ service cloud.firestore {
       }
 
       match /invoices/{invoiceId} {
+        allow read: if isInstitutionMember(institutionId);
+        allow write: if isInstitutionMember(institutionId);
+      }
+
+      match /payables/{payableId} {
         allow read: if isInstitutionMember(institutionId);
         allow write: if isInstitutionMember(institutionId);
       }

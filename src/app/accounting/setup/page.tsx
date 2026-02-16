@@ -139,6 +139,11 @@ export default function AccountingSetupPage() {
                 <div className="space-y-6">
                   <h3 className="text-xs font-bold text-accent uppercase border-b pb-2">Expenses & Liabilities</h3>
                   <AccountSelect 
+                    name="accountsPayableAccountId" 
+                    label="Accounts Payable" 
+                    description="Liability account for vendor credit and bills."
+                  />
+                  <AccountSelect 
                     name="cogsAccountId" 
                     label="Cost of Goods Sold" 
                     description="Expense account recorded when inventory is sold."

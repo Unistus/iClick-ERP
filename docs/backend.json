@@ -129,12 +129,31 @@
       },
       "required": ["id", "institutionId", "invoiceNumber", "amount", "balance", "status"]
     },
+    "VendorInvoice": {
+      "title": "VendorInvoice",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "institutionId": { "type": "string" },
+        "vendorName": { "type": "string" },
+        "billNumber": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "amount": { "type": "number" },
+        "balance": { "type": "number" },
+        "status": { "type": "string", "enum": ["Unpaid", "Partial", "Paid", "Overdue"] },
+        "expenseAccountId": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "institutionId", "vendorName", "amount", "balance", "status"]
+    },
     "AccountingSetup": {
       "title": "AccountingSetup",
       "type": "object",
       "properties": {
         "salesRevenueAccountId": { "type": "string" },
         "accountsReceivableAccountId": { "type": "string" },
+        "accountsPayableAccountId": { "type": "string" },
         "inventoryAssetAccountId": { "type": "string" },
         "cogsAccountId": { "type": "string" },
         "vatPayableAccountId": { "type": "string" },
@@ -215,434 +234,6 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "institutionId", "title", "prefix", "nextNumber", "padding"]
-    },
-    "Institution": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Institution",
-      "type": "object",
-      "description": "Represents a top-level business organization or tenant within the iClick ERP system, enabling multi-tenant architecture.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Institution entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "The legal name of the institution."
-        },
-        "logoUrl": {
-          "type": "string",
-          "description": "URL to the institution's logo.",
-          "format": "uri"
-        },
-        "country": {
-          "type": "string",
-          "description": "The primary country of operation for the institution, influencing tax and localization."
-        },
-        "defaultCurrencyId": {
-          "type": "string",
-          "description": "Reference to the default Currency used by the institution. (Relationship: Currency 1:N Institution)"
-        },
-        "taxIdentificationNumber": {
-          "type": "string",
-          "description": "The institution's tax identification number (e.g., VAT number, TIN)."
-        },
-        "isActive": {
-          "type": "boolean",
-          "description": "Indicates if the institution is currently active."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the institution record was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the institution record was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "country",
-        "defaultCurrencyId",
-        "isActive",
-        "createdAt"
-      ]
-    },
-    "Currency": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Currency",
-      "type": "object",
-      "description": "Defines different currencies supported by the system for multi-currency operations.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Currency entity (e.g., 'USD', 'KES')."
-        },
-        "name": {
-          "type": "string",
-          "description": "The full name of the currency (e.g., 'United States Dollar')."
-        },
-        "symbol": {
-          "type": "string",
-          "description": "The symbol for the currency (e.g., '$', 'KSh')."
-        },
-        "exchangeRateToBase": {
-          "type": "number",
-          "description": "The exchange rate of this currency relative to the system's base currency."
-        },
-        "isBaseCurrency": {
-          "type": "boolean",
-          "description": "Indicates if this is the base currency for exchange rate calculations."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the currency record was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the currency record was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "symbol",
-        "exchangeRateToBase",
-        "isBaseCurrency",
-        "createdAt"
-      ]
-    },
-    "TaxSetting": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "TaxSetting",
-      "type": "object",
-      "description": "Configures various tax rates and rules applicable to products and services, supporting cross-border tax logic.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the TaxSetting entity."
-        },
-        "institutionId": {
-          "type": "string",
-          "description": "Reference to the Institution this tax setting belongs to. (Relationship: Institution 1:N TaxSetting)"
-        },
-        "name": {
-          "type": "string",
-          "description": "Name of the tax (e.g., 'VAT 16%', 'Withholding Tax')."
-        },
-        "rate": {
-          "type": "number",
-          "description": "The percentage rate of the tax (e.g., 0.16 for 16%)."
-        },
-        "type": {
-          "type": "string",
-          "description": "The type of tax (e.g., 'VAT', 'Sales Tax', 'Withholding Tax')."
-        },
-        "description": {
-          "type": "string",
-          "description": "A detailed description of the tax setting."
-        },
-        "countryCode": {
-          "type": "string",
-          "description": "The ISO 3166-1 alpha-2 country code where this tax applies."
-        },
-        "isActive": {
-          "type": "boolean",
-          "description": "Indicates if the tax setting is currently active."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the tax setting was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the tax setting was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "institutionId",
-        "name",
-        "rate",
-        "type",
-        "countryCode",
-        "isActive",
-        "createdAt"
-      ]
-    },
-    "Branch": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Branch",
-      "type": "object",
-      "description": "Represents a physical location or sub-division of an institution, supporting multi-branch chains.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Branch entity."
-        },
-        "institutionId": {
-          "type": "string",
-          "description": "Reference to the Institution this branch belongs to. (Relationship: Institution 1:N Branch)"
-        },
-        "name": {
-          "type": "string",
-          "description": "The name of the branch."
-        },
-        "address": {
-          "type": "string",
-          "description": "The physical address of the branch."
-        },
-        "contactEmail": {
-          "type": "string",
-          "description": "The contact email for the branch.",
-          "format": "email"
-        },
-        "contactPhone": {
-          "type": "string",
-          "description": "The contact phone number for the branch."
-        },
-        "isActive": {
-          "type": "boolean",
-          "description": "Indicates if the branch is currently active."
-        },
-        "defaultTaxSettingId": {
-          "type": "string",
-          "description": "Reference to the default TaxSetting for this branch. (Relationship: TaxSetting 1:N Branch)"
-        },
-        "defaultCurrencyId": {
-          "type": "string",
-          "description": "Reference to the default Currency for this branch. (Relationship: Currency 1:N Branch)"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the branch record was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the branch record was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "institutionId",
-        "name",
-        "address",
-        "isActive",
-        "defaultCurrencyId",
-        "createdAt"
-      ]
-    },
-    "Department": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Department",
-      "type": "object",
-      "description": "Defines departments within a branch or institution for organizational structure and budgeting.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Department entity."
-        },
-        "institutionId": {
-          "type": "string",
-          "description": "Reference to the Institution this department belongs to. (Relationship: Institution 1:N Department)"
-        },
-        "branchId": {
-          "type": "string",
-          "description": "Reference to the Branch this department belongs to. (Relationship: Branch 1:N Department)"
-        },
-        "name": {
-          "type": "string",
-          "description": "The name of the department (e.g., 'Sales', 'HR', 'Kitchen')."
-        },
-        "description": {
-          "type": "string",
-          "description": "A description of the department's function."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the department record was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the department record was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "institutionId",
-        "branchId",
-        "name",
-        "createdAt"
-      ]
-    },
-    "Permission": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Permission",
-      "type": "object",
-      "description": "Defines a specific action or resource access within the system for granular Role-Based Access Control (RBAC).",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Permission entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "The programmatic name of the permission (e.g., 'product:create', 'sale:read')."
-        },
-        "description": {
-          "type": "string",
-          "description": "A human-readable description of what the permission allows."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the permission record was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the permission record was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "description",
-        "createdAt"
-      ]
-    },
-    "Role": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Role",
-      "type": "object",
-      "description": "Groups a set of permissions to define user roles within the system, enabling multi-user with role control.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Role entity."
-        },
-        "institutionId": {
-          "type": "string",
-          "description": "Reference to the Institution this role belongs to. (Relationship: Institution 1:N Role)"
-        },
-        "name": {
-          "type": "string",
-          "description": "The name of the role (e.g., 'Admin', 'Cashier', 'Inventory Manager')."
-        },
-        "description": {
-          "type": "string",
-          "description": "A description of the responsibilities associated with the role."
-        },
-        "permissionIds": {
-          "type": "array",
-          "description": "References to Permissions granted to this role. (Relationship: Permission N:N Role)",
-          "items": {
-            "type": "string"
-          }
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the role record was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the role record was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "institutionId",
-        "name",
-        "description",
-        "permissionIds",
-        "createdAt"
-      ]
-    },
-    "User": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "User",
-      "type": "object",
-      "description": "Represents a system user with associated roles and access, relying on an external authentication system.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the User entity, typically from an external authentication system."
-        },
-        "institutionId": {
-          "type": "string",
-          "description": "Reference to the Institution the user belongs to. (Relationship: Institution 1:N User)"
-        },
-        "branchId": {
-          "type": "string",
-          "description": "Reference to the primary Branch the user is associated with. (Relationship: Branch 1:N User)"
-        },
-        "firstName": {
-          "type": "string",
-          "description": "The user's first name."
-        },
-        "lastName": {
-          "type": "string",
-          "description": "The user's last name."
-        },
-        "email": {
-          "type": "string",
-          "description": "The user's email address.",
-          "format": "email"
-        },
-        "phone": {
-          "type": "string",
-          "description": "The user's phone number."
-        },
-        "roleIds": {
-          "type": "array",
-          "description": "References to Roles assigned to this user. (Relationship: Role N:N User)",
-          "items": {
-            "type": "string"
-          }
-        },
-        "isActive": {
-          "type": "boolean",
-          "description": "Indicates if the user account is currently active."
-        },
-        "lastLogin": {
-          "type": "string",
-          "description": "Timestamp of the user's last login.",
-          "format": "date-time"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the user record was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the user record was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "institutionId",
-        "firstName",
-        "lastName",
-        "email",
-        "roleIds",
-        "isActive",
-        "createdAt"
-      ]
     }
   },
   "auth": {
@@ -653,6 +244,16 @@
   },
   "firestore": {
     "structure": [
+      {
+        "path": "/institutions/{institutionId}/payables/{payableId}",
+        "definition": {
+          "entityName": "VendorInvoice",
+          "schema": {
+            "$ref": "#/backend/entities/VendorInvoice"
+          },
+          "description": "Accounts payable vendor bills."
+        }
+      },
       {
         "path": "/institutions/{institutionId}/settings/global",
         "definition": {
@@ -701,136 +302,6 @@
             "$ref": "#/backend/entities/Invoice"
           },
           "description": "Accounts receivable invoices."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/notification_templates/{templateId}",
-        "definition": {
-          "entityName": "NotificationTemplate",
-          "schema": {
-            "$ref": "#/backend/entities/NotificationTemplate"
-          },
-          "description": "Templates for multi-channel institutional communication."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/api_keys/{keyId}",
-        "definition": {
-          "entityName": "ApiKey",
-          "schema": {
-            "$ref": "#/backend/entities/ApiKey"
-          },
-          "description": "Integration credentials for external developers and services."
-        }
-      },
-      {
-        "path": "/system_admins/{uid}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Dedicated collection for system-wide administrators."
-        }
-      },
-      {
-        "path": "/users/{userId}",
-        "definition": {
-          "entityName": "User",
-          "schema": {
-            "$ref": "#/backend/entities/User"
-          },
-          "description": "Stores user profiles."
-        }
-      },
-      {
-        "path": "/user_institutions/{userId}/memberships/{institutionId}",
-        "definition": {
-          "entityName": "Institution",
-          "schema": {
-            "$ref": "#/backend/entities/Institution"
-          },
-          "description": "Membership verification."
-        }
-      },
-      {
-        "path": "/currencies/{currencyId}",
-        "definition": {
-          "entityName": "Currency",
-          "schema": {
-            "$ref": "#/backend/entities/Currency"
-          },
-          "description": "Global currencies."
-        }
-      },
-      {
-        "path": "/permissions/{permissionId}",
-        "definition": {
-          "entityName": "Permission",
-          "schema": {
-            "$ref": "#/backend/entities/Permission"
-          },
-          "description": "Global permissions."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}",
-        "definition": {
-          "entityName": "Institution",
-          "schema": {
-            "$ref": "#/backend/entities/Institution"
-          },
-          "description": "Top-level institution."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/audit_logs/{logId}",
-        "definition": {
-          "entityName": "AuditLog",
-          "schema": {
-            "$ref": "#/backend/entities/AuditLog"
-          },
-          "description": "Institutional audit trail."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/document_sequences/{sequenceId}",
-        "definition": {
-          "entityName": "DocumentSequence",
-          "schema": {
-            "$ref": "#/backend/entities/DocumentSequence"
-          },
-          "description": "Numbering sequences."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/roles/{roleId}",
-        "definition": {
-          "entityName": "Role",
-          "schema": {
-            "$ref": "#/backend/entities/Role"
-          },
-          "description": "Security roles."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/tax_settings/{taxSettingId}",
-        "definition": {
-          "entityName": "TaxSetting",
-          "schema": {
-            "$ref": "#/backend/entities/TaxSetting"
-          },
-          "description": "Tax rules."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/branches/{branchId}",
-        "definition": {
-          "entityName": "Branch",
-          "schema": {
-            "$ref": "#/backend/entities/Branch"
-          },
-          "description": "Branch locations."
         }
       }
     ]

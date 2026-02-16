@@ -28,7 +28,16 @@ import {
   Activity,
   Key,
   BellRing,
-  Command
+  Command,
+  Box,
+  Truck,
+  Layers,
+  History,
+  UserCheck,
+  CreditCard,
+  FileText,
+  PieChart,
+  UserPlus
 } from "lucide-react"
 
 import {
@@ -48,31 +57,96 @@ import { usePathname, useRouter } from "next/navigation"
 import { useAuth, useUser } from "@/firebase"
 import { cn } from "@/lib/utils"
 
-const mainModules = [
-  { title: "Command Center", icon: LayoutDashboard, url: "/", pattern: /^\/$/ },
-  { title: "iClick POS", icon: ShoppingCart, url: "/pos", pattern: /^\/pos/ },
-  { title: "Stock Vault", icon: Package, url: "/inventory", pattern: /^\/inventory/ },
-  { title: "Financial Suite", icon: Calculator, url: "/accounting", pattern: /^\/accounting/ },
-  { title: "People Hub", icon: Users, url: "/hr", pattern: /^\/hr/ },
-  { title: "Client Care", icon: HeartHandshake, url: "/crm", pattern: /^\/crm/ },
-  { title: "AI Analysis", icon: Sparkles, url: "/ai-insights", pattern: /^\/ai-insights/ },
-  { title: "Administration", icon: Settings, url: "/admin/institutions", pattern: /^\/admin/ },
-]
+interface NavItem {
+  title: string
+  icon: any
+  url: string
+  pattern: RegExp
+  submenus?: { title: string; icon: any; url: string }[]
+}
 
-const adminSubmenus = [
-  { title: "Institutions", icon: Store, url: "/admin/institutions" },
-  { title: "Branches", icon: MapPin, url: "/admin/branches" },
-  { title: "Departments", icon: Briefcase, url: "/admin/departments" },
-  { title: "Roles & Permissions", icon: Shield, url: "/admin/roles" },
-  { title: "Approval Workflows", icon: GitPullRequest, url: "/admin/approval-workflows" },
-  { title: "Tax Config", icon: Percent, url: "/admin/tax" },
-  { title: "Currencies", icon: Coins, url: "/admin/currencies" },
-  { title: "Fiscal Periods", icon: CalendarDays, url: "/admin/fiscal-periods" },
-  { title: "Doc Numbering", icon: Hash, url: "/admin/document-numbering" },
-  { title: "Audit Logs", icon: FileClock, url: "/admin/audit-logs" },
-  { title: "Notification Templates", icon: BellRing, url: "/admin/notifications" },
-  { title: "System Health", icon: Activity, url: "/admin/system-health" },
-  { title: "API Management", icon: Key, url: "/admin/api-management" },
+const navConfig: NavItem[] = [
+  { 
+    title: "Command Center", 
+    icon: LayoutDashboard, 
+    url: "/", 
+    pattern: /^\/$/ 
+  },
+  { 
+    title: "iClick POS", 
+    icon: ShoppingCart, 
+    url: "/pos", 
+    pattern: /^\/pos/ 
+  },
+  { 
+    title: "Stock Vault", 
+    icon: Package, 
+    url: "/inventory", 
+    pattern: /^\/inventory/,
+    submenus: [
+      { title: "Products", icon: Box, url: "/inventory" },
+      { title: "Stock Transfers", icon: Truck, url: "/inventory/transfers" },
+      { title: "Adjustments", icon: Layers, url: "/inventory/adjustments" },
+      { title: "Categories", icon: Hash, url: "/inventory/categories" },
+    ]
+  },
+  { 
+    title: "Financial Suite", 
+    icon: Calculator, 
+    url: "/accounting", 
+    pattern: /^\/accounting/,
+    submenus: [
+      { title: "General Ledger", icon: History, url: "/accounting" },
+      { title: "Chart of Accounts", icon: Layers, url: "/accounting/coa" },
+      { title: "Budgets", icon: PieChart, url: "/accounting/budgets" },
+      { title: "Tax Returns", icon: FileText, url: "/accounting/tax" },
+    ]
+  },
+  { 
+    title: "People Hub", 
+    icon: Users, 
+    url: "/hr", 
+    pattern: /^\/hr/,
+    submenus: [
+      { title: "Employee List", icon: Users, url: "/hr" },
+      { title: "Payroll Runs", icon: CreditCard, url: "/hr/payroll" },
+      { title: "Leave Requests", icon: CalendarDays, url: "/hr/leave" },
+      { title: "Recruitment", icon: UserPlus, url: "/hr/recruitment" },
+    ]
+  },
+  { 
+    title: "Client Care", 
+    icon: HeartHandshake, 
+    url: "/crm", 
+    pattern: /^\/crm/ 
+  },
+  { 
+    title: "AI Analysis", 
+    icon: Sparkles, 
+    url: "/ai-insights", 
+    pattern: /^\/ai-insights/ 
+  },
+  { 
+    title: "Administration", 
+    icon: Settings, 
+    url: "/admin/institutions", 
+    pattern: /^\/admin/,
+    submenus: [
+      { title: "Institutions", icon: Store, url: "/admin/institutions" },
+      { title: "Branches", icon: MapPin, url: "/admin/branches" },
+      { title: "Departments", icon: Briefcase, url: "/admin/departments" },
+      { title: "Roles & Permissions", icon: Shield, url: "/admin/roles" },
+      { title: "Approval Workflows", icon: GitPullRequest, url: "/admin/approval-workflows" },
+      { title: "Tax Config", icon: Percent, url: "/admin/tax" },
+      { title: "Currencies", icon: Coins, url: "/admin/currencies" },
+      { title: "Fiscal Periods", icon: CalendarDays, url: "/admin/fiscal-periods" },
+      { title: "Doc Numbering", icon: Hash, url: "/admin/document-numbering" },
+      { title: "Audit Logs", icon: FileClock, url: "/admin/audit-logs" },
+      { title: "Notification Templates", icon: BellRing, url: "/admin/notifications" },
+      { title: "System Health", icon: Activity, url: "/admin/system-health" },
+      { title: "API Management", icon: Key, url: "/admin/api-management" },
+    ]
+  },
 ]
 
 export function AppSidebar() {
@@ -80,8 +154,11 @@ export function AppSidebar() {
   const router = useRouter()
   const auth = useAuth()
   const { user } = useUser()
+  const { setOpen } = useSidebar()
   
-  const isAdminActive = pathname.startsWith('/admin')
+  // Find the active main module based on URL pattern
+  const activeModule = navConfig.find(item => item.pattern.test(pathname))
+  const hasSubmenus = activeModule && activeModule.submenus && activeModule.submenus.length > 0
 
   const handleLogout = async () => {
     await auth.signOut()
@@ -90,10 +167,12 @@ export function AppSidebar() {
 
   return (
     <div className="flex h-full">
-      {/* PERSISTENT ICON SIDEBAR */}
+      {/* PERSISTENT ICON SIDEBAR (Primary) */}
       <Sidebar 
         collapsible="icon" 
-        className="z-30 !w-[var(--sidebar-width-icon)] border-r border-border/50"
+        className="z-30 !w-[var(--sidebar-width-icon)] border-r border-border/50 shrink-0"
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
       >
         <SidebarHeader className="h-16 flex items-center justify-center p-0">
           <div className="size-9 rounded-lg bg-primary flex items-center justify-center text-white">
@@ -102,7 +181,7 @@ export function AppSidebar() {
         </SidebarHeader>
         <SidebarContent className="p-2 gap-4">
           <SidebarMenu>
-            {mainModules.map((item) => {
+            {navConfig.map((item) => {
               const isActive = item.pattern.test(pathname)
               return (
                 <SidebarMenuItem key={item.title}>
@@ -117,7 +196,7 @@ export function AppSidebar() {
                   >
                     <Link href={item.url}>
                       <item.icon className="size-5" />
-                      <span className="hidden">item.title</span>
+                      <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -134,26 +213,29 @@ export function AppSidebar() {
                 tooltip="Logout"
               >
                 <LogOut className="size-5" />
+                <span>Logout</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
 
-      {/* SECONDARY SIDEBAR (SUBMENUS) */}
-      {isAdminActive && (
+      {/* DYNAMIC SECONDARY SIDEBAR (Submenus) */}
+      {hasSubmenus && (
         <Sidebar 
           collapsible="none" 
-          className="z-20 !w-64 border-r border-border/50 bg-sidebar/50 backdrop-blur-md animate-in slide-in-from-left duration-300"
+          className="z-20 !w-64 border-r border-border/50 bg-sidebar/50 backdrop-blur-md animate-in slide-in-from-left duration-300 shrink-0"
         >
           <SidebarHeader className="h-16 flex items-center px-6 border-b border-border/50">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Administration</h2>
+            <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+              {activeModule.title}
+            </h2>
           </SidebarHeader>
           <SidebarContent className="p-4">
             <SidebarGroup>
-              <SidebarGroupLabel className="px-2 mb-2">System Brain</SidebarGroupLabel>
+              <SidebarGroupLabel className="px-2 mb-2">Module Navigation</SidebarGroupLabel>
               <SidebarMenu className="gap-1">
-                {adminSubmenus.map((sub) => (
+                {activeModule.submenus?.map((sub) => (
                   <SidebarMenuItem key={sub.title}>
                     <SidebarMenuButton 
                       asChild 
@@ -181,7 +263,7 @@ export function AppSidebar() {
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs font-bold truncate">{user.email?.split('@')[0]}</span>
-                  <span className="text-[10px] text-muted-foreground">Admin Access</span>
+                  <span className="text-[10px] text-muted-foreground">Operator</span>
                 </div>
               </div>
             )}

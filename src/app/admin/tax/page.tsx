@@ -1,18 +1,19 @@
+
 'use client';
 
 import { useState } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
 import { collection, doc, serverTimestamp, query } from "firebase/firestore"
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates"
-import { Percent, Plus, Edit2, Search, CheckCircle } from "lucide-react"
+import { Percent, Plus, Edit2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 
 export default function TaxManagement() {
@@ -29,7 +30,7 @@ export default function TaxManagement() {
     return query(collection(db, 'institutions', selectedInstitutionId, 'tax_settings'))
   }, [db, selectedInstitutionId])
   
-  const { data: taxSettings, isLoading: isTaxLoading } = useCollection(taxQuery)
+  const { data: taxSettings, isLoading } = useCollection(taxQuery)
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -51,10 +52,7 @@ export default function TaxManagement() {
     if (editingTax) {
       updateDocumentNonBlocking(doc(taxColRef, editingTax.id), data)
     } else {
-      addDocumentNonBlocking(taxColRef, {
-        ...data,
-        createdAt: serverTimestamp(),
-      })
+      addDocumentNonBlocking(taxColRef, { ...data, createdAt: serverTimestamp() })
     }
     setIsCreateOpen(false)
     setEditingTax(null)
@@ -62,68 +60,62 @@ export default function TaxManagement() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-headline font-bold">Tax Configuration</h1>
-            <p className="text-muted-foreground">Manage VAT, Sales Tax, and withholding tax rules.</p>
-          </div>
-          <div className="flex gap-4 w-full md:w-auto">
+          <h1 className="text-2xl font-headline font-bold">Tax Config</h1>
+          <div className="flex gap-2 w-full md:w-auto">
             <Select value={selectedInstitutionId} onValueChange={setSelectedInstitutionId}>
-              <SelectTrigger className="w-[200px] h-11 bg-card border-none ring-1 ring-border">
+              <SelectTrigger className="w-[180px] h-9 bg-card border-none ring-1 ring-border text-xs">
                 <SelectValue placeholder="Select Institution" />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (
-                  <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
+                  <SelectItem key={i.id} value={i.id} className="text-xs">{i.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2 h-11" disabled={!selectedInstitutionId} onClick={() => setEditingTax(null)}>
-                  <Plus className="size-4" /> New Tax Rule
+                <Button size="sm" className="gap-2 h-9 text-xs" disabled={!selectedInstitutionId} onClick={() => setEditingTax(null)}>
+                  <Plus className="size-4" /> Add Rule
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <form onSubmit={handleSubmit}>
                   <DialogHeader>
-                    <DialogTitle>{editingTax ? 'Edit' : 'Add'} Tax Setting</DialogTitle>
-                    <DialogDescription>
-                      Configure tax rules for {institutions?.find(i => i.id === selectedInstitutionId)?.name}.
-                    </DialogDescription>
+                    <DialogTitle>{editingTax ? 'Edit' : 'Add'} Tax</DialogTitle>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="tax-name">Tax Name</Label>
-                      <Input id="tax-name" name="name" defaultValue={editingTax?.name} placeholder="e.g. VAT 16%" required />
+                      <Label htmlFor="name">Tax Name</Label>
+                      <Input id="name" name="name" defaultValue={editingTax?.name} placeholder="e.g. VAT 16%" required />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="grid gap-2">
                         <Label htmlFor="rate">Rate (%)</Label>
-                        <Input id="rate" name="rate" type="number" step="0.01" defaultValue={editingTax ? editingTax.rate * 100 : ''} placeholder="16" required />
+                        <Input id="rate" name="rate" type="number" step="0.01" defaultValue={editingTax ? editingTax.rate * 100 : ''} required />
                       </div>
                       <div className="grid gap-2">
-                        <Label htmlFor="type">Tax Type</Label>
+                        <Label htmlFor="type">Type</Label>
                         <Select name="type" defaultValue={editingTax?.type || "VAT"}>
-                          <SelectTrigger>
+                          <SelectTrigger className="text-xs h-9">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="VAT">VAT</SelectItem>
-                            <SelectItem value="SalesTax">Sales Tax</SelectItem>
-                            <SelectItem value="Withholding">Withholding</SelectItem>
+                            <SelectItem value="VAT" className="text-xs">VAT</SelectItem>
+                            <SelectItem value="SalesTax" className="text-xs">Sales Tax</SelectItem>
+                            <SelectItem value="Withholding" className="text-xs">Withholding</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="countryCode">ISO Country Code</Label>
-                      <Input id="countryCode" name="countryCode" defaultValue={editingTax?.countryCode || "KE"} placeholder="KE" required />
+                      <Input id="countryCode" name="countryCode" defaultValue={editingTax?.countryCode || "KE"} required />
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button type="submit">Save Configuration</Button>
+                    <Button type="submit">Save</Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
@@ -132,52 +124,43 @@ export default function TaxManagement() {
         </div>
 
         {!selectedInstitutionId ? (
-          <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-2xl bg-secondary/10">
-            <Percent className="size-12 text-muted-foreground opacity-20 mb-4" />
-            <p className="text-lg font-medium">Please select an institution to manage tax settings.</p>
+          <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed rounded-2xl bg-secondary/5">
+            <Percent className="size-10 text-muted-foreground opacity-20 mb-2" />
+            <p className="text-sm font-medium text-muted-foreground">Select institution to manage tax settings.</p>
           </div>
         ) : (
-          <Card className="border-none ring-1 ring-border shadow-xl">
-            <CardHeader>
-              <CardTitle>Tax Rules</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <Card className="border-none ring-1 ring-border shadow-lg">
+            <CardContent className="p-0">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-secondary/20">
                   <TableRow>
-                    <TableHead>Tax Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Rate</TableHead>
-                    <TableHead>Country</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="h-9 text-[10px] uppercase font-bold">Tax Name</TableHead>
+                    <TableHead className="h-9 text-[10px] uppercase font-bold">Type</TableHead>
+                    <TableHead className="h-9 text-[10px] uppercase font-bold">Rate</TableHead>
+                    <TableHead className="h-9 text-[10px] uppercase font-bold">Country</TableHead>
+                    <TableHead className="h-9 text-right text-[10px] uppercase font-bold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isTaxLoading ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-8">Loading tax settings...</TableCell></TableRow>
+                  {isLoading ? (
+                    <TableRow><TableCell colSpan={5} className="text-center py-8 text-xs">Loading...</TableCell></TableRow>
                   ) : taxSettings?.length === 0 ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No tax rules defined.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center py-8 text-xs text-muted-foreground">No records found.</TableCell></TableRow>
                   ) : taxSettings?.map((tax) => (
-                    <TableRow key={tax.id}>
-                      <TableCell className="font-bold flex items-center gap-3">
-                        <div className="size-8 rounded bg-accent/10 text-accent flex items-center justify-center">
-                          <Percent className="size-4" />
-                        </div>
+                    <TableRow key={tax.id} className="h-11">
+                      <TableCell className="font-bold text-xs flex items-center gap-2">
+                        <Percent className="size-3.5 text-accent" />
                         {tax.name}
                       </TableCell>
-                      <TableCell>{tax.type}</TableCell>
-                      <TableCell className="font-mono font-bold">{(tax.rate * 100).toFixed(1)}%</TableCell>
-                      <TableCell>{tax.countryCode}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-500">Active</Badge>
-                      </TableCell>
+                      <TableCell className="text-[11px]">{tax.type}</TableCell>
+                      <TableCell className="font-mono text-xs font-bold">{(tax.rate * 100).toFixed(1)}%</TableCell>
+                      <TableCell className="text-[11px]">{tax.countryCode}</TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => {
+                        <Button variant="ghost" size="icon" className="size-7" onClick={() => {
                           setEditingTax(tax)
                           setIsCreateOpen(true)
                         }}>
-                          <Edit2 className="size-4" />
+                          <Edit2 className="size-3.5" />
                         </Button>
                       </TableCell>
                     </TableRow>

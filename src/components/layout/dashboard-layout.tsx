@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useUser } from "@/firebase"
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({ children }: { children: React.Node }) {
   const { user, isUserLoading } = useUser()
   const router = useRouter()
 
@@ -36,8 +36,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <AppSidebar />
         
         <div className="flex-1 flex flex-col min-w-0 relative">
-          {/* FLOATING TOP BAR (FIXED) - Medium Height (h-14) */}
-          <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b px-6 bg-card/40 backdrop-blur-xl sticky top-0 z-10 w-full shadow-sm">
+          {/* FLOATING TOP BAR - Medium Height (h-12) */}
+          <header className="flex h-12 shrink-0 items-center justify-between gap-4 border-b px-6 bg-card/40 backdrop-blur-xl sticky top-0 z-10 w-full shadow-sm">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Sparkles className="size-3 text-accent animate-pulse" />
@@ -49,23 +49,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <Input
                   type="search"
                   placeholder="Universal Search..."
-                  className="pl-8 bg-secondary/30 border-none ring-1 ring-border/20 focus-visible:ring-primary h-8 text-[10px] rounded-full"
+                  className="pl-8 bg-secondary/30 border-none ring-1 ring-border/20 focus-visible:ring-primary h-7 text-[10px] rounded-full"
                 />
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" className="relative rounded-full h-8 w-8 hover:bg-secondary">
+              <Button variant="ghost" size="icon" className="relative rounded-full h-7 w-7 hover:bg-secondary">
                 <Bell className="size-4" />
-                <span className="absolute top-1.5 right-1.5 size-1.5 bg-accent rounded-full border border-background" />
+                <span className="absolute top-1 right-1 size-1.5 bg-accent rounded-full border border-background" />
               </Button>
               <div className="h-6 w-px bg-border/50 mx-1" />
               <div className="flex items-center gap-2 pl-2">
                 <div className="hidden lg:flex flex-col items-end text-right">
                   <span className="text-[10px] font-bold leading-none">{user.email?.split('@')[0]}</span>
-                  <span className="text-[8px] uppercase tracking-tighter text-muted-foreground">Active Operator</span>
                 </div>
-                <div className="size-7 rounded-full bg-gradient-to-tr from-primary to-accent p-0.5 shadow-sm">
-                  <div className="size-full rounded-full bg-background flex items-center justify-center font-bold text-[10px]">
+                <div className="size-6 rounded-full bg-gradient-to-tr from-primary to-accent p-0.5 shadow-sm">
+                  <div className="size-full rounded-full bg-background flex items-center justify-center font-bold text-[9px]">
                     {user.email?.[0].toUpperCase()}
                   </div>
                 </div>
@@ -74,14 +73,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </header>
 
           {/* INDEPENDENT SCROLLABLE CONTENT */}
-          <main className="flex-1 overflow-y-auto custom-scrollbar p-6">
-            <div className="max-w-[1600px] mx-auto min-h-full pb-12">
+          <main className="flex-1 overflow-y-auto custom-scrollbar p-4">
+            <div className="max-w-[1600px] mx-auto min-h-full pb-8">
               {children}
             </div>
           </main>
 
-          {/* SYSTEM FOOTER BAR (FIXED) */}
-          <footer className="h-8 shrink-0 bg-card/60 border-t flex items-center justify-between px-6 text-[9px] font-medium text-muted-foreground backdrop-blur-md z-10">
+          {/* SYSTEM FOOTER BAR - Compact Height (h-7) */}
+          <footer className="h-7 shrink-0 bg-card/60 border-t flex items-center justify-between px-6 text-[9px] font-medium text-muted-foreground backdrop-blur-md z-10">
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-1.5">
                 <Building2 className="size-3 text-primary" />
@@ -95,7 +94,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-1.5">
                 <ShieldCheck className="size-3 text-emerald-500" />
-                <span>Secure Connection</span>
+                <span>Secure</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <User className="size-3" />

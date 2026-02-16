@@ -1,18 +1,19 @@
+
 'use client';
 
 import { useState } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
 import { collection, doc, serverTimestamp, query } from "firebase/firestore"
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates"
-import { Briefcase, Plus, Edit2, Search } from "lucide-react"
+import { Briefcase, Plus, Edit2 } from "lucide-react"
 
 export default function DepartmentsManagement() {
   const db = useFirestore()
@@ -54,10 +55,7 @@ export default function DepartmentsManagement() {
     if (editingDept) {
       updateDocumentNonBlocking(doc(deptColRef, editingDept.id), data)
     } else {
-      addDocumentNonBlocking(deptColRef, {
-        ...data,
-        createdAt: serverTimestamp(),
-      })
+      addDocumentNonBlocking(deptColRef, { ...data, createdAt: serverTimestamp() })
     }
     setIsCreateOpen(false)
     setEditingDept(null)
@@ -65,59 +63,53 @@ export default function DepartmentsManagement() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-headline font-bold">Departments</h1>
-            <p className="text-muted-foreground">Organize branch operations into functional units.</p>
-          </div>
-          <div className="flex flex-wrap gap-4 w-full md:w-auto">
+          <h1 className="text-2xl font-headline font-bold">Departments</h1>
+          <div className="flex flex-wrap gap-2 w-full md:w-auto">
             <Select value={selectedInstitutionId} onValueChange={setSelectedInstitutionId}>
-              <SelectTrigger className="w-[180px] bg-card border-none ring-1 ring-border">
+              <SelectTrigger className="w-[160px] h-9 bg-card border-none ring-1 ring-border text-xs">
                 <SelectValue placeholder="Institution" />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (
-                  <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
+                  <SelectItem key={i.id} value={i.id} className="text-xs">{i.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select value={selectedBranchId} onValueChange={setSelectedBranchId} disabled={!selectedInstitutionId}>
-              <SelectTrigger className="w-[180px] bg-card border-none ring-1 ring-border">
+              <SelectTrigger className="w-[160px] h-9 bg-card border-none ring-1 ring-border text-xs">
                 <SelectValue placeholder="Branch" />
               </SelectTrigger>
               <SelectContent>
                 {branches?.map(b => (
-                  <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                  <SelectItem key={b.id} value={b.id} className="text-xs">{b.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2" disabled={!selectedBranchId} onClick={() => setEditingDept(null)}>
-                  <Plus className="size-4" /> New Dept
+                <Button size="sm" className="gap-2 h-9 text-xs" disabled={!selectedBranchId} onClick={() => setEditingDept(null)}>
+                  <Plus className="size-4" /> Add Dept
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <form onSubmit={handleSubmit}>
                   <DialogHeader>
                     <DialogTitle>{editingDept ? 'Edit' : 'Add'} Department</DialogTitle>
-                    <DialogDescription>
-                      Create a functional unit within {branches?.find(b => b.id === selectedBranchId)?.name}.
-                    </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="dept-name">Department Name</Label>
-                      <Input id="dept-name" name="name" defaultValue={editingDept?.name} placeholder="e.g. Pharmacy, Kitchen, Reception" required />
+                      <Label htmlFor="name">Name</Label>
+                      <Input id="name" name="name" defaultValue={editingDept?.name} required />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="description">Description</Label>
-                      <Input id="description" name="description" defaultValue={editingDept?.description} placeholder="A brief overview of function..." />
+                      <Input id="description" name="description" defaultValue={editingDept?.description} />
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button type="submit">Save Department</Button>
+                    <Button type="submit">Save</Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
@@ -126,44 +118,39 @@ export default function DepartmentsManagement() {
         </div>
 
         {!selectedBranchId ? (
-          <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-2xl bg-secondary/10">
-            <Briefcase className="size-12 text-muted-foreground opacity-20 mb-4" />
-            <p className="text-lg font-medium">Please select an institution and branch to manage departments.</p>
+          <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed rounded-2xl bg-secondary/5">
+            <Briefcase className="size-10 text-muted-foreground opacity-20 mb-2" />
+            <p className="text-sm font-medium text-muted-foreground">Select institution and branch to manage departments.</p>
           </div>
         ) : (
-          <Card className="border-none ring-1 ring-border shadow-xl">
-            <CardHeader>
-              <CardTitle>Departments List</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <Card className="border-none ring-1 ring-border shadow-lg">
+            <CardContent className="p-0">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-secondary/20">
                   <TableRow>
-                    <TableHead>Dept Name</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="h-9 text-[10px] uppercase font-bold">Dept Name</TableHead>
+                    <TableHead className="h-9 text-[10px] uppercase font-bold">Description</TableHead>
+                    <TableHead className="h-9 text-right text-[10px] uppercase font-bold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={3} className="text-center py-8">Loading...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={3} className="text-center py-8 text-xs">Loading...</TableCell></TableRow>
                   ) : departments?.length === 0 ? (
-                    <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No departments found.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={3} className="text-center py-8 text-xs text-muted-foreground">No records found.</TableCell></TableRow>
                   ) : departments?.map((dept) => (
-                    <TableRow key={dept.id}>
-                      <TableCell className="font-bold flex items-center gap-3">
-                        <div className="size-8 rounded bg-secondary text-primary flex items-center justify-center">
-                          <Briefcase className="size-4" />
-                        </div>
+                    <TableRow key={dept.id} className="h-11">
+                      <TableCell className="font-bold text-xs flex items-center gap-2">
+                        <Briefcase className="size-3.5 text-primary" />
                         {dept.name}
                       </TableCell>
-                      <TableCell>{dept.description}</TableCell>
+                      <TableCell className="text-xs">{dept.description}</TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => {
+                        <Button variant="ghost" size="icon" className="size-7" onClick={() => {
                           setEditingDept(dept)
                           setIsCreateOpen(true)
                         }}>
-                          <Edit2 className="size-4" />
+                          <Edit2 className="size-3.5" />
                         </Button>
                       </TableCell>
                     </TableRow>

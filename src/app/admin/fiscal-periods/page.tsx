@@ -3,17 +3,17 @@
 
 import { useState } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
-import { collection, doc, serverTimestamp, query } from "firebase/firestore"
-import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates"
-import { CalendarDays, Plus, Lock, Unlock, Search } from "lucide-react"
+import { collection, serverTimestamp, query } from "firebase/firestore"
+import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates"
+import { CalendarDays, Plus, Lock, Unlock } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 
 export default function FiscalPeriods() {
@@ -54,26 +54,23 @@ export default function FiscalPeriods() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-headline font-bold">Fiscal Periods</h1>
-            <p className="text-muted-foreground">Manage financial years and period closing for automated accounting.</p>
-          </div>
-          <div className="flex gap-4 w-full md:w-auto">
+          <h1 className="text-2xl font-headline font-bold">Fiscal Periods</h1>
+          <div className="flex gap-2 w-full md:w-auto">
             <Select value={selectedInstitutionId} onValueChange={setSelectedInstitutionId}>
-              <SelectTrigger className="w-[200px] h-11 bg-card border-none ring-1 ring-border">
+              <SelectTrigger className="w-[180px] h-9 bg-card border-none ring-1 ring-border text-xs">
                 <SelectValue placeholder="Select Institution" />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (
-                  <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
+                  <SelectItem key={i.id} value={i.id} className="text-xs">{i.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2 h-11" disabled={!selectedInstitutionId}>
+                <Button size="sm" className="gap-2 h-9 text-xs" disabled={!selectedInstitutionId}>
                   <Plus className="size-4" /> New Period
                 </Button>
               </DialogTrigger>
@@ -81,9 +78,8 @@ export default function FiscalPeriods() {
                 <form onSubmit={handleSubmit}>
                   <DialogHeader>
                     <DialogTitle>New Fiscal Period</DialogTitle>
-                    <DialogDescription>Define a new financial reporting period.</DialogDescription>
                   </DialogHeader>
-                  <div className="grid gap-4 py-4">
+                  <div className="grid gap-4 py-4 text-xs">
                     <div className="grid gap-2">
                       <Label htmlFor="name">Period Name</Label>
                       <Input id="name" name="name" placeholder="e.g. FY 2024" required />
@@ -109,48 +105,43 @@ export default function FiscalPeriods() {
         </div>
 
         {!selectedInstitutionId ? (
-          <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-2xl bg-secondary/10">
-            <CalendarDays className="size-12 text-muted-foreground opacity-20 mb-4" />
-            <p className="text-lg font-medium">Select an institution to manage fiscal cycles.</p>
+          <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed rounded-2xl bg-secondary/5">
+            <CalendarDays className="size-10 text-muted-foreground opacity-20 mb-2" />
+            <p className="text-sm font-medium text-muted-foreground">Select institution to manage cycles.</p>
           </div>
         ) : (
-          <Card className="border-none ring-1 ring-border shadow-xl">
-            <CardHeader>
-              <CardTitle>Financial Periods</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <Card className="border-none ring-1 ring-border shadow-lg">
+            <CardContent className="p-0">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-secondary/20">
                   <TableRow>
-                    <TableHead>Period Name</TableHead>
-                    <TableHead>Date Range</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="h-9 text-[10px] uppercase font-bold">Period Name</TableHead>
+                    <TableHead className="h-9 text-[10px] uppercase font-bold">Date Range</TableHead>
+                    <TableHead className="h-9 text-[10px] uppercase font-bold">Status</TableHead>
+                    <TableHead className="h-9 text-right text-[10px] uppercase font-bold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={4} className="text-center py-8">Loading...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="text-center py-8 text-xs">Loading...</TableCell></TableRow>
                   ) : periods?.length === 0 ? (
-                    <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">No fiscal periods defined.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="text-center py-8 text-xs text-muted-foreground">No records.</TableCell></TableRow>
                   ) : periods?.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-bold flex items-center gap-3">
-                        <div className="size-8 rounded bg-accent/10 text-accent flex items-center justify-center">
-                          <CalendarDays className="size-4" />
-                        </div>
+                    <TableRow key={p.id} className="h-11">
+                      <TableCell className="font-bold text-xs flex items-center gap-2">
+                        <CalendarDays className="size-3.5 text-accent" />
                         {p.name}
                       </TableCell>
-                      <TableCell className="text-sm font-mono">{p.startDate} to {p.endDate}</TableCell>
+                      <TableCell className="text-[11px] font-mono">{p.startDate} - {p.endDate}</TableCell>
                       <TableCell>
-                        <Badge variant={p.status === 'Open' ? 'secondary' : 'outline'} className={p.status === 'Open' ? 'bg-emerald-500/10 text-emerald-500' : ''}>
-                          {p.status === 'Open' ? <Unlock className="size-3 mr-1" /> : <Lock className="size-3 mr-1" />}
+                        <Badge variant={p.status === 'Open' ? 'secondary' : 'outline'} className={`text-[9px] h-4 ${p.status === 'Open' ? 'bg-emerald-500/10 text-emerald-500' : ''}`}>
+                          {p.status === 'Open' ? <Unlock className="size-2.5 mr-1" /> : <Lock className="size-2.5 mr-1" />}
                           {p.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="outline" size="sm" className="gap-2">
-                          <Lock className="size-3" /> Close Period
+                        <Button variant="outline" size="sm" className="h-7 text-[10px] px-2">
+                          Close Period
                         </Button>
                       </TableCell>
                     </TableRow>

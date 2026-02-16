@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useState } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -37,14 +38,13 @@ export default function InstitutionsManagement() {
 
     if (editingInstitution) {
       updateDocumentNonBlocking(doc(db, 'institutions', editingInstitution.id), data)
-      toast({ title: "Institution Updated", description: `${data.name} has been modified.` })
+      toast({ title: "Institution Updated" })
     } else {
       addDocumentNonBlocking(instCollectionRef, {
         ...data,
         createdAt: serverTimestamp(),
       }).then((docRef) => {
         if (docRef && user) {
-          // Automatically create a membership document for the creator
           setDocumentNonBlocking(
             doc(db, 'user_institutions', user.uid, 'memberships', docRef.id),
             { 
@@ -57,7 +57,7 @@ export default function InstitutionsManagement() {
           )
         }
       })
-      toast({ title: "Institution Created", description: `${data.name} is now ready for setup.` })
+      toast({ title: "Institution Created" })
     }
     setIsCreateOpen(false)
     setEditingInstitution(null)
@@ -74,34 +74,28 @@ export default function InstitutionsManagement() {
       },
       { merge: true }
     )
-    toast({ title: "Admin Rights Claimed", description: "You are now a global system administrator." })
+    toast({ title: "Admin Rights Claimed" })
   }
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-headline font-bold">Institutions</h1>
-            <p className="text-muted-foreground">Manage multi-tenant business organizations.</p>
-          </div>
-          <div className="flex gap-3">
-            <Button variant="outline" className="gap-2" onClick={handleClaimAdmin}>
-              <ShieldCheck className="size-4" /> Claim System Admin
+          <h1 className="text-2xl font-headline font-bold">Institutions</h1>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="gap-2 h-9 text-xs" onClick={handleClaimAdmin}>
+              <ShieldCheck className="size-4" /> Claim Admin
             </Button>
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2" onClick={() => setEditingInstitution(null)}>
-                  <Plus className="size-4" /> Add Institution
+                <Button size="sm" className="gap-2 h-9 text-xs" onClick={() => setEditingInstitution(null)}>
+                  <Plus className="size-4" /> Add New
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <form onSubmit={handleSubmit}>
                   <DialogHeader>
                     <DialogTitle>{editingInstitution ? 'Edit' : 'New'} Institution</DialogTitle>
-                    <DialogDescription>
-                      Enter the legal details for the institution.
-                    </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
@@ -113,12 +107,12 @@ export default function InstitutionsManagement() {
                       <Input id="country" name="country" defaultValue={editingInstitution?.country} placeholder="e.g. Kenya" required />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="tin">Tax ID Number (PIN/VAT)</Label>
+                      <Label htmlFor="tin">Tax ID Number</Label>
                       <Input id="tin" name="tin" defaultValue={editingInstitution?.taxIdentificationNumber} required />
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button type="submit">Save Institution</Button>
+                    <Button type="submit">Save</Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
@@ -127,50 +121,48 @@ export default function InstitutionsManagement() {
         </div>
 
         <Card className="border-none ring-1 ring-border shadow-lg">
-          <CardHeader>
+          <CardHeader className="py-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-              <Input placeholder="Search institutions..." className="pl-10 h-11 bg-secondary/20 border-none" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+              <Input placeholder="Search..." className="pl-9 h-9 bg-secondary/20 border-none text-xs" />
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-secondary/20">
                 <TableRow>
-                  <TableHead>Institution Name</TableHead>
-                  <TableHead>Country</TableHead>
-                  <TableHead>Tax ID</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="h-9 text-[10px] uppercase font-bold">Institution Name</TableHead>
+                  <TableHead className="h-9 text-[10px] uppercase font-bold">Country</TableHead>
+                  <TableHead className="h-9 text-[10px] uppercase font-bold">Tax ID</TableHead>
+                  <TableHead className="h-9 text-[10px] uppercase font-bold">Status</TableHead>
+                  <TableHead className="h-9 text-right text-[10px] uppercase font-bold">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8">Loading institutions...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-xs">Loading...</TableCell></TableRow>
                 ) : institutions?.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No institutions found. Create your first tenant.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center py-8 text-xs text-muted-foreground">No records found.</TableCell></TableRow>
                 ) : institutions?.map((inst) => (
-                  <TableRow key={inst.id}>
-                    <TableCell className="font-bold flex items-center gap-3">
-                      <div className="size-8 rounded bg-primary/10 text-primary flex items-center justify-center">
-                        <Building2 className="size-4" />
-                      </div>
+                  <TableRow key={inst.id} className="h-11">
+                    <TableCell className="font-bold text-xs flex items-center gap-2">
+                      <Building2 className="size-3.5 text-primary" />
                       {inst.name}
                     </TableCell>
-                    <TableCell>{inst.country}</TableCell>
-                    <TableCell className="font-mono text-xs">{inst.taxIdentificationNumber}</TableCell>
+                    <TableCell className="text-xs">{inst.country}</TableCell>
+                    <TableCell className="font-mono text-[10px]">{inst.taxIdentificationNumber}</TableCell>
                     <TableCell>
-                      <Badge variant={inst.isActive ? 'secondary' : 'destructive'} className="gap-1">
-                        {inst.isActive ? <CheckCircle className="size-3" /> : <XCircle className="size-3" />}
+                      <Badge variant={inst.isActive ? 'secondary' : 'destructive'} className="text-[9px] h-4 gap-1 px-1.5">
+                        {inst.isActive ? <CheckCircle className="size-2.5" /> : <XCircle className="size-2.5" />}
                         {inst.isActive ? 'Active' : 'Inactive'}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => {
+                      <Button variant="ghost" size="icon" className="size-7" onClick={() => {
                         setEditingInstitution(inst)
                         setIsCreateOpen(true)
                       }}>
-                        <Edit2 className="size-4" />
+                        <Edit2 className="size-3.5" />
                       </Button>
                     </TableCell>
                   </TableRow>

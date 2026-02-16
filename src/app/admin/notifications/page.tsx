@@ -3,15 +3,13 @@
 
 import { useState } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
-import { collection, query } from "firebase/firestore"
+import { collection } from "firebase/firestore"
 import { BellRing, Mail, MessageSquare, Send, Save, Variable } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 
@@ -26,97 +24,90 @@ export default function NotificationTemplates() {
 
   const templates = [
     { id: 1, name: "Welcome Email", type: "Email", trigger: "User Registration", content: "Hi {{firstName}}, Welcome to iClick ERP!" },
-    { id: 2, name: "Low Stock Alert", type: "SMS", trigger: "Inventory Drop", content: "Alert: {{productName}} is below re-order level ({{stock}} left)." },
-    { id: 3, name: "Payment Receipt", type: "Email", trigger: "Sale Completion", content: "Dear {{customerName}}, Your payment of {{amount}} for INV-{{invoiceNumber}} has been received." },
-    { id: 4, name: "M-Pesa STK Push", type: "Push", trigger: "Payment Initiation", content: "Pay {{amount}} to iClick ERP. Enter PIN on your phone." },
+    { id: 2, name: "Low Stock Alert", type: "SMS", trigger: "Inventory Drop", content: "Alert: {{productName}} is below re-order level." },
   ]
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-headline font-bold">Notification Templates</h1>
-            <p className="text-muted-foreground">Manage automated communication for customers and staff.</p>
-          </div>
+          <h1 className="text-2xl font-headline font-bold">Notifications</h1>
           <Select value={selectedInstitutionId} onValueChange={setSelectedInstitutionId}>
-            <SelectTrigger className="w-[200px] h-11 bg-card border-none ring-1 ring-border">
+            <SelectTrigger className="w-[180px] h-9 bg-card border-none ring-1 ring-border text-xs">
               <SelectValue placeholder="Select Institution" />
             </SelectTrigger>
             <SelectContent>
               {institutions?.map(i => (
-                <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
+                <SelectItem key={i.id} value={i.id} className="text-xs">{i.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-1 border-none ring-1 ring-border shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-sm font-bold uppercase">Template List</CardTitle>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card className="lg:col-span-1 border-none ring-1 ring-border shadow">
+            <CardHeader className="py-3">
+              <CardTitle className="text-[10px] font-bold uppercase tracking-widest">Templates</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-border">
                 {templates.map(t => (
                   <button 
                     key={t.id} 
-                    className={`w-full text-left p-4 hover:bg-secondary/20 transition-colors flex items-center justify-between ${activeTemplate?.id === t.id ? 'bg-secondary/40' : ''}`}
+                    className={`w-full text-left p-3 hover:bg-secondary/20 transition-colors flex items-center justify-between ${activeTemplate?.id === t.id ? 'bg-secondary/40' : ''}`}
                     onClick={() => setActiveTemplate(t)}
                   >
                     <div className="flex items-center gap-3">
-                      <div className="size-8 rounded-lg bg-secondary flex items-center justify-center text-primary">
-                        {t.type === 'Email' ? <Mail className="size-4" /> : <MessageSquare className="size-4" />}
+                      <div className="size-7 rounded bg-secondary flex items-center justify-center text-primary">
+                        {t.type === 'Email' ? <Mail className="size-3.5" /> : <MessageSquare className="size-3.5" />}
                       </div>
                       <div>
-                        <p className="text-sm font-bold">{t.name}</p>
-                        <p className="text-[10px] text-muted-foreground uppercase">{t.trigger}</p>
+                        <p className="text-[11px] font-bold">{t.name}</p>
+                        <p className="text-[9px] text-muted-foreground uppercase tracking-tighter">{t.trigger}</p>
                       </div>
                     </div>
-                    <Badge variant="outline" className="text-[10px]">{t.type}</Badge>
+                    <Badge variant="outline" className="text-[8px] h-3.5 px-1">{t.type}</Badge>
                   </button>
                 ))}
               </div>
             </CardContent>
           </Card>
 
-          <Card className="lg:col-span-2 border-none ring-1 ring-border shadow-xl">
+          <Card className="lg:col-span-2 border-none ring-1 ring-border shadow-lg">
             {activeTemplate ? (
               <>
-                <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <CardTitle>{activeTemplate.name}</CardTitle>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" className="gap-2">
-                        <Send className="size-4" /> Test
-                      </Button>
-                      <Button size="sm" className="gap-2">
-                        <Save className="size-4" /> Save
-                      </Button>
-                    </div>
+                <CardHeader className="py-3 flex flex-row items-center justify-between space-y-0">
+                  <CardTitle className="text-lg">{activeTemplate.name}</CardTitle>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="h-8 text-[10px] gap-1.5 px-2">
+                      <Send className="size-3" /> Test
+                    </Button>
+                    <Button size="sm" className="h-8 text-[10px] gap-1.5 px-2">
+                      <Save className="size-3" /> Save
+                    </Button>
                   </div>
-                  <CardDescription>Triggered by: {activeTemplate.trigger}</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent className="space-y-4">
                   <div className="grid gap-2">
-                    <Label>Message Content</Label>
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground">Message</Label>
                     <Textarea 
                       value={activeTemplate.content} 
-                      className="min-h-[200px] font-mono text-sm bg-secondary/20"
+                      className="min-h-[150px] font-mono text-xs bg-secondary/10 border-none ring-1 ring-border"
                     />
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      <Badge variant="secondary" className="gap-1 cursor-pointer"><Variable className="size-3" /> firstName</Badge>
-                      <Badge variant="secondary" className="gap-1 cursor-pointer"><Variable className="size-3" /> productName</Badge>
-                      <Badge variant="secondary" className="gap-1 cursor-pointer"><Variable className="size-3" /> amount</Badge>
-                      <Badge variant="secondary" className="gap-1 cursor-pointer"><Variable className="size-3" /> invoiceNumber</Badge>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {['firstName', 'amount', 'invoiceNumber'].map(v => (
+                        <Badge key={v} variant="secondary" className="text-[8px] h-4 gap-1 px-1.5 cursor-pointer opacity-70 hover:opacity-100">
+                          <Variable className="size-2.5" /> {v}
+                        </Badge>
+                      ))}
                     </div>
                   </div>
                 </CardContent>
               </>
             ) : (
-              <div className="h-full flex flex-col items-center justify-center text-muted-foreground py-20">
-                <BellRing className="size-12 opacity-10 mb-4" />
-                <p>Select a template to edit its configuration.</p>
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground py-16">
+                <BellRing className="size-10 opacity-10 mb-2" />
+                <p className="text-xs">Select a template to configure.</p>
               </div>
             )}
           </Card>

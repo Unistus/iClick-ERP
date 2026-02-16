@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase"
 import { collection, doc, serverTimestamp, query } from "firebase/firestore"
 import { addDocumentNonBlocking, updateDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase"
-import { Shield, Plus, Edit2, Check, Lock, UserCog, Search } from "lucide-react"
+import { Shield, Plus, Edit2, Lock, UserCog, Search, ChevronRight, ChevronDown } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { navConfig } from "@/lib/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -29,6 +29,7 @@ export default function RolesManagement() {
   const [editingRole, setEditingRole] = useState<any>(null)
   const [selectedInstitutionId, setSelectedInstitutionId] = useState<string>("")
   const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
+  const [expandedModules, setExpandedModules] = useState<string[]>([])
 
   const instCollectionRef = useMemoFirebase(() => collection(db, 'institutions'), [db])
   const { data: institutions } = useCollection(instCollectionRef)
@@ -48,6 +49,11 @@ export default function RolesManagement() {
   const handleEdit = (role: any) => {
     setEditingRole(role)
     setSelectedPermissions(role.permissionIds || [])
+    // Automatically expand modules that have permissions
+    const activeModules = navConfig
+      .filter(m => role.permissionIds?.some((p: string) => p.startsWith(`${m.id}:`)))
+      .map(m => m.id)
+    setExpandedModules(activeModules)
     setIsCreateOpen(true)
   }
 
@@ -56,6 +62,21 @@ export default function RolesManagement() {
     setSelectedPermissions(prev => 
       prev.includes(permId) ? prev.filter(id => id !== permId) : [...prev, permId]
     )
+  }
+
+  const toggleModuleAccess = (moduleId: string) => {
+    const rootReadPerm = `${moduleId}:root:read`;
+    const isCurrentlyChecked = selectedPermissions.includes(rootReadPerm);
+
+    if (isCurrentlyChecked) {
+      // Unchecking module: remove all its permissions and collapse
+      setSelectedPermissions(prev => prev.filter(p => !p.startsWith(`${moduleId}:`)));
+      setExpandedModules(prev => prev.filter(id => id !== moduleId));
+    } else {
+      // Checking module: add root read and expand
+      setSelectedPermissions(prev => [...prev, rootReadPerm]);
+      setExpandedModules(prev => [...prev, moduleId]);
+    }
   }
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -81,6 +102,7 @@ export default function RolesManagement() {
     setIsCreateOpen(false)
     setEditingRole(null)
     setSelectedPermissions([])
+    setExpandedModules([])
   }
 
   const assignRoleToUser = (userId: string, roleId: string) => {
@@ -120,7 +142,11 @@ export default function RolesManagement() {
             </Select>
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
-                <Button size="sm" className="gap-2 h-9 text-xs" disabled={!selectedInstitutionId}>
+                <Button size="sm" className="gap-2 h-9 text-xs" disabled={!selectedInstitutionId} onClick={() => {
+                  setEditingRole(null);
+                  setSelectedPermissions([]);
+                  setExpandedModules([]);
+                }}>
                   <Plus className="size-4" /> New Role
                 </Button>
               </DialogTrigger>
@@ -149,45 +175,66 @@ export default function RolesManagement() {
                         <TableHeader className="bg-secondary/30 sticky top-0 z-10 backdrop-blur-sm">
                           <TableRow>
                             <TableHead className="h-9 text-[10px] font-bold uppercase w-1/3">Module / Section</TableHead>
+                            <TableHead className="h-9 text-[10px] font-bold uppercase text-center">Module Access</TableHead>
                             {PERMISSION_ACTIONS.map(action => (
                               <TableHead key={action} className="h-9 text-[10px] font-bold uppercase text-center">{action}</TableHead>
                             ))}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {navConfig.map(module => (
-                            <React.Fragment key={module.id}>
-                              <TableRow className="bg-secondary/10">
-                                <TableCell className="font-bold text-xs flex items-center gap-2 py-2">
-                                  <module.icon className="size-3.5 text-primary" />
-                                  {module.title}
-                                </TableCell>
-                                {PERMISSION_ACTIONS.map(action => (
-                                  <TableCell key={action} className="text-center py-2">
+                          {navConfig.map(module => {
+                            const isExpanded = expandedModules.includes(module.id);
+                            const hasRootRead = selectedPermissions.includes(`${module.id}:root:read`);
+
+                            return (
+                              <React.Fragment key={module.id}>
+                                <TableRow className="bg-secondary/10 border-b-primary/10">
+                                  <TableCell className="font-bold text-xs flex items-center gap-2 py-3">
+                                    <module.icon className="size-3.5 text-primary" />
+                                    {module.title}
+                                    {module.submenus && module.submenus.length > 0 && (
+                                      isExpanded ? <ChevronDown className="size-3 opacity-50" /> : <ChevronRight className="size-3 opacity-50" />
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-center">
                                     <Checkbox 
-                                      checked={selectedPermissions.includes(`${module.id}:root:${action}`)}
-                                      onCheckedChange={() => togglePermission(module.id, null, action)}
+                                      checked={hasRootRead}
+                                      onCheckedChange={() => toggleModuleAccess(module.id)}
                                     />
                                   </TableCell>
-                                ))}
-                              </TableRow>
-                              {module.submenus?.map(sub => (
-                                <TableRow key={`${module.id}-${sub.id}`}>
-                                  <TableCell className="text-[11px] pl-8 text-muted-foreground py-1.5">
-                                    {sub.title}
-                                  </TableCell>
                                   {PERMISSION_ACTIONS.map(action => (
-                                    <TableCell key={action} className="text-center py-1.5">
+                                    <TableCell key={action} className="text-center py-2">
                                       <Checkbox 
-                                        checked={selectedPermissions.includes(`${module.id}:${sub.id}:${action}`)}
-                                        onCheckedChange={() => togglePermission(module.id, sub.id, action)}
+                                        disabled={!hasRootRead && action !== 'read'}
+                                        checked={selectedPermissions.includes(`${module.id}:root:${action}`)}
+                                        onCheckedChange={() => togglePermission(module.id, null, action)}
                                       />
                                     </TableCell>
                                   ))}
                                 </TableRow>
-                              ))}
-                            </React.Fragment>
-                          ))}
+                                
+                                {isExpanded && module.submenus?.map(sub => (
+                                  <TableRow key={`${module.id}-${sub.id}`} className="bg-background/50 animate-in fade-in slide-in-from-top-1 duration-200">
+                                    <TableCell className="text-[11px] pl-10 text-muted-foreground py-2 border-l-2 border-l-primary/20">
+                                      <div className="flex items-center gap-2">
+                                        <sub.icon className="size-3 opacity-50" />
+                                        {sub.title}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-center" />
+                                    {PERMISSION_ACTIONS.map(action => (
+                                      <TableCell key={action} className="text-center py-1.5">
+                                        <Checkbox 
+                                          checked={selectedPermissions.includes(`${module.id}:${sub.id}:${action}`)}
+                                          onCheckedChange={() => togglePermission(module.id, sub.id, action)}
+                                        />
+                                      </TableCell>
+                                    ))}
+                                  </TableRow>
+                                ))}
+                              </React.Fragment>
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     </div>
@@ -195,7 +242,7 @@ export default function RolesManagement() {
 
                   <DialogFooter className="p-6 border-t bg-secondary/5 shrink-0">
                     <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs">Cancel</Button>
-                    <Button type="submit" className="text-xs">Save Configuration</Button>
+                    <Button type="submit" className="text-xs">Save Role Configuration</Button>
                   </DialogFooter>
                 </form>
               </DialogContent>

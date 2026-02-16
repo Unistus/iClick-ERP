@@ -1,11 +1,10 @@
-
 "use client"
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "./app-sidebar"
-import { Bell, Search, Loader2, Sparkles, Building2, MapPin, User, ShieldCheck, Menu } from "lucide-react"
+import { Bell, Search, Loader2, Sparkles, Building2, MapPin, User, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useUser } from "@/firebase"
@@ -41,7 +40,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* FLOATING TOP BAR - Medium Height (h-12) */}
           <header className="flex h-12 shrink-0 items-center justify-between gap-4 border-b px-4 md:px-6 bg-card/40 backdrop-blur-xl sticky top-0 z-10 w-full shadow-sm">
             <div className="flex items-center gap-2 md:gap-4">
-              {isMobile && <SidebarTrigger className="md:hidden" />}
+              <SidebarTrigger className="text-primary hover:bg-primary/10" />
               <div className="flex items-center gap-2">
                 <Sparkles className="size-3 text-accent animate-pulse" />
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest hidden sm:inline">Enterprise Mode</span>

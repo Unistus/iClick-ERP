@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -93,12 +92,12 @@ export function AppSidebar() {
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar 
-        collapsible={isMobile ? "none" : "icon"} 
+        collapsible="icon" // Persistent icon mode for all devices
         className="z-30 border-r border-border/50 shrink-0"
         onMouseEnter={() => !isMobile && setOpen(true)}
         onMouseLeave={() => !isMobile && setOpen(false)}
       >
-        <SidebarHeader className="h-14 flex items-center justify-center p-0 border-b border-border/10">
+        <SidebarHeader className="h-12 flex items-center justify-center p-0 border-b border-border/10">
           <div className="size-8 rounded-lg bg-primary flex items-center justify-center text-white">
             <Command className="size-4" />
           </div>
@@ -107,7 +106,6 @@ export function AppSidebar() {
           <SidebarMenu>
             {filteredNav.map((item) => {
               const isActive = item.pattern.test(pathname)
-              const showSubmenuInMobile = isMobile && isActive && item.submenus && item.submenus.length > 0;
 
               return (
                 <React.Fragment key={item.title}>
@@ -126,29 +124,13 @@ export function AppSidebar() {
                         <item.icon className="size-5 shrink-0" />
                         <span className={cn(
                           "ml-3 text-sm transition-opacity duration-200",
-                          !isMobile && state === "collapsed" ? "opacity-0 invisible" : "opacity-100 visible"
+                          state === "collapsed" ? "opacity-0 invisible" : "opacity-100 visible"
                         )}>
                           {item.title}
                         </span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                  
-                  {/* Inline submenus for Mobile */}
-                  {showSubmenuInMobile && (
-                    <div className="ml-6 mt-1 space-y-1 border-l-2 border-primary/20 pl-2">
-                      {item.submenus?.map((sub) => (
-                        <SidebarMenuItem key={sub.title}>
-                          <SidebarMenuButton asChild isActive={pathname === sub.url} className="h-8 text-xs">
-                            <Link href={sub.url}>
-                              <sub.icon className="size-3.5 mr-2 opacity-70" />
-                              {sub.title}
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      ))}
-                    </div>
-                  )}
                 </React.Fragment>
               )
             })}
@@ -165,7 +147,7 @@ export function AppSidebar() {
                 <LogOut className="size-5 shrink-0" />
                 <span className={cn(
                   "ml-3 text-sm transition-opacity duration-200",
-                  !isMobile && state === "collapsed" ? "opacity-0 invisible" : "opacity-100 visible"
+                  state === "collapsed" ? "opacity-0 invisible" : "opacity-100 visible"
                 )}>
                   Logout
                 </span>
@@ -175,20 +157,21 @@ export function AppSidebar() {
         </SidebarFooter>
       </Sidebar>
 
-      {!isMobile && hasSubmenus && (
+      {/* Secondary Sidebar - Persistent if activeModule has submenus */}
+      {hasSubmenus && (
         <div 
-          className="z-20 w-64 border-r border-border/50 bg-sidebar/30 backdrop-blur-md shrink-0 h-screen flex flex-col"
+          className={cn(
+            "z-20 border-r border-border/50 bg-sidebar/30 backdrop-blur-md shrink-0 h-screen flex flex-col transition-all duration-300",
+            isMobile ? "w-48" : "w-64"
+          )}
         >
-          <div className="h-14 flex items-center px-6 border-b border-border/50 bg-background/50">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-primary">
+          <div className="h-12 flex items-center px-6 border-b border-border/50 bg-background/50">
+            <h2 className="text-[10px] font-bold uppercase tracking-widest text-primary truncate">
               {activeModule.title}
             </h2>
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
             <div className="space-y-4">
-              <div className="px-2">
-                <span className="text-[10px] font-bold uppercase text-muted-foreground/50 tracking-wider">Navigation</span>
-              </div>
               <nav className="space-y-1">
                 {activeModule.submenus?.map((sub) => (
                   <Link 
@@ -202,7 +185,7 @@ export function AppSidebar() {
                     )}
                   >
                     <sub.icon className={cn("size-4", pathname === sub.url ? "text-primary" : "text-muted-foreground/70")} />
-                    <span>{sub.title}</span>
+                    <span className="truncate">{sub.title}</span>
                   </Link>
                 ))}
               </nav>

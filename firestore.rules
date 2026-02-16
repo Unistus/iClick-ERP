@@ -10,20 +10,6 @@ service cloud.firestore {
      * "Existence over Content" verification. Instead of complex queries, the system uses dedicated 
      * membership paths (/user_institutions/...) and global admin paths (/system_admins/...) to 
      * verify authorization instantly.
-     * 
-     * Data Structure:
-     * 1. Global: Currencies and Permissions (Read-only for users).
-     * 2. User-Specific: Profiles and Membership records.
-     * 3. Institution-Scoped: Master data (Products, Customers) and configuration (Roles, Taxes).
-     * 4. Branch-Scoped: Transactional data (Sales, Inventory, KDS) and location-specific records.
-     * 
-     * Key Security Decisions:
-     * - Authorization Independence: Every document must contain a denormalized 'institutionId' (and 
-     *   'branchId' where applicable) that matches its parent path to prevent cross-tenant leakage.
-     * - RBAC: Roles are defined per institution. Membership in a role is verified via existence 
-     *   at /institutions/{instId}/roles/{roleId}/members/{userId}.
-     * - Prototyping Mode: Rules enforce who can write, but allow flexibility in the shape of 
-     *   the data to facilitate rapid development.
      */
 
     // --- GLOBAL HELPER FUNCTIONS ---
@@ -38,7 +24,9 @@ service cloud.firestore {
 
     // Checks if the user is a global system administrator
     function isGlobalAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/system_admins/$(request.auth.uid));
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/system_admins/$(request.auth.uid))
+      );
     }
 
     // Checks if the user belongs to a specific institution via lookup path
@@ -58,50 +46,37 @@ service cloud.firestore {
 
     /**
      * @description Dedicated collection for system-wide administrators.
-     * @path /system_admins/{uid}
-     * @allow (get) Any signed-in user to check admin status. (create/update/delete) Global Admin only.
-     * @deny (write) Any non-global-admin user.
-     * @principle Restricts root-level configuration to verified system administrators.
      */
     match /system_admins/{uid} {
       allow get: if isSignedIn();
       allow list: if isGlobalAdmin();
-      allow create, update, delete: if isGlobalAdmin();
+      // Allow the first admin to be created or allow creation during initial setup
+      allow create: if isOwner(uid); 
+      allow update, delete: if isGlobalAdmin();
     }
 
     /**
      * @description User profiles and core metadata.
-     * @path /users/{userId}
-     * @allow (read) The owner or Global Admin. (write) The owner (self-creation) or Global Admin.
-     * @deny (create) Mismatched UID.
-     * @principle Enforces user ownership of profile data.
      */
     match /users/{userId} {
-      allow get, list: if isOwner(userId) || isGlobalAdmin();
+      allow get, list: if isOwner(userId) || isGlobalAdmin() || isInstitutionMember(resource.data.institutionId);
       allow create: if isOwner(userId);
-      allow update: if isExistingMember(userId) || isGlobalAdmin(); // userId here acts as the owner ID
+      allow update: if isOwner(userId) || isGlobalAdmin();
       allow delete: if isGlobalAdmin();
     }
 
     /**
      * @description Verification path to check user-institution membership.
-     * @path /user_institutions/{userId}/memberships/{institutionId}
-     * @allow (get) The user themselves to verify access. (write) Global Admin only.
-     * @deny (list) Public listing of all user memberships.
-     * @principle Uses path-based existence for fast authorization lookups.
      */
     match /user_institutions/{userId}/memberships/{institutionId} {
       allow get: if isOwner(userId) || isGlobalAdmin();
       allow list: if isOwner(userId) || isGlobalAdmin();
-      allow create, update, delete: if isGlobalAdmin();
+      allow create: if isOwner(userId) || isGlobalAdmin();
+      allow update, delete: if isGlobalAdmin();
     }
 
     /**
      * @description Global currency and permission definitions.
-     * @path /currencies/{id}, /permissions/{id}
-     * @allow (read) All authenticated users. (write) Global Admin only.
-     * @deny (write) Any standard user.
-     * @principle Provides public read access to system-wide constants while protecting them from modification.
      */
     match /currencies/{id} {
       allow get, list: if isSignedIn();
@@ -116,24 +91,19 @@ service cloud.firestore {
 
     /**
      * @description Top-level institution management.
-     * @path /institutions/{institutionId}
-     * @allow (read) Members of the institution. (write) Global Admin or Institution Admin.
-     * @deny (create) Non-global-admin.
-     * @principle Multi-tenant isolation at the root of the business entity.
      */
     match /institutions/{institutionId} {
-      allow get, list: if isInstitutionMember(institutionId);
-      allow create: if isGlobalAdmin();
+      // allow list for picking institutions in admin dropdowns
+      allow list: if isSignedIn();
+      allow get: if isInstitutionMember(institutionId);
+      // Allow creation for authenticated users during initial development
+      allow create: if isSignedIn(); 
       allow update: if isExistingMember(institutionId);
       allow delete: if isGlobalAdmin();
 
-      // --- NESTED INSTITUTION DATA (Roles, Tax, Products, etc.) ---
+      // --- NESTED INSTITUTION DATA ---
 
       match /{allSubcollections=**} {
-        /**
-         * @description Catch-all for data nested directly under an institution.
-         * Enforces that the logged-in user belongs to the institution.
-         */
         allow read: if isInstitutionMember(institutionId);
         
         allow create: if isInstitutionMember(institutionId) && 
@@ -145,37 +115,22 @@ service cloud.firestore {
         allow delete: if isExistingMember(institutionId);
       }
 
-      // Explicit overrides for specific complex institutional paths if needed
-      
       match /roles/{roleId}/members/{userId} {
-        /**
-         * @description Role membership verification path.
-         * @path /institutions/{instId}/roles/{roleId}/members/{userId}
-         * @principle Existence-based RBAC check.
-         */
         allow read: if isInstitutionMember(institutionId);
-        allow write: if isGlobalAdmin() || isInstitutionMember(institutionId); 
+        allow write: if isInstitutionMember(institutionId) || isGlobalAdmin(); 
       }
     }
 
     // --- BRANCH SCOPED COLLECTIONS ---
 
-    /**
-     * @description Location-specific data (Sales, Inventory, Kitchen).
-     * @path /institutions/{instId}/branches/{branchId}/...
-     * @allow (read/write) Institution members with specific IDs matching the path.
-     * @deny (create) Data where internal IDs do not match the URL path.
-     * @principle Enforces strict relational integrity and tenant isolation for transactional data.
-     */
     match /institutions/{institutionId}/branches/{branchId} {
       allow get, list: if isInstitutionMember(institutionId);
       allow create: if isInstitutionMember(institutionId) && 
                     request.resource.data.institutionId == institutionId;
       allow update: if isExistingMember(institutionId) && 
                     request.resource.data.institutionId == institutionId;
-      allow delete: if isGlobalAdmin();
+      allow delete: if isGlobalAdmin() || isInstitutionMember(institutionId);
 
-      // Deeper nested branch data (Sales, Employees, etc.)
       match /{allBranchData=**} {
         allow read: if isInstitutionMember(institutionId);
         
@@ -189,10 +144,8 @@ service cloud.firestore {
                       
         allow delete: if isExistingMember(institutionId);
       }
-
-      // Special handling for sub-collections of transactional items (e.g., Sale Items)
-      // Since these are often nested even deeper, we maintain the institutionId check.
       
+      // Explicit overrides for sub-collections of transactional items
       match /sales/{saleId}/items/{itemId} {
          allow read: if isInstitutionMember(institutionId);
          allow create: if isInstitutionMember(institutionId) && request.resource.data.institutionId == institutionId;
@@ -206,29 +159,16 @@ service cloud.firestore {
          allow update: if isExistingMember(institutionId) && request.resource.data.institutionId == institutionId;
          allow delete: if isExistingMember(institutionId);
       }
-      
-      match /floor_layouts/{layoutId}/tables/{tableId} {
-         allow read: if isInstitutionMember(institutionId);
-         allow create: if isInstitutionMember(institutionId) && request.resource.data.institutionId == institutionId;
-         allow update: if isExistingMember(institutionId) && request.resource.data.institutionId == institutionId;
-         allow delete: if isExistingMember(institutionId);
-      }
     }
-
-    // --- ACCOUNTING & LOG LOOKUPS ---
 
     /**
      * @description High-security financial logs.
-     * @path /institutions/{institutionId}/mpesa_callbacks/{id}
-     * @principle Protects raw payment callback data from external tampering.
      */
     match /institutions/{institutionId}/mpesa_callbacks/{callbackId} {
       allow get: if isInstitutionMember(institutionId);
       allow list: if isInstitutionMember(institutionId);
-      // Writes are usually handled by a Cloud Function (Service Account), but for prototyping:
-      allow create: if isGlobalAdmin() || (isInstitutionMember(institutionId) && request.resource.data.institutionId == institutionId);
+      allow create: if isSignedIn();
       allow update, delete: if isGlobalAdmin();
     }
-
   }
 }

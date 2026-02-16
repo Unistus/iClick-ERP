@@ -41,6 +41,7 @@ export default function RolesManagement() {
   
   const { data: roles, isLoading: isRolesLoading } = useCollection(rolesQuery)
 
+  // Fetch all users to display in the Staff Assignment tab
   const usersQuery = useMemoFirebase(() => {
     return query(collection(db, 'users'))
   }, [db])
@@ -49,6 +50,7 @@ export default function RolesManagement() {
   const handleEdit = (role: any) => {
     setEditingRole(role)
     setSelectedPermissions(role.permissionIds || [])
+    // Auto-expand modules that have active permissions
     const activeModules = navConfig
       .filter(m => role.permissionIds?.some((p: string) => p.startsWith(`${m.id}:`)))
       .map(m => m.id)
@@ -68,9 +70,11 @@ export default function RolesManagement() {
     const isCurrentlyChecked = selectedPermissions.includes(rootReadPerm);
 
     if (isCurrentlyChecked) {
+      // Remove all permissions for this module
       setSelectedPermissions(prev => prev.filter(p => !p.startsWith(`${moduleId}:`)));
       setExpandedModules(prev => prev.filter(id => id !== moduleId));
     } else {
+      // Grant root read and expand
       setSelectedPermissions(prev => [...prev, rootReadPerm]);
       setExpandedModules(prev => [...prev, moduleId]);
     }
@@ -125,12 +129,14 @@ export default function RolesManagement() {
   const assignRoleToUser = (userId: string, roleId: string) => {
     if (!selectedInstitutionId) return;
     
+    // 1. Update the institution's role membership (for Security Rules)
     setDocumentNonBlocking(
       doc(db, 'institutions', selectedInstitutionId, 'roles', roleId, 'members', userId),
       { active: true, assignedAt: serverTimestamp() },
       { merge: true }
     );
 
+    // 2. Update the user's profile with the role mapping (for UI filtering)
     setDocumentNonBlocking(
       doc(db, 'users', userId),
       { 

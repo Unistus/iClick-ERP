@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -37,8 +38,10 @@ export function AppSidebar() {
   const { setOpen, state, openMobile } = useSidebar()
   const isMobile = useIsMobile()
   
+  // For prototype logic, we'll try to find institution ID from pathname or default
   const institutionId = pathname.split('/')[2] || "SYSTEM";
 
+  // 1. Fetch the user's document to get their role assignments
   const userRef = useMemoFirebase(() => {
     if (!user) return null;
     return doc(db, 'users', user.uid);
@@ -46,6 +49,7 @@ export function AppSidebar() {
 
   const { data: userData } = useDoc(userRef);
 
+  // 2. Fetch the actual role document based on the user's role for this institution
   const userRoleId = userData?.rolesByInstitution?.[institutionId];
   const roleRef = useMemoFirebase(() => {
     if (!userRoleId || !institutionId) return null;
@@ -55,12 +59,16 @@ export function AppSidebar() {
   const { data: roleData } = useDoc(roleRef);
   const permissions = roleData?.permissionIds || [];
 
+  // Permission check helper
   const hasAccess = (moduleId: string, submenuId: string | null = null) => {
+    // If no role is assigned yet (development), allow access
     if (!roleData && userData) return true;
+    
     const permKey = `${moduleId}:${submenuId || 'root'}:read`;
     return permissions.includes(permKey);
   }
 
+  // 3. Filter navigation based on permissions
   const filteredNav = navConfig.filter(item => {
     const hasRootAccess = hasAccess(item.id);
     const hasAnySubmenuAccess = item.submenus?.some(sub => hasAccess(item.id, sub.id));

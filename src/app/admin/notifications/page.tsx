@@ -23,14 +23,15 @@ import {
   Sparkles,
   Info,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Zap
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { toast } from '@/hooks/use-toast';
+import { sendTransactionalEmail } from '@/lib/email-service';
 
 /**
  * Registry of standard notification templates across the ERP.
- * This is used for auto-initialization.
  */
 const TEMPLATE_REGISTRY = [
   // POS & SALES
@@ -60,6 +61,7 @@ export default function NotificationTemplates() {
   const [activeChannel, setActiveChannel] = useState<"Email" | "SMS" | "System">("Email")
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null)
   const [initializing, setInitializing] = useState(false)
+  const [sendingTest, setSendingTest] = useState(false)
 
   const instCollectionRef = useMemoFirebase(() => collection(db, 'institutions'), [db])
   const { data: institutions } = useCollection(instCollectionRef)
@@ -113,10 +115,40 @@ export default function NotificationTemplates() {
     try {
       const docRef = doc(db, 'institutions', selectedInstitutionId, 'notification_templates', activeTemplateId)
       await setDoc(docRef, data, { merge: true })
-      toast({ title: "Template Saved", description: "Changes will apply to future triggers." })
+      toast({ title: "Template Saved" })
     } catch (e) {
       toast({ variant: "destructive", title: "Save Failed" })
     }
+  }
+
+  const handleSendTest = async () => {
+    if (!selectedInstitutionId || !activeTemplateId || !activeTemplate) return;
+    
+    setSendingTest(true);
+    const testEmail = prompt("Enter email address for test message:");
+    if (!testEmail) {
+      setSendingTest(false);
+      return;
+    }
+
+    // Prepare mock tags based on template requirements
+    const mockTags: Record<string, string> = {};
+    activeTemplate.tags?.forEach((tag: string) => {
+      mockTags[tag] = `[TEST_${tag.toUpperCase()}]`;
+    });
+
+    const result = await sendTransactionalEmail(db, selectedInstitutionId, {
+      to: testEmail,
+      templateId: activeTemplateId,
+      tags: mockTags
+    });
+
+    if (result.success) {
+      toast({ title: "Test Email Sent", description: `Message delivered via institutional SMTP.` });
+    } else {
+      toast({ variant: "destructive", title: "Delivery Failed", description: result.error });
+    }
+    setSendingTest(false);
   }
 
   return (
@@ -177,7 +209,6 @@ export default function NotificationTemplates() {
             </TabsList>
 
             <div className="grid gap-4 lg:grid-cols-12 min-h-[600px]">
-              {/* Sidebar List */}
               <Card className="lg:col-span-4 border-none ring-1 ring-border shadow bg-card/50 overflow-hidden flex flex-col">
                 <CardHeader className="py-3 px-4 border-b border-border/50">
                   <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Available Templates</p>
@@ -206,7 +237,6 @@ export default function NotificationTemplates() {
                 </div>
               </Card>
 
-              {/* Main Editor */}
               <Card className="lg:col-span-8 border-none ring-1 ring-border shadow-xl bg-card overflow-hidden flex flex-col">
                 {activeTemplate ? (
                   <form onSubmit={handleSaveTemplate} className="flex flex-col h-full">
@@ -215,9 +245,24 @@ export default function NotificationTemplates() {
                         <h3 className="text-lg font-bold">{activeTemplate.name}</h3>
                         <p className="text-[10px] text-muted-foreground uppercase font-mono tracking-widest">{activeTemplate.trigger}</p>
                       </div>
-                      <Button type="submit" size="sm" className="gap-2 h-9 px-6 font-bold shadow-lg shadow-primary/20">
-                        <Save className="size-4" /> Save Changes
-                      </Button>
+                      <div className="flex gap-2">
+                        {activeChannel === 'Email' && (
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm" 
+                            disabled={sendingTest}
+                            className="gap-2 h-9 px-4 text-xs font-bold border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/10"
+                            onClick={handleSendTest}
+                          >
+                            {sendingTest ? <RefreshCw className="size-3.5 animate-spin" /> : <Zap className="size-3.5" />}
+                            Test Delivery
+                          </Button>
+                        )}
+                        <Button type="submit" size="sm" className="gap-2 h-9 px-6 font-bold shadow-lg shadow-primary/20">
+                          <Save className="size-4" /> Save
+                        </Button>
+                      </div>
                     </CardHeader>
                     
                     <div className="flex-1 p-6 space-y-6 overflow-y-auto custom-scrollbar">
@@ -254,7 +299,6 @@ export default function NotificationTemplates() {
                               variant="outline" 
                               className="text-[10px] py-1 px-2.5 bg-background cursor-pointer hover:bg-primary/10 hover:border-primary/50 transition-colors"
                               onClick={() => {
-                                // Simple copy to clipboard helper
                                 navigator.clipboard.writeText(`{{${tag}}}`)
                                 toast({ title: "Tag Copied", description: `{{${tag}}} added to clipboard.` })
                               }}
@@ -264,7 +308,7 @@ export default function NotificationTemplates() {
                           ))}
                         </div>
                         <p className="text-[9px] text-muted-foreground italic flex items-center gap-1.5">
-                          <Info className="size-3" /> Click a tag to copy its identifier. Use Handlebars syntax to inject data.
+                          <Info className="size-3" /> Click a tag to copy. Use {{tag}} syntax in the body or subject.
                         </p>
                       </div>
                     </div>

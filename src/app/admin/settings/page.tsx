@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,13 +19,13 @@ import {
   Mail, 
   Database, 
   Palette, 
-  Link as LinkIcon, 
-  Key,
   Save,
   Loader2,
   CheckCircle2,
   Globe,
-  Monitor
+  Monitor,
+  ShieldCheck,
+  Server
 } from "lucide-react";
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, serverTimestamp, setDoc } from "firebase/firestore";
@@ -36,7 +36,7 @@ export default function SystemSettingsPage() {
   const db = useFirestore();
   const { user } = useUser();
   const [selectedInstitutionId, setSelectedInstitutionId] = useState<string>("");
-  const [isSaving, setIsRefreshing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const instCollectionRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instCollectionRef);
@@ -46,30 +46,29 @@ export default function SystemSettingsPage() {
     return doc(db, 'institutions', selectedInstitutionId, 'settings', 'global');
   }, [db, selectedInstitutionId]);
 
-  const { data: settings, isLoading } = useDoc(settingsRef);
+  const { data: settings } = useDoc(settingsRef);
 
   const handleSave = async (category: string, e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstitutionId) return;
 
-    setIsRefreshing(true);
+    setIsSaving(true);
     const formData = new FormData(e.currentTarget);
-    const updates: any = { ...settings };
-
-    // Initialize category if not exists
-    if (!updates[category]) updates[category] = {};
-
-    // Map form data to object
+    const currentCategoryData = settings?.[category] || {};
+    
+    const updates: any = {};
     formData.forEach((value, key) => {
-      // Handle switches/checkboxes manually if needed or use standard values
-      if (value === 'on') updates[category][key] = true;
-      else if (value === 'off') updates[category][key] = false;
-      else updates[category][key] = value;
+      if (value === 'on') updates[key] = true;
+      else if (value === 'off') updates[key] = false;
+      else updates[key] = value;
     });
 
     try {
       await setDoc(settingsRef!, {
-        ...updates,
+        [category]: {
+          ...currentCategoryData,
+          ...updates
+        },
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
@@ -78,7 +77,7 @@ export default function SystemSettingsPage() {
     } catch (err) {
       toast({ variant: "destructive", title: "Save Failed", description: "You might not have permission to modify global settings." });
     } finally {
-      setIsRefreshing(false);
+      setIsSaving(false);
     }
   };
 
@@ -117,13 +116,11 @@ export default function SystemSettingsPage() {
               <TabsTrigger value="pos" className="text-xs gap-2"><ShoppingCart className="size-3.5" /> POS</TabsTrigger>
               <TabsTrigger value="payments" className="text-xs gap-2"><CreditCard className="size-3.5" /> Payments</TabsTrigger>
               <TabsTrigger value="sms" className="text-xs gap-2"><MessageSquare className="size-3.5" /> SMS</TabsTrigger>
-              <TabsTrigger value="email" className="text-xs gap-2"><Mail className="size-3.5" /> Email</TabsTrigger>
+              <TabsTrigger value="email" className="text-xs gap-2"><Mail className="size-3.5" /> Email Center</TabsTrigger>
               <TabsTrigger value="branding" className="text-xs gap-2"><Palette className="size-3.5" /> Branding</TabsTrigger>
-              <TabsTrigger value="integrations" className="text-xs gap-2"><LinkIcon className="size-3.5" /> API</TabsTrigger>
               <TabsTrigger value="maintenance" className="text-xs gap-2"><Database className="size-3.5" /> Maintenance</TabsTrigger>
             </TabsList>
 
-            {/* GENERAL SETTINGS */}
             <TabsContent value="general">
               <form onSubmit={(e) => handleSave('general', e)}>
                 <Card className="border-none ring-1 ring-border shadow-xl">
@@ -166,7 +163,6 @@ export default function SystemSettingsPage() {
               </form>
             </TabsContent>
 
-            {/* POS SETTINGS */}
             <TabsContent value="pos">
               <form onSubmit={(e) => handleSave('pos', e)}>
                 <Card className="border-none ring-1 ring-border shadow-xl">
@@ -215,7 +211,6 @@ export default function SystemSettingsPage() {
               </form>
             </TabsContent>
 
-            {/* PAYMENT GATEWAY */}
             <TabsContent value="payments">
               <form onSubmit={(e) => handleSave('gateways', e)}>
                 <Card className="border-none ring-1 ring-border shadow-xl">
@@ -260,7 +255,6 @@ export default function SystemSettingsPage() {
               </form>
             </TabsContent>
 
-            {/* SMS SETUP */}
             <TabsContent value="sms">
               <form onSubmit={(e) => handleSave('comms', e)}>
                 <Card className="border-none ring-1 ring-border shadow-xl">
@@ -295,7 +289,72 @@ export default function SystemSettingsPage() {
               </form>
             </TabsContent>
 
-            {/* BRANDING & THEME */}
+            <TabsContent value="email">
+              <form onSubmit={(e) => handleSave('comms', e)}>
+                <Card className="border-none ring-1 ring-border shadow-xl">
+                  <CardHeader>
+                    <CardTitle>SMTP & Mail Gateway</CardTitle>
+                    <CardDescription>Configure the system to send emails directly using institutional mail servers.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label>From Name / Entity</Label>
+                        <Input name="emailFromAddress" defaultValue={settings?.comms?.emailFromAddress} placeholder="e.g. iClick Nairobi Accounts" className="h-9 text-xs" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Service Provider</Label>
+                        <Select name="emailProvider" defaultValue={settings?.comms?.emailProvider || "SMTP"}>
+                          <SelectTrigger className="h-9 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="SMTP">Custom SMTP</SelectItem>
+                            <SelectItem value="SendGrid">SendGrid API</SelectItem>
+                            <SelectItem value="Resend">Resend API</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-secondary/10 rounded-lg border space-y-4">
+                      <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-widest">
+                        <Server className="size-3.5" /> Connection Parameters
+                      </div>
+                      <div className="grid md:grid-cols-3 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] font-bold opacity-60">SMTP HOST</Label>
+                          <Input name="smtpHost" defaultValue={settings?.comms?.smtpHost} placeholder="smtp.gmail.com" className="h-8 text-xs font-mono" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] font-bold opacity-60">SMTP PORT</Label>
+                          <Input name="smtpPort" type="number" defaultValue={settings?.comms?.smtpPort} placeholder="465" className="h-8 text-xs font-mono" />
+                        </div>
+                        <div className="flex items-center gap-2 pt-6">
+                          <Switch name="smtpSecure" defaultChecked={settings?.comms?.smtpSecure} />
+                          <Label className="text-[10px] font-bold opacity-60">USE SSL/TLS</Label>
+                        </div>
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] font-bold opacity-60">AUTH USERNAME</Label>
+                          <Input name="smtpUser" defaultValue={settings?.comms?.smtpUser} placeholder="erp@company.com" className="h-8 text-xs font-mono" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-[10px] font-bold opacity-60">AUTH PASSWORD</Label>
+                          <Input name="smtpPass" type="password" defaultValue={settings?.comms?.smtpPass} className="h-8 text-xs font-mono" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <Button type="submit" className="w-fit gap-2 h-9 px-6 font-bold uppercase text-[10px]">
+                      <Save className="size-3" /> Save SMTP Setup
+                    </Button>
+                  </CardContent>
+                </Card>
+              </form>
+            </TabsContent>
+
             <TabsContent value="branding">
               <form onSubmit={(e) => handleSave('branding', e)}>
                 <Card className="border-none ring-1 ring-border shadow-xl">
@@ -332,7 +391,6 @@ export default function SystemSettingsPage() {
               </form>
             </TabsContent>
 
-            {/* MAINTENANCE & BACKUP */}
             <TabsContent value="maintenance">
               <form onSubmit={(e) => handleSave('maintenance', e)}>
                 <Card className="border-none ring-1 ring-border shadow-xl">

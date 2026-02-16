@@ -21,7 +21,7 @@ export interface ChartOfAccount {
 export const ACCOUNT_TYPES: AccountType[] = ['Asset', 'Liability', 'Equity', 'Income', 'Expense'];
 
 export const ACCOUNT_SUBTYPES: Record<AccountType, string[]> = {
-  Asset: ['Cash & Bank', 'Accounts Receivable', 'Inventory', 'Fixed Assets', 'Current Assets'],
+  Asset: ['Cash & Bank', 'M-Pesa Clearing', 'Petty Cash', 'Accounts Receivable', 'Inventory', 'Fixed Assets', 'Current Assets'],
   Liability: ['Accounts Payable', 'VAT Payable', 'Loans', 'Accrued Liabilities'],
   Equity: ['Owner Capital', 'Retained Earnings'],
   Income: ['Sales Revenue', 'Service Income', 'Other Income'],

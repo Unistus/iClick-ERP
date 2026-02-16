@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -10,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from "@/firebase";
-import { collection, query, where, doc, serverTimestamp } from "firebase/firestore";
+import { collection, query, where, doc, serverTimestamp, addDoc } from "firebase/firestore";
 import { 
   Landmark, 
   ArrowRightLeft, 
@@ -22,18 +23,23 @@ import {
   Banknote,
   CheckCircle2,
   AlertCircle,
-  History
+  History,
+  PlusCircle,
+  Store
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { postJournalEntry } from "@/lib/accounting/journal.service";
+import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
+import { ACCOUNT_SUBTYPES } from "@/lib/accounting/coa.model";
 
 export default function BankingPage() {
   const db = useFirestore();
   const { user } = useUser();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Data Fetching
@@ -58,8 +64,12 @@ export default function BankingPage() {
 
   const currency = settings?.general?.currencySymbol || "KES";
 
-  // Filter Cash/Bank accounts
-  const bankAccounts = accounts?.filter(a => a.subtype === 'Cash & Bank' || a.subtype === 'M-Pesa Clearing') || [];
+  // Filter Cash/Bank accounts for liquidity tracking
+  const bankAccounts = accounts?.filter(a => 
+    a.subtype === 'Cash & Bank' || 
+    a.subtype === 'M-Pesa Clearing' || 
+    a.subtype === 'Petty Cash'
+  ) || [];
   
   // Aggregates
   const totalCash = bankAccounts.reduce((sum, acc) => sum + (acc.balance || 0), 0);
@@ -84,9 +94,6 @@ export default function BankingPage() {
     }
 
     try {
-      // Post Journal Entry
-      // DR: Target Account
-      // CR: Source Account
       await postJournalEntry(db, selectedInstId, {
         date: new Date(),
         description: `Internal Transfer: ${ref}`,
@@ -107,6 +114,35 @@ export default function BankingPage() {
     }
   };
 
+  const handleRegisterAccount = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedInstId || isProcessing) return;
+    setIsProcessing(true);
+
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      code: formData.get('code') as string,
+      name: formData.get('name') as string,
+      subtype: formData.get('subtype') as string,
+      type: 'Asset',
+      balance: 0,
+      isActive: true,
+      institutionId: selectedInstId,
+      updatedAt: serverTimestamp(),
+    };
+
+    try {
+      await addDoc(collection(db, 'institutions', selectedInstId, 'coa'), data);
+      logSystemEvent(db, selectedInstId, user, 'BANKING', 'Register Account', `New ${data.subtype} account '${data.name}' registered.`);
+      toast({ title: "Account Registered", description: `${data.name} is now available for transactions.` });
+      setIsAddAccountOpen(false);
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Registration Failed", description: err.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-4">
@@ -121,7 +157,7 @@ export default function BankingPage() {
             </div>
           </div>
           
-          <div className="flex gap-2 w-full md:w-auto">
+          <div className="flex flex-wrap gap-2 w-full md:w-auto">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
               <SelectTrigger className="w-[220px] h-9 bg-card border-none ring-1 ring-border text-xs">
                 <SelectValue placeholder="Select Institution" />
@@ -132,6 +168,52 @@ export default function BankingPage() {
                 ))}
               </SelectContent>
             </Select>
+
+            <Dialog open={isAddAccountOpen} onOpenChange={setIsAddAccountOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline" className="gap-2 h-9 text-xs font-bold uppercase" disabled={!selectedInstId}>
+                  <PlusCircle className="size-4" /> Register Account
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-sm">
+                <form onSubmit={handleRegisterAccount}>
+                  <DialogHeader>
+                    <DialogTitle>New Financial Node</DialogTitle>
+                    <CardDescription>Register a new bank account, till, or clearing node.</CardDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4 text-xs">
+                    <div className="space-y-2">
+                      <Label>Account Name</Label>
+                      <Input name="name" placeholder="e.g. Stanbic Corporate A/C" required className="h-9" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>GL Code</Label>
+                        <Input name="code" placeholder="1001" required className="h-9 font-mono" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Category</Label>
+                        <Select name="subtype" defaultValue="Cash & Bank">
+                          <SelectTrigger className="h-9 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Cash & Bank" className="text-xs">Bank Account</SelectItem>
+                            <SelectItem value="Petty Cash" className="text-xs">Cash Till / Petty Cash</SelectItem>
+                            <SelectItem value="M-Pesa Clearing" className="text-xs">Mobile Clearing (M-Pesa)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button type="submit" disabled={isProcessing} className="w-full h-9 font-bold uppercase text-xs">
+                      {isProcessing ? "Adding..." : "Commit Account"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
 
             <Dialog open={isTransferOpen} onOpenChange={setIsTransferOpen}>
               <DialogTrigger asChild>
@@ -208,7 +290,7 @@ export default function BankingPage() {
                   <Wallet className="size-3 text-emerald-500" />
                 </CardHeader>
                 <CardContent className="pb-3">
-                  <div className="text-lg font-bold">{currency} {totalCash.toLocaleString()}</div>
+                  <div className="text-lg font-bold">{currency} {totalCash.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                   <p className="text-[9px] text-emerald-500 mt-1 uppercase font-bold">Total Cash Assets</p>
                 </CardContent>
               </Card>
@@ -218,7 +300,7 @@ export default function BankingPage() {
                   <Banknote className="size-3 text-primary" />
                 </CardHeader>
                 <CardContent className="pb-3">
-                  <div className="text-lg font-bold">{currency} {bankLiquidity.toLocaleString()}</div>
+                  <div className="text-lg font-bold">{currency} {bankLiquidity.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                   <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold">Settled Funds</p>
                 </CardContent>
               </Card>
@@ -228,11 +310,10 @@ export default function BankingPage() {
                   <Smartphone className="size-3 text-accent" />
                 </CardHeader>
                 <CardContent className="pb-3">
-                  <div className="text-lg font-bold">{currency} {clearingBalances.toLocaleString()}</div>
+                  <div className="text-lg font-bold">{currency} {clearingBalances.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                   <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold">M-Pesa / Card Pending</p>
                 </CardContent>
-              </Card>
-            </div>
+              </div>
 
             <Card className="border-none ring-1 ring-border shadow-xl bg-card">
               <CardHeader className="py-3 px-6 border-b border-border/50 flex flex-row items-center justify-between">
@@ -271,7 +352,7 @@ export default function BankingPage() {
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className="text-[9px] h-4 uppercase font-bold bg-background">
-                            {acc.subtype === 'M-Pesa Clearing' ? <Smartphone className="size-2 mr-1" /> : <Landmark className="size-2 mr-1" />}
+                            {acc.subtype === 'M-Pesa Clearing' ? <Smartphone className="size-2 mr-1" /> : acc.subtype === 'Petty Cash' ? <Banknote className="size-2 mr-1" /> : <Landmark className="size-2 mr-1" />}
                             {acc.subtype}
                           </Badge>
                         </TableCell>

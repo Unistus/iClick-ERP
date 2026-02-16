@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -27,7 +26,8 @@ import {
   TrendingUp,
   Settings2,
   Trash2,
-  Loader2
+  Loader2,
+  Search
 } from "lucide-react";
 import { 
   DropdownMenu, 

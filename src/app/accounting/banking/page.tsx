@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -7,31 +8,26 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from "@/firebase";
-import { collection, query, where, doc, serverTimestamp, addDoc } from "firebase/firestore";
+import { collection, query, where, doc } from "firebase/firestore";
 import { 
   Landmark, 
   ArrowRightLeft, 
-  Plus, 
-  Search, 
   RefreshCw, 
   Wallet, 
   Smartphone, 
   Banknote,
-  CheckCircle2,
   AlertCircle,
   History,
   PlusCircle,
-  Store,
-  Coins,
   MoreHorizontal,
   FileText,
   TrendingUp,
   Settings2,
   Trash2,
-  ArrowUpRight
+  Loader2
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -100,7 +96,7 @@ export default function BankingPage() {
   const bankLiquidity = bankAccounts.filter(a => a.subtype === 'Cash & Bank').reduce((sum, acc) => sum + (acc.balance || 0), 0);
   const clearingBalances = bankAccounts.filter(a => a.subtype === 'M-Pesa Clearing').reduce((sum, acc) => sum + (acc.balance || 0), 0);
 
-  const handleTransfer = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleTransfer = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || isProcessing) return;
     setIsProcessing(true);
@@ -117,28 +113,26 @@ export default function BankingPage() {
       return;
     }
 
-    try {
-      await postJournalEntry(db, selectedInstId, {
-        date: new Date(),
-        description: `Internal Transfer: ${ref}`,
-        reference: `TRF-${Date.now()}`,
-        items: [
-          { accountId: toId, amount: amount, type: 'Debit' },
-          { accountId: fromId, amount: amount, type: 'Credit' },
-        ]
-      });
+    // Close Immediately for snappy UI
+    setIsTransferOpen(false);
 
+    postJournalEntry(db, selectedInstId, {
+      date: new Date(),
+      description: `Internal Transfer: ${ref}`,
+      reference: `TRF-${Date.now()}`,
+      items: [
+        { accountId: toId, amount: amount, type: 'Debit' },
+        { accountId: fromId, amount: amount, type: 'Credit' },
+      ]
+    }).then(() => {
       logSystemEvent(db, selectedInstId, user, 'BANKING', 'Transfer Funds', `Transferred ${currency} ${amount} from account ${fromId} to ${toId}.`);
-      toast({ title: "Transfer Successful", description: "Balances updated across the ledger." });
-      setIsTransferOpen(false);
-    } catch (err: any) {
+      toast({ title: "Transfer Successful" });
+    }).catch(err => {
       toast({ variant: "destructive", title: "Transfer Failed", description: err.message });
-    } finally {
-      setIsProcessing(false);
-    }
+    }).finally(() => setIsProcessing(false));
   };
 
-  const handleAdjustBalance = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAdjustBalance = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || !selectedAccount || isProcessing) return;
     setIsProcessing(true);
@@ -149,54 +143,40 @@ export default function BankingPage() {
     const difference = targetBalance - currentBalance;
 
     if (difference === 0) {
-      toast({ title: "No change detected." });
       setIsAdjustOpen(false);
       setIsProcessing(false);
       return;
     }
 
     if (!accountingSetup?.openingBalanceEquityAccountId) {
-      toast({ variant: "destructive", title: "Setup Required", description: "Opening Balance Equity account must be mapped in Accounting Setup." });
+      toast({ variant: "destructive", title: "Setup Required", description: "Opening Balance Equity account must be mapped." });
       setIsProcessing(false);
       return;
     }
 
-    try {
-      // Post Correction Journal
-      // If diff > 0: DR Asset (Selected), CR Equity
-      // If diff < 0: DR Equity, CR Asset (Selected)
-      const isPositive = difference > 0;
-      const absAmount = Math.abs(difference);
+    // Close Immediately
+    setIsAdjustOpen(false);
 
-      await postJournalEntry(db, selectedInstId, {
-        date: new Date(),
-        description: `Balance Correction for ${selectedAccount.name}`,
-        reference: `CORR-${Date.now()}`,
-        items: [
-          { 
-            accountId: selectedAccount.id, 
-            amount: absAmount, 
-            type: isPositive ? 'Debit' : 'Credit' 
-          },
-          { 
-            accountId: accountingSetup.openingBalanceEquityAccountId, 
-            amount: absAmount, 
-            type: isPositive ? 'Credit' : 'Debit' 
-          },
-        ]
-      });
+    const isPositive = difference > 0;
+    const absAmount = Math.abs(difference);
 
-      logSystemEvent(db, selectedInstId, user, 'BANKING', 'Adjust Balance', `Adjusted balance for '${selectedAccount.name}' to ${targetBalance}.`);
-      toast({ title: "Balance Corrected", description: "Ledger has been adjusted to match physical records." });
-      setIsAdjustOpen(false);
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Adjustment Failed", description: err.message });
-    } finally {
-      setIsProcessing(false);
-    }
+    postJournalEntry(db, selectedInstId, {
+      date: new Date(),
+      description: `Balance Correction for ${selectedAccount.name}`,
+      reference: `CORR-${Date.now()}`,
+      items: [
+        { accountId: selectedAccount.id, amount: absAmount, type: isPositive ? 'Debit' : 'Credit' },
+        { accountId: accountingSetup.openingBalanceEquityAccountId, amount: absAmount, type: isPositive ? 'Credit' : 'Debit' },
+      ]
+    }).then(() => {
+      logSystemEvent(db, selectedInstId, user, 'BANKING', 'Adjust Balance', `Adjusted '${selectedAccount.name}' to ${targetBalance}.`);
+      toast({ title: "Correction Posted" });
+    }).catch(err => {
+      toast({ variant: "destructive", title: "Adjustment Failed" });
+    }).finally(() => setIsProcessing(false));
   };
 
-  const handleRegisterAccount = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleRegisterAccount = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || isProcessing) return;
     setIsProcessing(true);
@@ -210,16 +190,15 @@ export default function BankingPage() {
       currencyId: formData.get('currencyId') as string || 'KES',
     };
 
-    try {
-      await registerFinancialAccount(db, selectedInstId, payload);
-      logSystemEvent(db, selectedInstId, user, 'BANKING', 'Register Account', `New ${payload.subtype} account '${payload.name}' registered with starting balance.`);
-      toast({ title: "Account Registered", description: "Ledger has been initialized with the opening balance." });
-      setIsAddAccountOpen(false);
-    } catch (err: any) {
+    // Close Immediately
+    setIsAddAccountOpen(false);
+
+    registerFinancialAccount(db, selectedInstId, payload).then(() => {
+      logSystemEvent(db, selectedInstId, user, 'BANKING', 'Register Account', `New node '${payload.name}' registered.`);
+      toast({ title: "Account Registered" });
+    }).catch(err => {
       toast({ variant: "destructive", title: "Registration Failed", description: err.message });
-    } finally {
-      setIsProcessing(false);
-    }
+    }).finally(() => setIsProcessing(false));
   };
 
   return (
@@ -231,8 +210,8 @@ export default function BankingPage() {
               <Landmark className="size-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-headline font-bold">Cash &amp; Bank</h1>
-              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Treasury &amp; Liquidity Management</p>
+              <h1 className="text-2xl font-headline font-bold">Cash & Bank</h1>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Treasury & Liquidity</p>
             </div>
           </div>
           
@@ -248,133 +227,13 @@ export default function BankingPage() {
               </SelectContent>
             </Select>
 
-            <Dialog open={isAddAccountOpen} onOpenChange={setIsAddAccountOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" variant="outline" className="gap-2 h-9 text-xs font-bold uppercase" disabled={!selectedInstId}>
-                  <PlusCircle className="size-4" /> Register Account
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <form onSubmit={handleRegisterAccount}>
-                  <DialogHeader>
-                    <DialogTitle>New Financial Node</DialogTitle>
-                    <CardDescription>Register a new bank account or till with industry best practices.</CardDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4 text-xs">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Account Name</Label>
-                        <Input name="name" placeholder="e.g. Stanbic Corporate" required className="h-9" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>GL Code</Label>
-                        <Input name="code" placeholder="1001" required className="h-9 font-mono" />
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Category</Label>
-                        <Select name="subtype" defaultValue="Cash & Bank">
-                          <SelectTrigger className="h-9 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Cash & Bank" className="text-xs">Bank Account</SelectItem>
-                            <SelectItem value="Petty Cash" className="text-xs">Cash Till / Petty Cash</SelectItem>
-                            <SelectItem value="M-Pesa Clearing" className="text-xs">Mobile Clearing (M-Pesa)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Base Currency</Label>
-                        <Select name="currencyId" defaultValue="KES">
-                          <SelectTrigger className="h-9 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="KES" className="text-xs">KES - Kenya Shilling</SelectItem>
-                            {currencies?.filter(c => c.id !== 'KES').map(c => (
-                              <SelectItem key={c.id} value={c.id} className="text-xs">{c.id} - {c.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
+            <Button size="sm" variant="outline" className="gap-2 h-9 text-xs font-bold uppercase" disabled={!selectedInstId} onClick={() => setIsAddAccountOpen(true)}>
+              <PlusCircle className="size-4" /> Register Account
+            </Button>
 
-                    <div className="p-4 bg-primary/5 rounded-lg border border-primary/10 space-y-2">
-                      <Label className="text-primary font-bold">Opening Balance</Label>
-                      <p className="text-[10px] text-muted-foreground leading-tight">Entering a balance will auto-post a Journal Entry against your Opening Balance Equity account.</p>
-                      <Input name="openingBalance" type="number" step="0.01" placeholder="0.00" className="h-9 font-mono bg-background" />
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button type="submit" disabled={isProcessing} className="w-full h-9 font-bold uppercase text-xs">
-                      {isProcessing ? "Adding..." : "Commit Financial Node"}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={isTransferOpen} onOpenChange={setIsTransferOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase" disabled={!selectedInstId}>
-                  <ArrowRightLeft className="size-4" /> Transfer Funds
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <form onSubmit={handleTransfer}>
-                  <DialogHeader>
-                    <DialogTitle>Move Liquidity</DialogTitle>
-                    <CardDescription>Transfer funds between cash tills, bank accounts, or clearing nodes.</CardDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4 text-xs">
-                    <div className="space-y-2">
-                      <Label>Source Account</Label>
-                      <Select name="fromAccountId" required>
-                        <SelectTrigger className="h-9 text-xs">
-                          <SelectValue placeholder="Pay from..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {bankAccounts.map(acc => (
-                            <SelectItem key={acc.id} value={acc.id} className="text-xs">[{acc.code}] {acc.name} - {currency} {acc.balance.toLocaleString()}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Target Account</Label>
-                      <Select name="toAccountId" required>
-                        <SelectTrigger className="h-9 text-xs">
-                          <SelectValue placeholder="Deposit to..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {bankAccounts.map(acc => (
-                            <SelectItem key={acc.id} value={acc.id} className="text-xs">[{acc.code}] {acc.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Amount ({currency})</Label>
-                        <Input name="amount" type="number" step="0.01" placeholder="0.00" required className="h-9 text-xs" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Reference / Memo</Label>
-                        <Input name="reference" placeholder="e.g. M-Pesa Settlement" required className="h-9 text-xs" />
-                      </div>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button type="submit" disabled={isProcessing} className="w-full h-9 font-bold uppercase text-xs">
-                      {isProcessing ? "Processing..." : "Confirm Movement"}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase" disabled={!selectedInstId} onClick={() => setIsTransferOpen(true)}>
+              <ArrowRightLeft className="size-4" /> Transfer Funds
+            </Button>
           </div>
         </div>
 
@@ -398,7 +257,7 @@ export default function BankingPage() {
               </Card>
               <Card className="bg-card border-none ring-1 ring-border shadow-sm">
                 <CardHeader className="pb-1 pt-3 space-y-0 flex flex-row items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase text-primary">Bank &amp; Till</span>
+                  <span className="text-[10px] font-bold uppercase text-primary">Bank & Till</span>
                   <Banknote className="size-3 text-primary" />
                 </CardHeader>
                 <CardContent className="pb-3">
@@ -434,16 +293,15 @@ export default function BankingPage() {
                     <TableRow>
                       <TableHead className="h-10 text-[10px] uppercase font-bold pl-6">Code</TableHead>
                       <TableHead className="h-10 text-[10px] uppercase font-bold">Account Name</TableHead>
-                      <TableHead className="h-10 text-[10px] uppercase font-bold">Subtype</TableHead>
                       <TableHead className="h-10 text-[10px] uppercase font-bold text-right">Balance</TableHead>
                       <TableHead className="h-10 text-[10px] uppercase font-bold text-right pr-6">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs uppercase font-bold animate-pulse opacity-50">Syncing vault...</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={4} className="text-center py-12 text-xs uppercase font-bold animate-pulse opacity-50">Syncing vault...</TableCell></TableRow>
                     ) : bankAccounts.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs text-muted-foreground uppercase font-bold">No banking accounts configured.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={4} className="text-center py-12 text-xs text-muted-foreground uppercase font-bold">No accounts found.</TableCell></TableRow>
                     ) : bankAccounts.map((acc) => (
                       <TableRow key={acc.id} className="h-14 hover:bg-secondary/5 transition-colors group">
                         <TableCell className="pl-6 font-mono text-[10px] font-bold text-muted-foreground">{acc.code}</TableCell>
@@ -451,13 +309,8 @@ export default function BankingPage() {
                           <div className="flex items-center gap-2">
                             <div className="size-2 rounded-full bg-emerald-500 animate-pulse" />
                             <span className="text-xs font-bold">{acc.name}</span>
+                            <Badge variant="outline" className="text-[8px] h-3.5 uppercase font-bold bg-background ml-2">{acc.subtype}</Badge>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-[9px] h-4 uppercase font-bold bg-background">
-                            {acc.subtype === 'M-Pesa Clearing' ? <Smartphone className="size-2 mr-1" /> : acc.subtype === 'Petty Cash' ? <Banknote className="size-2 mr-1" /> : <Landmark className="size-2 mr-1" />}
-                            {acc.subtype}
-                          </Badge>
                         </TableCell>
                         <TableCell className="text-right font-mono font-bold text-sm text-primary">
                           {currency} {acc.balance?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -487,9 +340,6 @@ export default function BankingPage() {
                                 <FileText className="size-3.5 text-accent" /> Account Statement
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-xs gap-2">
-                                <Settings2 className="size-3.5" /> Modify Node
-                              </DropdownMenuItem>
                               <DropdownMenuItem className="text-xs gap-2 text-destructive">
                                 <Trash2 className="size-3.5" /> Deactivate
                               </DropdownMenuItem>
@@ -511,43 +361,121 @@ export default function BankingPage() {
             <form onSubmit={handleAdjustBalance}>
               <DialogHeader>
                 <DialogTitle>Balance Correction</DialogTitle>
-                <CardDescription>Update the ledger to match the physical account status for {selectedAccount?.name}.</CardDescription>
+                <CardDescription>Update the ledger to match physical records for {selectedAccount?.name}.</CardDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4 text-xs">
                 <div className="p-4 bg-secondary/20 rounded-lg border flex justify-between items-center">
                   <div>
-                    <p className="text-[9px] font-bold uppercase text-muted-foreground">Current Ledger Balance</p>
+                    <p className="text-[9px] font-bold uppercase text-muted-foreground">Ledger Balance</p>
                     <p className="text-lg font-mono font-bold">{currency} {selectedAccount?.balance?.toLocaleString()}</p>
                   </div>
-                  <ArrowRightLeft className="size-4 text-muted-foreground opacity-30" />
+                  <RefreshCw className="size-4 text-muted-foreground opacity-30" />
                 </div>
-                
                 <div className="space-y-2">
                   <Label>True Physical Balance ({currency})</Label>
-                  <p className="text-[10px] text-muted-foreground">Enter the actual amount currently in the bank or till.</p>
-                  <Input 
-                    name="targetBalance" 
-                    type="number" 
-                    step="0.01" 
-                    placeholder="0.00" 
-                    required 
-                    className="h-10 font-mono text-lg"
-                  />
+                  <Input name="targetBalance" type="number" step="0.01" placeholder="0.00" required className="h-10 font-mono text-lg" />
                 </div>
-
                 <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg">
-                  <p className="text-[10px] text-amber-600 font-bold uppercase flex items-center gap-1.5">
-                    <AlertCircle className="size-3" /> Audit Warning
-                  </p>
-                  <p className="text-[9px] text-muted-foreground mt-1 leading-tight">
-                    This action will auto-post an adjustment journal entry against your Opening Balance Equity account to preserve double-entry integrity.
-                  </p>
+                  <p className="text-[10px] text-amber-600 font-bold uppercase flex items-center gap-1.5"><AlertCircle className="size-3" /> Audit Alert</p>
+                  <p className="text-[9px] text-muted-foreground mt-1 leading-tight">This will auto-post a corrective Journal Entry.</p>
                 </div>
               </div>
               <DialogFooter>
-                <Button type="submit" disabled={isProcessing} className="w-full h-10 font-bold uppercase text-xs shadow-lg shadow-primary/20">
-                  {isProcessing ? "Processing Audit..." : "Commit Correction"}
-                </Button>
+                <Button type="button" variant="ghost" className="text-xs" onClick={() => setIsAdjustOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={isProcessing} className="h-10 font-bold uppercase text-xs">Commit Correction</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Account Dialog */}
+        <Dialog open={isAddAccountOpen} onOpenChange={setIsAddAccountOpen}>
+          <DialogContent className="max-w-md">
+            <form onSubmit={handleRegisterAccount}>
+              <DialogHeader>
+                <DialogTitle>New Financial Node</DialogTitle>
+                <CardDescription>Register a new bank account or till.</CardDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4 text-xs">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2"><Label>Account Name</Label><Input name="name" placeholder="e.g. KCB Corporate" required className="h-9" /></div>
+                  <div className="space-y-2"><Label>GL Code</Label><Input name="code" placeholder="1001" required className="h-9 font-mono" /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Category</Label>
+                    <Select name="subtype" defaultValue="Cash & Bank">
+                      <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Cash & Bank" className="text-xs">Bank Account</SelectItem>
+                        <SelectItem value="Petty Cash" className="text-xs">Petty Cash</SelectItem>
+                        <SelectItem value="M-Pesa Clearing" className="text-xs">M-Pesa Clearing</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Base Currency</Label>
+                    <Select name="currencyId" defaultValue="KES">
+                      <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="KES" className="text-xs">KES - Shilling</SelectItem>
+                        {currencies?.map(c => <SelectItem key={c.id} value={c.id} className="text-xs">{c.id}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="p-4 bg-primary/5 rounded-lg border border-primary/10 space-y-2">
+                  <Label className="text-primary font-bold">Opening Balance</Label>
+                  <Input name="openingBalance" type="number" step="0.01" placeholder="0.00" className="h-9 font-mono" />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="ghost" className="text-xs" onClick={() => setIsAddAccountOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={isProcessing} className="h-9 font-bold uppercase text-xs">Register Node</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Transfer Funds Dialog */}
+        <Dialog open={isTransferOpen} onOpenChange={setIsTransferOpen}>
+          <DialogContent className="max-w-md">
+            <form onSubmit={handleTransfer}>
+              <DialogHeader>
+                <DialogTitle>Move Liquidity</DialogTitle>
+                <CardDescription>Transfer between treasury nodes.</CardDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4 text-xs">
+                <div className="space-y-2">
+                  <Label>Source Account</Label>
+                  <Select name="fromAccountId" required>
+                    <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Pay from..." /></SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.map(acc => (
+                        <SelectItem key={acc.id} value={acc.id} className="text-xs">[{acc.code}] {acc.name} - {currency} {acc.balance.toLocaleString()}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Target Account</Label>
+                  <Select name="toAccountId" required>
+                    <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Deposit to..." /></SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts.map(acc => (
+                        <SelectItem key={acc.id} value={acc.id} className="text-xs">[{acc.code}] {acc.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2"><Label>Amount ({currency})</Label><Input name="amount" type="number" step="0.01" required className="h-9 text-xs" /></div>
+                  <div className="space-y-2"><Label>Reference</Label><Input name="reference" placeholder="Memo" required className="h-9 text-xs" /></div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="ghost" className="text-xs" onClick={() => setIsTransferOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={isProcessing} className="h-9 font-bold uppercase text-xs">Confirm Movement</Button>
               </DialogFooter>
             </form>
           </DialogContent>

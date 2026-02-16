@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from "@/firebase";
 import { collection, query, orderBy, limit, doc, where } from "firebase/firestore";
@@ -56,55 +56,48 @@ export default function AccountsPayablePage() {
   const totalPayable = bills?.reduce((sum, bill) => sum + (bill.balance || 0), 0) || 0;
   const overduePayable = bills?.filter(bill => bill.status !== 'Paid' && isAfter(new Date(), bill.dueDate.toDate())).reduce((sum, bill) => sum + (bill.balance || 0), 0) || 0;
 
-  const handleCreateBill = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateBill = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || isProcessing) return;
     setIsProcessing(true);
 
     const formData = new FormData(e.currentTarget);
-    try {
-      await createVendorBill(db, selectedInstId, {
-        vendorName: formData.get('vendorName') as string,
-        billNumber: formData.get('billNumber') as string,
-        date: new Date(formData.get('date') as string),
-        dueDate: new Date(formData.get('dueDate') as string),
-        amount: parseFloat(formData.get('amount') as string),
-        expenseAccountId: formData.get('expenseAccountId') as string,
-      });
+    const data = {
+      vendorName: formData.get('vendorName') as string,
+      billNumber: formData.get('billNumber') as string,
+      date: new Date(formData.get('date') as string),
+      dueDate: new Date(formData.get('dueDate') as string),
+      amount: parseFloat(formData.get('amount') as string),
+      expenseAccountId: formData.get('expenseAccountId') as string,
+    };
 
-      logSystemEvent(db, selectedInstId, user, 'ACCOUNTING', 'Create Bill', `New bill from ${formData.get('vendorName')} recorded.`);
-      toast({ title: "Bill Recorded", description: "Ledger updated." });
-      setIsCreateOpen(false);
-    } catch (err: any) {
+    setIsCreateOpen(false); // Snap Close
+
+    createVendorBill(db, selectedInstId, data).then(() => {
+      logSystemEvent(db, selectedInstId, user, 'ACCOUNTING', 'Create Bill', `Bill ${data.billNumber} from ${data.vendorName} recorded.`);
+      toast({ title: "Bill Recorded" });
+    }).catch(err => {
       toast({ variant: "destructive", title: "Recording Failed", description: err.message });
-    } finally {
-      setIsProcessing(false);
-    }
+    }).finally(() => setIsProcessing(false));
   };
 
-  const handleRecordPayment = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleRecordPayment = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || !selectedBill || isProcessing) return;
     setIsProcessing(true);
 
     const formData = new FormData(e.currentTarget);
-    try {
-      await recordVendorPayment(
-        db, 
-        selectedInstId, 
-        selectedBill.id, 
-        parseFloat(formData.get('amount') as string),
-        formData.get('sourceAccountId') as string
-      );
+    const amount = parseFloat(formData.get('amount') as string);
+    const sourceAccountId = formData.get('sourceAccountId') as string;
 
-      logSystemEvent(db, selectedInstId, user, 'ACCOUNTING', 'Vendor Payment', `Payment made for bill ${selectedBill.billNumber}.`);
-      toast({ title: "Payment Recorded", description: "Liability reduced." });
-      setIsPaymentOpen(false);
-    } catch (err: any) {
+    setIsPaymentOpen(false); // Snap Close
+
+    recordVendorPayment(db, selectedInstId, selectedBill.id, amount, sourceAccountId).then(() => {
+      logSystemEvent(db, selectedInstId, user, 'ACCOUNTING', 'Vendor Payment', `Payment for bill ${selectedBill.billNumber} processed.`);
+      toast({ title: "Payment Recorded" });
+    }).catch(err => {
       toast({ variant: "destructive", title: "Payment Failed", description: err.message });
-    } finally {
-      setIsProcessing(false);
-    }
+    }).finally(() => setIsProcessing(false));
   };
 
   return (
@@ -133,65 +126,9 @@ export default function AccountsPayablePage() {
               </SelectContent>
             </Select>
 
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase" disabled={!selectedInstId}>
-                  <Plus className="size-4" /> New Bill
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <form onSubmit={handleCreateBill}>
-                  <DialogHeader>
-                    <DialogTitle>Record Vendor Bill</DialogTitle>
-                    <CardDescription>Enter a new purchase or expense bill.</CardDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4 text-xs">
-                    <div className="space-y-2">
-                      <Label>Vendor Name</Label>
-                      <Input name="vendorName" placeholder="e.g. Medical Supplies Ltd" required className="h-9 text-xs" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Bill / Invoice #</Label>
-                      <Input name="billNumber" placeholder="REF-12345" required className="h-9 text-xs" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Bill Date</Label>
-                        <Input name="date" type="date" defaultValue={format(new Date(), 'yyyy-MM-dd')} required className="h-9 text-xs" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Due Date</Label>
-                        <Input name="dueDate" type="date" required className="h-9 text-xs" />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Total Amount ({currency})</Label>
-                        <Input name="amount" type="number" step="0.01" placeholder="0.00" required className="h-9 text-xs" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Allocation Account</Label>
-                        <Select name="expenseAccountId" required>
-                          <SelectTrigger className="h-9 text-xs">
-                            <SelectValue placeholder="Expense/Asset Type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {accounts?.filter(a => a.type === 'Expense' || a.subtype === 'Inventory' || a.subtype === 'Fixed Assets').map(acc => (
-                              <SelectItem key={acc.id} value={acc.id} className="text-xs">[{acc.code}] {acc.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button type="submit" disabled={isProcessing} className="w-full h-9 font-bold uppercase text-xs">
-                      {isProcessing ? "Processing..." : "Commit Bill"}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase" disabled={!selectedInstId} onClick={() => setIsCreateOpen(true)}>
+              <Plus className="size-4" /> New Bill
+            </Button>
           </div>
         </div>
 
@@ -210,7 +147,6 @@ export default function AccountsPayablePage() {
                 </CardHeader>
                 <CardContent className="pb-3">
                   <div className="text-lg font-bold">{currency} {totalPayable.toLocaleString()}</div>
-                  <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold">Unsettled vendor bills</p>
                 </CardContent>
               </Card>
               <Card className="bg-card border-none ring-1 ring-border shadow-sm">
@@ -220,7 +156,6 @@ export default function AccountsPayablePage() {
                 </CardHeader>
                 <CardContent className="pb-3">
                   <div className="text-lg font-bold text-destructive">{currency} {overduePayable.toLocaleString()}</div>
-                  <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold">Immediate attention required</p>
                 </CardContent>
               </Card>
               <Card className="bg-card border-none ring-1 ring-border shadow-sm">
@@ -230,7 +165,6 @@ export default function AccountsPayablePage() {
                 </CardHeader>
                 <CardContent className="pb-3">
                   <div className="text-lg font-bold text-primary">{currency} 0</div>
-                  <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold">Outgoing cash flow this month</p>
                 </CardContent>
               </Card>
             </div>
@@ -316,7 +250,7 @@ export default function AccountsPayablePage() {
         {/* Record Payment Dialog */}
         <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
           <DialogContent className="max-w-sm">
-            <form onSubmit={handleRecordVendorPayment}>
+            <form onSubmit={handleRecordPayment}>
               <DialogHeader>
                 <DialogTitle>Settle Bill</DialogTitle>
                 <CardDescription>Issue payment to {selectedBill?.vendorName}</CardDescription>
@@ -337,7 +271,7 @@ export default function AccountsPayablePage() {
                       <SelectValue placeholder="Select Funding Account" />
                     </SelectTrigger>
                     <SelectContent>
-                      {accounts?.filter(a => a.subtype === 'Cash & Bank').map(acc => (
+                      {accounts?.filter(a => a.subtype === 'Cash & Bank' || a.subtype === 'Petty Cash').map(acc => (
                         <SelectItem key={acc.id} value={acc.id} className="text-xs">[{acc.code}] {acc.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -345,9 +279,63 @@ export default function AccountsPayablePage() {
                 </div>
               </div>
               <DialogFooter>
-                <Button type="submit" disabled={isProcessing} className="w-full h-9 font-bold uppercase text-xs">
-                  {isProcessing ? "Posting..." : "Confirm Outflow"}
-                </Button>
+                <Button type="button" variant="ghost" onClick={() => setIsPaymentOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={isProcessing} className="h-9 font-bold uppercase text-xs">Confirm Outflow</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create Bill Dialog */}
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogContent className="max-w-md">
+            <form onSubmit={handleCreateBill}>
+              <DialogHeader>
+                <DialogTitle>Record Vendor Bill</DialogTitle>
+                <CardDescription>Enter a new purchase or expense bill.</CardDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4 text-xs">
+                <div className="space-y-2">
+                  <Label>Vendor Name</Label>
+                  <Input name="vendorName" placeholder="e.g. Medical Supplies Ltd" required className="h-9 text-xs" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Bill / Invoice #</Label>
+                  <Input name="billNumber" placeholder="REF-12345" required className="h-9 text-xs" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Bill Date</Label>
+                    <Input name="date" type="date" defaultValue={format(new Date(), 'yyyy-MM-dd')} required className="h-9 text-xs" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Due Date</Label>
+                    <Input name="dueDate" type="date" required className="h-9 text-xs" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Total Amount ({currency})</Label>
+                    <Input name="amount" type="number" step="0.01" placeholder="0.00" required className="h-9 text-xs" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Allocation Account</Label>
+                    <Select name="expenseAccountId" required>
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue placeholder="Account Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts?.filter(a => a.type === 'Expense' || a.subtype === 'Inventory' || a.subtype === 'Fixed Assets').map(acc => (
+                          <SelectItem key={acc.id} value={acc.id} className="text-xs">[{acc.code}] {acc.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={isProcessing} className="h-9 font-bold uppercase text-xs">Commit Bill</Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -355,29 +343,4 @@ export default function AccountsPayablePage() {
       </div>
     </DashboardLayout>
   );
-
-  async function handleRecordVendorPayment(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!selectedInstId || !selectedBill || isProcessing) return;
-    setIsProcessing(true);
-
-    const formData = new FormData(e.currentTarget);
-    try {
-      await recordVendorPayment(
-        db, 
-        selectedInstId, 
-        selectedBill.id, 
-        parseFloat(formData.get('amount') as string),
-        formData.get('sourceAccountId') as string
-      );
-
-      logSystemEvent(db, selectedInstId, user, 'ACCOUNTING', 'Vendor Payment', `Payment made for bill ${selectedBill.billNumber}.`);
-      toast({ title: "Payment Recorded", description: "Liability reduced." });
-      setIsPaymentOpen(false);
-    } catch (err: any) {
-      toast({ variant: "destructive", title: "Payment Failed", description: err.message });
-    } finally {
-      setIsProcessing(false);
-    }
-  }
 }

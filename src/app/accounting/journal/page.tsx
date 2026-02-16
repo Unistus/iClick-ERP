@@ -8,12 +8,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from "@/firebase";
-import { collection, query, orderBy, limit, doc, getDoc, runTransaction, serverTimestamp } from "firebase/firestore";
+import { collection, query, orderBy, limit, doc, getDoc, runTransaction } from "firebase/firestore";
 import { format } from "date-fns";
-import { Plus, History, Calculator, ArrowRightLeft, Save, Trash2, AlertCircle, CheckCircle2, Search } from "lucide-react";
+import { Plus, History, Calculator, ArrowLeft, Save, Trash2, AlertCircle, CheckCircle2, Search, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { postJournalEntry, type JournalItem } from "@/lib/accounting/journal.service";
 import { toast } from "@/hooks/use-toast";
@@ -23,7 +22,7 @@ export default function JournalEntriesPage() {
   const db = useFirestore();
   const { user } = useUser();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [view, setView] = useState<'list' | 'create'>('list');
   const [isPosting, setIsPosting] = useState(false);
 
   // Form State
@@ -65,7 +64,7 @@ export default function JournalEntriesPage() {
   // Calculations
   const totalDebit = items.filter(i => i.type === 'Debit').reduce((sum, i) => sum + i.amount, 0);
   const totalCredit = items.filter(i => i.type === 'Credit').reduce((sum, i) => sum + i.amount, 0);
-  const isBalanced = totalDebit === totalCredit && totalDebit > 0;
+  const isBalanced = Math.abs(totalDebit - totalCredit) < 0.01 && totalDebit > 0;
 
   const addItem = () => setItems([...items, { accountId: "", amount: 0, type: 'Debit' }]);
   const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index));
@@ -80,7 +79,7 @@ export default function JournalEntriesPage() {
     setIsPosting(true);
 
     try {
-      // 1. Fetch Sequence for Reference
+      // 1. Fetch Sequence for Reference (Blocking but necessary for atomic numbering)
       const seqRef = doc(db, 'institutions', selectedInstId, 'document_sequences', 'journal_entry');
       const seqSnap = await getDoc(seqRef);
       let reference = `JE-${Date.now()}`;
@@ -89,8 +88,8 @@ export default function JournalEntriesPage() {
         const seqData = seqSnap.data();
         reference = `${seqData.prefix}${seqData.nextNumber.toString().padStart(seqData.padding, '0')}`;
         
-        // Non-blocking update of sequence
-        await runTransaction(db, async (transaction) => {
+        // Transaction for sequence update
+        runTransaction(db, async (transaction) => {
           const s = await transaction.get(seqRef);
           if (s.exists()) {
             transaction.update(seqRef, { nextNumber: s.data().nextNumber + 1 });
@@ -98,8 +97,8 @@ export default function JournalEntriesPage() {
         });
       }
 
-      // 2. Post Journal
-      await postJournalEntry(db, selectedInstId, {
+      // 2. Post Journal (Non-blocking internal mutations)
+      postJournalEntry(db, selectedInstId, {
         date: new Date(date),
         description,
         reference,
@@ -108,10 +107,12 @@ export default function JournalEntriesPage() {
 
       logSystemEvent(db, selectedInstId, user, 'ACCOUNTING', 'Post Journal', `Manual entry ${reference} posted.`);
       toast({ title: "Journal Posted", description: `Reference: ${reference}` });
-      setIsCreateOpen(false);
+      
+      // Reset UI Immediately
+      setView('list');
       resetForm();
     } catch (err) {
-      toast({ variant: "destructive", title: "Posting Failed", description: "Ledger transaction error." });
+      toast({ variant: "destructive", title: "Posting Failed", description: "Reference generation error." });
     } finally {
       setIsPosting(false);
     }
@@ -122,6 +123,145 @@ export default function JournalEntriesPage() {
     setDate(format(new Date(), 'yyyy-MM-dd'));
     setItems([{ accountId: "", amount: 0, type: 'Debit' }, { accountId: "", amount: 0, type: 'Credit' }]);
   };
+
+  if (view === 'create') {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => setView('list')}>
+              <ArrowLeft className="size-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-headline font-bold">New Journal Entry</h1>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Manual Double-Entry Adjustment</p>
+            </div>
+          </div>
+
+          <Card className="border-none ring-1 ring-border shadow-2xl bg-card">
+            <div className="p-6 space-y-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-[10px] uppercase font-bold opacity-60">Entry Description</Label>
+                  <Input 
+                    placeholder="e.g. Opening balance adjustment" 
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="bg-secondary/10 border-none ring-1 ring-border h-10 text-sm"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] uppercase font-bold opacity-60">Transaction Date</Label>
+                  <Input 
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="bg-secondary/10 border-none ring-1 ring-border h-10 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-secondary/20">
+                    <TableRow>
+                      <TableHead className="text-[10px] uppercase font-bold h-10">Ledger Account</TableHead>
+                      <TableHead className="text-[10px] uppercase font-bold h-10 w-[140px]">Type</TableHead>
+                      <TableHead className="text-[10px] uppercase font-bold h-10 text-right w-[180px]">Amount</TableHead>
+                      <TableHead className="text-[10px] uppercase font-bold h-10 text-right w-[60px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((item, idx) => (
+                      <TableRow key={idx} className="h-14">
+                        <TableCell>
+                          <Select value={item.accountId} onValueChange={(val) => updateItem(idx, 'accountId', val)}>
+                            <SelectTrigger className="h-9 text-xs bg-transparent border-none ring-1 ring-border">
+                              <SelectValue placeholder="Select Account..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {accounts?.map(acc => (
+                                <SelectItem key={acc.id} value={acc.id} className="text-xs">
+                                  [{acc.code}] {acc.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select value={item.type} onValueChange={(val: any) => updateItem(idx, 'type', val)}>
+                            <SelectTrigger className="h-9 text-[10px] font-bold bg-transparent border-none ring-1 ring-border">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Debit" className="text-[10px] font-bold">DEBIT</SelectItem>
+                              <SelectItem value="Credit" className="text-[10px] font-bold">CREDIT</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Input 
+                            type="number" 
+                            step="0.01"
+                            value={item.amount || ''} 
+                            onChange={(e) => updateItem(idx, 'amount', parseFloat(e.target.value) || 0)}
+                            className="h-9 text-right font-mono text-sm bg-transparent border-none ring-1 ring-border"
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" className="size-8 text-destructive" onClick={() => removeItem(idx)} disabled={items.length <= 2}>
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <div className="p-4 bg-secondary/10 border-t flex justify-start">
+                  <Button variant="outline" size="sm" className="h-8 text-[10px] gap-2 uppercase font-bold" onClick={addItem}>
+                    <Plus className="size-3.5" /> Add Row
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex flex-col md:flex-row justify-between items-center gap-8 p-6 bg-secondary/5 rounded-xl border border-border/50">
+                <div className="flex gap-12">
+                  <div className="text-center">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Total Debits</p>
+                    <p className="text-xl font-mono font-bold text-emerald-500">{currency} {totalDebit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Total Credits</p>
+                    <p className="text-xl font-mono font-bold text-destructive">{currency} {totalCredit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-6">
+                  {!isBalanced && totalDebit > 0 && (
+                    <div className="flex items-center gap-2 text-destructive text-[10px] font-bold uppercase animate-pulse bg-destructive/10 px-3 py-1.5 rounded-full">
+                      <AlertCircle className="size-4" /> Unbalanced Discrepancy: {currency} {Math.abs(totalDebit - totalCredit).toLocaleString()}
+                    </div>
+                  )}
+                  {isBalanced && (
+                    <div className="flex items-center gap-2 text-emerald-500 text-[10px] font-bold uppercase bg-emerald-500/10 px-3 py-1.5 rounded-full">
+                      <CheckCircle2 className="size-4" /> Double-Entry Balanced
+                    </div>
+                  )}
+                  <Button 
+                    disabled={!isBalanced || isPosting} 
+                    onClick={handlePost}
+                    className="gap-2 px-10 font-bold uppercase text-xs h-11 shadow-lg shadow-primary/20"
+                  >
+                    {isPosting ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Post Journal
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -149,139 +289,9 @@ export default function JournalEntriesPage() {
               </SelectContent>
             </Select>
 
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase" disabled={!selectedInstId}>
-                  <Plus className="size-4" /> New Entry
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
-                <DialogHeader className="p-6 pb-2 shrink-0 border-b">
-                  <DialogTitle className="text-xl">Create Journal Entry</DialogTitle>
-                  <CardDescription>Record manual adjustments or external transactions to the general ledger.</CardDescription>
-                </DialogHeader>
-                
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-[10px] uppercase font-bold opacity-60">Entry Description</Label>
-                      <Input 
-                        placeholder="e.g. Opening balance adjustment" 
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        className="bg-secondary/10 border-none ring-1 ring-border h-9 text-xs"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-[10px] uppercase font-bold opacity-60">Transaction Date</Label>
-                      <Input 
-                        type="date"
-                        value={date}
-                        onChange={(e) => setDate(e.target.value)}
-                        className="bg-secondary/10 border-none ring-1 ring-border h-9 text-xs"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="border rounded-lg overflow-hidden">
-                    <Table>
-                      <TableHeader className="bg-secondary/20">
-                        <TableRow>
-                          <TableHead className="text-[10px] uppercase font-bold h-9">Ledger Account</TableHead>
-                          <TableHead className="text-[10px] uppercase font-bold h-9 w-[120px]">Type</TableHead>
-                          <TableHead className="text-[10px] uppercase font-bold h-9 text-right w-[150px]">Amount</TableHead>
-                          <TableHead className="text-[10px] uppercase font-bold h-9 text-right w-[50px]"></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {items.map((item, idx) => (
-                          <TableRow key={idx} className="h-12">
-                            <TableCell>
-                              <Select value={item.accountId} onValueChange={(val) => updateItem(idx, 'accountId', val)}>
-                                <SelectTrigger className="h-8 text-[11px] bg-transparent border-none ring-1 ring-border">
-                                  <SelectValue placeholder="Select Account..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {accounts?.map(acc => (
-                                    <SelectItem key={acc.id} value={acc.id} className="text-xs">
-                                      [{acc.code}] {acc.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell>
-                              <Select value={item.type} onValueChange={(val: any) => updateItem(idx, 'type', val)}>
-                                <SelectTrigger className="h-8 text-[11px] bg-transparent border-none ring-1 ring-border">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="Debit" className="text-xs">DEBIT</SelectItem>
-                                  <SelectItem value="Credit" className="text-xs">CREDIT</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Input 
-                                type="number" 
-                                value={item.amount || ''} 
-                                onChange={(e) => updateItem(idx, 'amount', parseFloat(e.target.value) || 0)}
-                                className="h-8 text-right font-mono text-xs bg-transparent border-none ring-1 ring-border"
-                              />
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={() => removeItem(idx)} disabled={items.length <= 2}>
-                                <Trash2 className="size-3.5" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                    <div className="p-3 bg-secondary/10 border-t flex justify-start">
-                      <Button variant="outline" size="sm" className="h-7 text-[10px] gap-2 uppercase font-bold" onClick={addItem}>
-                        <Plus className="size-3" /> Add Row
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-6 border-t bg-secondary/5 shrink-0">
-                  <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-                    <div className="flex gap-8">
-                      <div className="text-center">
-                        <p className="text-[9px] uppercase font-bold text-muted-foreground mb-1">Total Debits</p>
-                        <p className="text-lg font-mono font-bold text-emerald-500">{currency} {totalDebit.toLocaleString()}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-[9px] uppercase font-bold text-muted-foreground mb-1">Total Credits</p>
-                        <p className="text-lg font-mono font-bold text-destructive">{currency} {totalCredit.toLocaleString()}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                      {!isBalanced && totalDebit > 0 && (
-                        <div className="flex items-center gap-2 text-destructive text-[10px] font-bold uppercase animate-pulse">
-                          <AlertCircle className="size-3.5" /> Out of Balance ({currency} {Math.abs(totalDebit - totalCredit).toLocaleString()})
-                        </div>
-                      )}
-                      {isBalanced && (
-                        <div className="flex items-center gap-2 text-emerald-500 text-[10px] font-bold uppercase">
-                          <CheckCircle2 className="size-3.5" /> Entry Balanced
-                        </div>
-                      )}
-                      <Button 
-                        disabled={!isBalanced || isPosting} 
-                        onClick={handlePost}
-                        className="gap-2 px-8 font-bold uppercase text-xs h-10 shadow-lg shadow-primary/20"
-                      >
-                        {isPosting ? <Plus className="size-4 animate-spin" /> : <Save className="size-4" />} Post Entry
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase" disabled={!selectedInstId} onClick={() => setView('create')}>
+              <Plus className="size-4" /> New Entry
+            </Button>
           </div>
         </div>
 
@@ -295,7 +305,7 @@ export default function JournalEntriesPage() {
             <CardHeader className="py-3 px-6 border-b border-border/50 flex flex-row items-center justify-between">
               <div className="relative max-w-sm w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-                <Input placeholder="Search references or descriptions..." className="pl-9 h-8 text-[10px] bg-secondary/20 border-none" />
+                <Input placeholder="Search references..." className="pl-9 h-8 text-[10px] bg-secondary/20 border-none" />
               </div>
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{entries?.length || 0} Recent Records</p>
             </CardHeader>
@@ -313,9 +323,9 @@ export default function JournalEntriesPage() {
                 </TableHeader>
                 <TableBody>
                   {entriesLoading ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-12 text-xs">Synchronizing ledger...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="text-center py-12 text-xs uppercase font-bold animate-pulse opacity-50">Syncing ledger...</TableCell></TableRow>
                   ) : !entries || entries.length === 0 ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-12 text-xs text-muted-foreground">No financial activity recorded yet.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="text-center py-12 text-xs text-muted-foreground uppercase font-bold">No financial activity recorded yet.</TableCell></TableRow>
                   ) : entries.map((entry) => {
                     const debits = entry.items?.reduce((sum: number, i: any) => i.type === 'Debit' ? sum + i.amount : sum, 0) || 0;
                     const credits = entry.items?.reduce((sum: number, i: any) => i.type === 'Credit' ? sum + i.amount : sum, 0) || 0;
@@ -337,7 +347,7 @@ export default function JournalEntriesPage() {
                           {currency} {credits.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </TableCell>
                         <TableCell className="text-right pr-6">
-                          <Badge variant="secondary" className="text-[9px] h-4 bg-emerald-500/10 text-emerald-500 font-bold px-2">POSTED</Badge>
+                          <Badge variant="secondary" className="text-[9px] h-4 bg-emerald-500/10 text-emerald-500 font-bold px-2 border-none">POSTED</Badge>
                         </TableCell>
                       </TableRow>
                     );

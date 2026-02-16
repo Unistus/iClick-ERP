@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from "@/firebase";
 import { collection, query, orderBy, limit, doc, where } from "firebase/firestore";
@@ -56,55 +56,48 @@ export default function AccountsReceivablePage() {
   const totalReceivable = invoices?.reduce((sum, inv) => sum + (inv.balance || 0), 0) || 0;
   const overdueReceivable = invoices?.filter(inv => inv.status !== 'Paid' && isAfter(new Date(), inv.dueDate.toDate())).reduce((sum, inv) => sum + (inv.balance || 0), 0) || 0;
 
-  const handleCreateInvoice = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateInvoice = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || isProcessing) return;
     setIsProcessing(true);
 
     const formData = new FormData(e.currentTarget);
-    try {
-      await createReceivableInvoice(db, selectedInstId, {
-        customerName: formData.get('customerName') as string,
-        customerId: `CUST-${Date.now()}`,
-        date: new Date(formData.get('date') as string),
-        dueDate: new Date(formData.get('dueDate') as string),
-        amount: parseFloat(formData.get('amount') as string),
-        taxAmount: parseFloat(formData.get('taxAmount') as string) || 0,
-      });
+    const data = {
+      customerName: formData.get('customerName') as string,
+      customerId: `CUST-${Date.now()}`,
+      date: new Date(formData.get('date') as string),
+      dueDate: new Date(formData.get('dueDate') as string),
+      amount: parseFloat(formData.get('amount') as string),
+      taxAmount: parseFloat(formData.get('taxAmount') as string) || 0,
+    };
 
+    setIsCreateOpen(false); // Snap Close
+
+    createReceivableInvoice(db, selectedInstId, data).then(() => {
       logSystemEvent(db, selectedInstId, user, 'ACCOUNTING', 'Create Invoice', `New credit sale invoice issued.`);
-      toast({ title: "Invoice Created", description: "Ledger has been auto-updated." });
-      setIsCreateOpen(false);
-    } catch (err: any) {
+      toast({ title: "Invoice Created" });
+    }).catch(err => {
       toast({ variant: "destructive", title: "Invoicing Failed", description: err.message });
-    } finally {
-      setIsProcessing(false);
-    }
+    }).finally(() => setIsProcessing(false));
   };
 
-  const handleRecordPayment = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleRecordPayment = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || !selectedInvoice || isProcessing) return;
     setIsProcessing(true);
 
     const formData = new FormData(e.currentTarget);
-    try {
-      await recordInvoicePayment(
-        db, 
-        selectedInstId, 
-        selectedInvoice.id, 
-        parseFloat(formData.get('amount') as string),
-        formData.get('paymentAccountId') as string
-      );
+    const amount = parseFloat(formData.get('amount') as string);
+    const paymentAccountId = formData.get('paymentAccountId') as string;
 
+    setIsPaymentOpen(false); // Snap Close
+
+    recordInvoicePayment(db, selectedInstId, selectedInvoice.id, amount, paymentAccountId).then(() => {
       logSystemEvent(db, selectedInstId, user, 'ACCOUNTING', 'Record Payment', `Payment received for invoice ${selectedInvoice.invoiceNumber}.`);
-      toast({ title: "Payment Recorded", description: "Invoice balance cleared." });
-      setIsPaymentOpen(false);
-    } catch (err: any) {
+      toast({ title: "Payment Recorded" });
+    }).catch(err => {
       toast({ variant: "destructive", title: "Payment Failed", description: err.message });
-    } finally {
-      setIsProcessing(false);
-    }
+    }).finally(() => setIsProcessing(false));
   };
 
   return (
@@ -133,52 +126,9 @@ export default function AccountsReceivablePage() {
               </SelectContent>
             </Select>
 
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase" disabled={!selectedInstId}>
-                  <Plus className="size-4" /> New Invoice
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md">
-                <form onSubmit={handleCreateInvoice}>
-                  <DialogHeader>
-                    <DialogTitle>Issue New Invoice</DialogTitle>
-                    <CardDescription>Generate a credit sale and auto-post to ledger.</CardDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4 text-xs">
-                    <div className="space-y-2">
-                      <Label>Customer Name</Label>
-                      <Input name="customerName" placeholder="e.g. Acme Corp" required className="h-9 text-xs" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Invoice Date</Label>
-                        <Input name="date" type="date" defaultValue={format(new Date(), 'yyyy-MM-dd')} required className="h-9 text-xs" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Due Date</Label>
-                        <Input name="dueDate" type="date" required className="h-9 text-xs" />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Total Amount ({currency})</Label>
-                        <Input name="amount" type="number" step="0.01" placeholder="0.00" required className="h-9 text-xs" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>VAT Portion ({currency})</Label>
-                        <Input name="taxAmount" type="number" step="0.01" placeholder="0.00" className="h-9 text-xs" />
-                      </div>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button type="submit" disabled={isProcessing} className="w-full h-9 font-bold uppercase text-xs">
-                      {isProcessing ? "Processing..." : "Issue Invoice"}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase" disabled={!selectedInstId} onClick={() => setIsCreateOpen(true)}>
+              <Plus className="size-4" /> New Invoice
+            </Button>
           </div>
         </div>
 
@@ -197,7 +147,6 @@ export default function AccountsReceivablePage() {
                 </CardHeader>
                 <CardContent className="pb-3">
                   <div className="text-lg font-bold">{currency} {totalReceivable.toLocaleString()}</div>
-                  <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold">Unsettled Invoices</p>
                 </CardContent>
               </Card>
               <Card className="bg-card border-none ring-1 ring-border shadow-sm">
@@ -207,7 +156,6 @@ export default function AccountsReceivablePage() {
                 </CardHeader>
                 <CardContent className="pb-3">
                   <div className="text-lg font-bold text-destructive">{currency} {overdueReceivable.toLocaleString()}</div>
-                  <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold">Immediate Collection Required</p>
                 </CardContent>
               </Card>
               <Card className="bg-card border-none ring-1 ring-border shadow-sm">
@@ -217,7 +165,6 @@ export default function AccountsReceivablePage() {
                 </CardHeader>
                 <CardContent className="pb-3">
                   <div className="text-lg font-bold text-emerald-500">{currency} 0</div>
-                  <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold">Total Receipts this month</p>
                 </CardContent>
               </Card>
             </div>
@@ -226,7 +173,7 @@ export default function AccountsReceivablePage() {
               <CardHeader className="py-3 px-6 border-b border-border/50 flex flex-row items-center justify-between">
                 <div className="relative max-w-sm w-full">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-                  <Input placeholder="Search customer or invoice..." className="pl-9 h-8 text-[10px] bg-secondary/20 border-none" />
+                  <Input placeholder="Search invoices..." className="pl-9 h-8 text-[10px] bg-secondary/20 border-none" />
                 </div>
                 <div className="flex gap-2">
                   <Button size="icon" variant="ghost" className="size-8"><Filter className="size-3.5" /></Button>
@@ -332,9 +279,50 @@ export default function AccountsReceivablePage() {
                 </div>
               </div>
               <DialogFooter>
-                <Button type="submit" disabled={isProcessing} className="w-full h-9 font-bold uppercase text-xs">
-                  {isProcessing ? "Posting..." : "Confirm Receipt"}
-                </Button>
+                <Button type="button" variant="ghost" onClick={() => setIsPaymentOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={isProcessing} className="h-9 font-bold uppercase text-xs">Confirm Receipt</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Issue Invoice Dialog */}
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+          <DialogContent className="max-w-md">
+            <form onSubmit={handleCreateInvoice}>
+              <DialogHeader>
+                <DialogTitle>Issue New Invoice</DialogTitle>
+                <CardDescription>Generate a credit sale and auto-post to ledger.</CardDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4 text-xs">
+                <div className="space-y-2">
+                  <Label>Customer Name</Label>
+                  <Input name="customerName" placeholder="e.g. Acme Corp" required className="h-9 text-xs" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Invoice Date</Label>
+                    <Input name="date" type="date" defaultValue={format(new Date(), 'yyyy-MM-dd')} required className="h-9 text-xs" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Due Date</Label>
+                    <Input name="dueDate" type="date" required className="h-9 text-xs" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Total Amount ({currency})</Label>
+                    <Input name="amount" type="number" step="0.01" placeholder="0.00" required className="h-9 text-xs" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>VAT Portion ({currency})</Label>
+                    <Input name="taxAmount" type="number" step="0.01" placeholder="0.00" className="h-9 text-xs" />
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={isProcessing} className="h-9 font-bold uppercase text-xs">Issue Invoice</Button>
               </DialogFooter>
             </form>
           </DialogContent>

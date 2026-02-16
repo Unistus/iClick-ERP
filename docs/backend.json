@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "InstitutionSettings": {
@@ -81,6 +82,8 @@
         "currencyId": { "type": "string" },
         "balance": { "type": "number" },
         "isActive": { "type": "boolean" },
+        "isTrackedForBudget": { "type": "boolean", "description": "Whether this expense account is monitored in the budget module." },
+        "monthlyLimit": { "type": "number", "description": "The spending limit for this account per budget period." },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "institutionId", "code", "name", "type"]

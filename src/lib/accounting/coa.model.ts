@@ -1,3 +1,4 @@
+
 /**
  * @fileOverview Standard account types and subtypes for the iClick ERP.
  */
@@ -14,6 +15,8 @@ export interface ChartOfAccount {
   balance: number;
   isActive: boolean;
   currencyId: string;
+  isTrackedForBudget?: boolean;
+  monthlyLimit?: number;
   updatedAt: any;
 }
 

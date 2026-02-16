@@ -1,6 +1,25 @@
 
 {
   "entities": {
+    "NotificationTemplate": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "NotificationTemplate",
+      "type": "object",
+      "description": "Configures message templates for Email, SMS, and System notifications with support for dynamic placeholders.",
+      "properties": {
+        "id": { "type": "string" },
+        "institutionId": { "type": "string" },
+        "name": { "type": "string" },
+        "channel": { "type": "string", "enum": ["Email", "SMS", "System"] },
+        "trigger": { "type": "string", "description": "The event that triggers this notification." },
+        "subject": { "type": "string", "description": "Subject line (primarily for Email)." },
+        "content": { "type": "string", "description": "The message body containing placeholders like {{name}}." },
+        "tags": { "type": "array", "items": { "type": "string" }, "description": "Allowed dynamic tags for this template." },
+        "isActive": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "institutionId", "name", "channel", "content"]
+    },
     "AuditLog": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "AuditLog",
@@ -3333,6 +3352,16 @@
   },
   "firestore": {
     "structure": [
+      {
+        "path": "/institutions/{institutionId}/notification_templates/{templateId}",
+        "definition": {
+          "entityName": "NotificationTemplate",
+          "schema": {
+            "$ref": "#/backend/entities/NotificationTemplate"
+          },
+          "description": "Templates for multi-channel institutional communication."
+        }
+      },
       {
         "path": "/system_admins/{uid}",
         "definition": {

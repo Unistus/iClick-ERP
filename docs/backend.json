@@ -20,6 +20,24 @@
       },
       "required": ["id", "institutionId", "name", "channel", "content"]
     },
+    "ApiKey": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ApiKey",
+      "type": "object",
+      "description": "Manages credentials for external integrations and mobile interfaces.",
+      "properties": {
+        "id": { "type": "string" },
+        "institutionId": { "type": "string" },
+        "name": { "type": "string", "description": "Display name for the key (e.g., 'Mobile POS')." },
+        "key": { "type": "string", "description": "The public part of the API key." },
+        "secret": { "type": "string", "description": "The secret/private part of the key (shown only once)." },
+        "scopes": { "type": "array", "items": { "type": "string" }, "description": "Permissions assigned to this key." },
+        "status": { "type": "string", "enum": ["Active", "Revoked"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "institutionId", "name", "key", "status"]
+    },
     "AuditLog": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "AuditLog",
@@ -3360,6 +3378,16 @@
             "$ref": "#/backend/entities/NotificationTemplate"
           },
           "description": "Templates for multi-channel institutional communication."
+        }
+      },
+      {
+        "path": "/institutions/{institutionId}/api_keys/{keyId}",
+        "definition": {
+          "entityName": "ApiKey",
+          "schema": {
+            "$ref": "#/backend/entities/ApiKey"
+          },
+          "description": "Integration credentials for external developers and services."
         }
       },
       {

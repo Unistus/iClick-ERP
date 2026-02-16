@@ -128,6 +128,12 @@ service cloud.firestore {
         allow write: if isInstitutionMember(institutionId);
       }
 
+      // Explicit match for API keys
+      match /api_keys/{keyId} {
+        allow read: if isInstitutionMember(institutionId);
+        allow write: if isInstitutionMember(institutionId);
+      }
+
       // Explicit match for audit logs - IMMUTABLE
       match /audit_logs/{logId} {
         allow read: if isInstitutionMember(institutionId);

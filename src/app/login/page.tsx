@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -53,7 +52,6 @@ export default function LoginPage() {
           <h1 className="text-3xl font-headline font-bold tracking-tight">
             iClick <span className="text-accent">ERP</span>
           </h1>
-          <p className="text-muted-foreground mt-2">Enterprise Resource Planning for Multi-Tenant Chains</p>
         </div>
 
         <Tabs defaultValue="login" className="w-full">

@@ -1,6 +1,6 @@
 'use client';
 
-import { Firestore, collection, doc, serverTimestamp, getDocs, query, where, writeBatch, setDoc, getDoc } from 'firebase/firestore';
+import { Firestore, collection, doc, serverTimestamp, getDocs, query, where, writeBatch, getDoc } from 'firebase/firestore';
 
 export interface BudgetAllocation {
   accountId: string;
@@ -10,6 +10,12 @@ export interface BudgetAllocation {
   actual: number;
   variance: number;
   utilization: number;
+}
+
+export interface DepartmentSpend {
+  branchId: string;
+  branchName: string;
+  actual: number;
 }
 
 /**
@@ -45,7 +51,6 @@ export async function calculatePeriodVariance(
   institutionId: string,
   periodId: string
 ): Promise<BudgetAllocation[]> {
-  // 1. Fetch Period Dates
   const periodRef = doc(db, 'institutions', institutionId, 'fiscal_periods', periodId);
   const periodSnap = await getDoc(periodRef);
   if (!periodSnap.exists()) return [];
@@ -53,22 +58,18 @@ export async function calculatePeriodVariance(
   const start = new Date(period.startDate);
   const end = new Date(period.endDate);
 
-  // 2. Fetch All Budget-Tracked Accounts
   const coaSnap = await getDocs(query(
     collection(db, 'institutions', institutionId, 'coa'),
     where('isTrackedForBudget', '==', true)
   ));
   const accounts = coaSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
 
-  // 3. Fetch Period Allocations
   const allocSnap = await getDocs(collection(db, 'institutions', institutionId, 'fiscal_periods', periodId, 'allocations'));
   const allocations = allocSnap.docs.reduce((acc, d) => {
     acc[d.id] = d.data().limit || 0;
     return acc;
   }, {} as Record<string, number>);
 
-  // 4. Fetch and Aggregate Journal Entries in range
-  // Note: For large datasets, this would be a Cloud Function or use specialized aggregation docs.
   const jeSnap = await getDocs(query(
     collection(db, 'institutions', institutionId, 'journal_entries'),
     where('date', '>=', start),
@@ -80,16 +81,16 @@ export async function calculatePeriodVariance(
     const entry = d.data();
     entry.items?.forEach((item: any) => {
       if (allocations[item.accountId] !== undefined) {
+        const amount = item.amount || 0;
         if (item.type === 'Debit') {
-          actuals[item.accountId] = (actuals[item.accountId] || 0) + item.amount;
+          actuals[item.accountId] = (actuals[item.accountId] || 0) + amount;
         } else {
-          actuals[item.accountId] = (actuals[item.accountId] || 0) - item.amount;
+          actuals[item.accountId] = (actuals[item.accountId] || 0) - amount;
         }
       }
     });
   });
 
-  // 5. Consolidate
   return accounts.map(acc => {
     const limit = allocations[acc.id] || 0;
     const actual = actuals[acc.id] || 0;
@@ -103,4 +104,49 @@ export async function calculatePeriodVariance(
       utilization: limit > 0 ? (actual / limit) * 100 : 0
     };
   });
+}
+
+/**
+ * Aggregates actual spend by branch for a specific period.
+ */
+export async function calculateDepartmentalSpend(
+  db: Firestore,
+  institutionId: string,
+  periodId: string
+): Promise<Record<string, number>> {
+  const periodRef = doc(db, 'institutions', institutionId, 'fiscal_periods', periodId);
+  const periodSnap = await getDoc(periodRef);
+  if (!periodSnap.exists()) return {};
+  const period = periodSnap.data();
+  const start = new Date(period.startDate);
+  const end = new Date(period.endDate);
+
+  const budgetAccSnap = await getDocs(query(
+    collection(db, 'institutions', institutionId, 'coa'),
+    where('isTrackedForBudget', '==', true)
+  ));
+  const trackedAccountIds = budgetAccSnap.docs.map(d => d.id);
+
+  const jeSnap = await getDocs(query(
+    collection(db, 'institutions', institutionId, 'journal_entries'),
+    where('date', '>=', start),
+    where('date', '<=', end)
+  ));
+
+  const branchSpend: Record<string, number> = {};
+
+  jeSnap.docs.forEach(d => {
+    const entry = d.data();
+    const branchId = entry.branchId || 'UNASSIGNED';
+    
+    entry.items?.forEach((item: any) => {
+      if (trackedAccountIds.includes(item.accountId)) {
+        const amount = item.amount || 0;
+        const impact = item.type === 'Debit' ? amount : -amount;
+        branchSpend[branchId] = (branchSpend[branchId] || 0) + impact;
+      }
+    });
+  });
+
+  return branchSpend;
 }

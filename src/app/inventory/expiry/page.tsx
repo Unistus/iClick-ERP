@@ -247,7 +247,7 @@ export default function ExpiryControlPage() {
                   <p className="text-[9px] font-bold text-primary uppercase mb-1 tracking-wider">Risk Exposure</p>
                   <div className="text-lg font-bold text-primary">Live Monitoring</div>
                 </CardContent>
-              </div>
+              </Card>
             </div>
 
             <div className="flex flex-col md:flex-row gap-4 justify-between items-end md:items-center">
@@ -361,7 +361,7 @@ export default function ExpiryControlPage() {
                 </div>
               ) : aiResult ? (
                 <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                  <div className="p-4 bg-accent/5 rounded-xl border border-accent/20 relative overflow-hidden">
+                  <div className="p-4 bg-accent/5 rounded-xl border border-accent/10 relative overflow-hidden">
                     <div className="flex justify-between items-start relative z-10">
                       <div>
                         <p className="text-[9px] font-bold text-accent uppercase tracking-[0.2em]">Target Markdown</p>

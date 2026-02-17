@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -170,7 +169,7 @@ export default function WarehousesPage() {
                 <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg flex items-start gap-3">
                   <Sparkles className="size-4 text-primary shrink-0 mt-0.5" />
                   <p className="text-[10px] text-muted-foreground leading-relaxed">
-                    <strong>Automation Hub:</strong> Leaving the Code field blank will trigger the sequence generator using rules from <strong>Admin &gt; Doc Numbering</strong> settings.
+                    <strong>Automation Hub:</strong> Leaving the Code field blank will trigger the sequence generator using rules from <strong>Admin &gt; Document Numbering</strong> settings.
                   </p>
                 </div>
               </div>

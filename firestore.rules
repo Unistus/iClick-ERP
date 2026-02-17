@@ -22,6 +22,7 @@ service cloud.firestore {
     }
 
     // Global Superuser Override - Absolute access for admin
+    // This must be evaluated first to ensure the primary admin is never blocked
     match /{allPaths=**} {
       allow read, write: if isGlobalAdmin();
     }

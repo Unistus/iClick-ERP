@@ -1,7 +1,7 @@
 
 'use client';
 
-import { Firestore, collection, doc, serverTimestamp, increment, getDoc, runTransaction, addDoc } from 'firebase/firestore';
+import { Firestore, collection, doc, serverTimestamp, increment, getDoc, runTransaction, addDoc, updateDoc } from 'firebase/firestore';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { postJournalEntry } from '../accounting/journal.service';
 import { recordStockMovement } from '../inventory/inventory.service';
@@ -75,6 +75,32 @@ export async function createSalesInvoice(db: Firestore, institutionId: string, p
   });
 }
 
+export async function createQuotation(db: Firestore, institutionId: string, payload: any, userId: string) {
+  const quoteNumber = await getNextSequence(db, institutionId, 'sales_quotation');
+  const ref = collection(db, 'institutions', institutionId, 'sales_quotations');
+  return addDoc(ref, {
+    ...payload,
+    quoteNumber,
+    status: 'Draft',
+    createdBy: userId,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+}
+
+export async function createSalesOrder(db: Firestore, institutionId: string, payload: any, userId: string) {
+  const orderNumber = await getNextSequence(db, institutionId, 'sales_order');
+  const ref = collection(db, 'institutions', institutionId, 'sales_orders');
+  return addDoc(ref, {
+    ...payload,
+    orderNumber,
+    status: 'Draft',
+    createdBy: userId,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+}
+
 export async function createDeliveryNote(db: Firestore, institutionId: string, payload: {
   invoiceId: string;
   warehouseId: string;
@@ -90,7 +116,7 @@ export async function createDeliveryNote(db: Firestore, institutionId: string, p
       type: 'Out',
       quantity: item.qty,
       reference: `Delivery: ${dnNumber}`,
-      unitCost: 0 // Service handles fetching cost price internally
+      unitCost: 0 
     });
   }
 

@@ -15,13 +15,45 @@ import {
   BrainCircuit,
   FileText,
   Users,
-  Wallet
+  Wallet,
+  Plus,
+  ArrowDownLeft,
+  DollarSign,
+  Activity,
+  ChevronRight,
+  Sparkles,
+  MapPin,
+  Calendar
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, limit } from "firebase/firestore";
+import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
+import { collection, query, orderBy, limit, doc } from "firebase/firestore";
 import Link from 'next/link';
+import { 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  PieChart,
+  Pie,
+  Cell
+} from 'recharts';
+
+const salesData = [
+  { name: 'Mon', revenue: 45000, profit: 12000 },
+  { name: 'Tue', revenue: 52000, profit: 15000 },
+  { name: 'Wed', revenue: 48000, profit: 11000 },
+  { name: 'Thu', revenue: 61000, profit: 18000 },
+  { name: 'Fri', revenue: 55000, profit: 14000 },
+  { name: 'Sat', revenue: 67000, profit: 21000 },
+  { name: 'Sun', revenue: 42000, profit: 9000 },
+];
+
+const COLORS = ['#008080', '#FF4500', '#10b981', '#f59e0b'];
 
 export default function SalesOverviewPage() {
   const db = useFirestore();
@@ -29,6 +61,14 @@ export default function SalesOverviewPage() {
 
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instColRef);
+
+  const settingsRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return doc(db, 'institutions', selectedInstId, 'settings', 'global');
+  }, [db, selectedInstId]);
+  const { data: settings } = useDoc(settingsRef);
+
+  const currency = settings?.general?.currencySymbol || "KES";
 
   return (
     <DashboardLayout>
@@ -54,8 +94,8 @@ export default function SalesOverviewPage() {
               {institutions?.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
             </select>
             <Link href="/sales/invoices">
-              <Button size="sm" className="gap-2 h-10 text-xs font-bold uppercase shadow-lg shadow-primary/20">
-                <Plus className="size-4" /> New Invoice
+              <Button size="sm" className="gap-2 h-10 text-xs font-bold uppercase shadow-lg shadow-primary/20" disabled={!selectedInstId}>
+                <Plus className="size-4" /> Issue Invoice
               </Button>
             </Link>
           </div>
@@ -72,7 +112,7 @@ export default function SalesOverviewPage() {
               <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden relative group hover:ring-primary/30 transition-all">
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Monthly Revenue</span></CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-2xl font-bold font-headline text-emerald-500">KES 4.2M</div>
+                  <div className="text-2xl font-bold font-headline text-emerald-500">{currency} 4.2M</div>
                   <div className="flex items-center gap-1.5 mt-1 text-emerald-500 font-bold text-[9px] uppercase">
                     <ArrowUpRight className="size-3" /> +12% Growth
                   </div>
@@ -98,7 +138,7 @@ export default function SalesOverviewPage() {
               <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm relative overflow-hidden">
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-primary tracking-widest">A/R Position</span></CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-2xl font-bold font-headline">KES 840k</div>
+                  <div className="text-2xl font-bold font-headline">{currency} 840k</div>
                   <div className="flex items-center gap-1.5 mt-1 text-primary font-bold text-[9px] uppercase">
                     <History className="size-3" /> Debt Collection
                   </div>
@@ -117,10 +157,23 @@ export default function SalesOverviewPage() {
                     <Button variant="ghost" size="sm" className="text-[10px] font-bold uppercase gap-1">Full Ledger <ArrowUpRight className="size-3" /></Button>
                   </Link>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <div className="h-96 flex flex-col items-center justify-center space-y-4 opacity-20">
-                    <Zap className="size-12" />
-                    <p className="text-xs font-black uppercase tracking-widest">Streaming Transaction Data...</p>
+                <CardContent className="p-6">
+                  <div className="h-[350px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={salesData}>
+                        <defs>
+                          <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${v/1000}k`} />
+                        <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', fontSize: '10px' }} />
+                        <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" fill="url(#colorRevenue)" strokeWidth={2} />
+                      </AreaChart>
+                    </ResponsiveContainer>
                   </div>
                 </CardContent>
               </Card>

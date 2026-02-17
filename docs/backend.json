@@ -47,7 +47,14 @@
         "loyaltyPoints": { "type": "number" },
         "walletBalance": { "type": "number" },
         "creditLimit": { "type": "number" },
-        "birthday": { "type": "string", "format": "date" }
+        "birthday": { "type": "string", "format": "date" },
+        "taxPin": { "type": "string", "description": "Tax identification number for invoicing." },
+        "billingAddress": { "type": "string" },
+        "shippingAddress": { "type": "string" },
+        "city": { "type": "string" },
+        "region": { "type": "string" },
+        "preferredDeliveryTime": { "type": "string", "enum": ["Morning", "Afternoon", "Evening"] },
+        "deliveryNotes": { "type": "string" }
       }
     },
     "LoyaltyLog": {

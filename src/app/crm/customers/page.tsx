@@ -27,7 +27,11 @@ import {
   Crown,
   Loader2,
   MoreVertical,
-  Calendar
+  Calendar,
+  MapPin,
+  Truck,
+  FileText,
+  Clock
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
@@ -39,6 +43,8 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function CustomerDirectoryPage() {
   const db = useFirestore();
@@ -71,6 +77,13 @@ export default function CustomerDirectoryPage() {
       tier: 'Silver',
       creditLimit: parseFloat(formData.get('creditLimit') as string) || 0,
       birthday: formData.get('birthday') as string,
+      taxPin: formData.get('taxPin') as string,
+      billingAddress: formData.get('billingAddress') as string,
+      shippingAddress: formData.get('shippingAddress') as string,
+      city: formData.get('city') as string,
+      region: formData.get('region') as string,
+      preferredDeliveryTime: formData.get('preferredDeliveryTime') as any,
+      deliveryNotes: formData.get('deliveryNotes') as string,
     };
 
     try {
@@ -154,9 +167,9 @@ export default function CustomerDirectoryPage() {
                 <TableHeader className="bg-secondary/20">
                   <TableRow>
                     <TableHead className="h-10 text-[10px] uppercase font-black pl-6">Client Identity</TableHead>
-                    <TableHead className="h-10 text-[10px] uppercase font-black">Contact Points</TableHead>
+                    <TableHead className="h-10 text-[10px] uppercase font-black">Contact & Tax</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-black text-center">Status</TableHead>
-                    <TableHead className="h-10 text-[10px] uppercase font-black text-center">Tier</TableHead>
+                    <TableHead className="h-10 text-[10px] uppercase font-black">Logistics Area</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-black text-right">Points</TableHead>
                     <TableHead className="h-10 text-right text-[10px] uppercase font-black pr-6">Management</TableHead>
                   </TableRow>
@@ -176,8 +189,8 @@ export default function CustomerDirectoryPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground"><Mail className="size-3" /> {c.email}</div>
-                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground"><Phone className="size-3" /> {c.phone}</div>
+                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium truncate max-w-[180px]"><Mail className="size-3" /> {c.email}</div>
+                          {c.taxPin && <div className="flex items-center gap-1.5 text-[9px] text-primary font-bold uppercase"><FileText className="size-3" /> {c.taxPin}</div>}
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
@@ -188,10 +201,11 @@ export default function CustomerDirectoryPage() {
                           {c.status}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="secondary" className="text-[8px] h-4 uppercase font-black bg-accent/10 text-accent border-none gap-1">
-                          <Crown className="size-2" /> {c.tier || 'Silver'}
-                        </Badge>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-bold uppercase">{c.city || 'N/A'}</span>
+                          <span className="text-[9px] text-muted-foreground opacity-60 truncate max-w-[120px]">{c.shippingAddress}</span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right font-mono text-xs font-black text-primary">
                         {(c.loyaltyPoints || 0).toLocaleString()}
@@ -219,57 +233,118 @@ export default function CustomerDirectoryPage() {
         )}
 
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh]">
             <form onSubmit={handleCreateCustomer}>
               <DialogHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <UserCircle className="size-5 text-primary" />
                   <DialogTitle>Register Client Profile</DialogTitle>
                 </div>
-                <CardDescription className="text-xs uppercase font-black tracking-tight">Identity Initialization v1.4</CardDescription>
+                <CardDescription className="text-xs uppercase font-black tracking-tight">Identity & Logistics Initialization v2.0</CardDescription>
               </DialogHeader>
               
-              <div className="grid gap-4 py-4 text-xs">
-                <div className="space-y-2">
-                  <Label>Full Trading Name / Individual</Label>
-                  <Input name="name" placeholder="e.g. Acme Corp or Jane Doe" required className="h-10 font-bold" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5"><Mail className="size-3" /> Email Address</Label>
-                    <Input name="email" type="email" placeholder="jane@example.com" required />
+              <Tabs defaultValue="basic" className="py-4">
+                <TabsList className="bg-secondary/30 h-10 p-1 mb-4">
+                  <TabsTrigger value="basic" className="text-xs gap-2 px-6">Basic Info</TabsTrigger>
+                  <TabsTrigger value="billing" className="text-xs gap-2 px-6">Billing & Tax</TabsTrigger>
+                  <TabsTrigger value="logistics" className="text-xs gap-2 px-6">Logistics</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="basic" className="space-y-4">
+                  <div className="grid gap-4 py-4 text-xs">
+                    <div className="space-y-2">
+                      <Label>Full Trading Name / Individual</Label>
+                      <Input name="name" placeholder="e.g. Acme Corp or Jane Doe" required className="h-10 font-bold" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1.5"><Mail className="size-3" /> Email Address</Label>
+                        <Input name="email" type="email" placeholder="jane@example.com" required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1.5"><Phone className="size-3" /> Phone Contact</Label>
+                        <Input name="phone" placeholder="+254..." required />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1.5"><Calendar className="size-3" /> Birthday (Promo Trigger)</Label>
+                        <Input name="birthday" type="date" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Initial Status</Label>
+                        <Select name="status" defaultValue="Lead">
+                          <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Lead">Lead (Awaiting verification)</SelectItem>
+                            <SelectItem value="Active">Active (Ready for billing)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5"><Phone className="size-3" /> Phone Contact</Label>
-                    <Input name="phone" placeholder="+254..." required />
+                </TabsContent>
+
+                <TabsContent value="billing" className="space-y-4">
+                  <div className="grid gap-4 py-4 text-xs">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1.5 text-primary font-bold"><FileText className="size-3" /> Tax Identification (PIN)</Label>
+                        <Input name="taxPin" placeholder="e.g. P051..." className="font-mono uppercase" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1.5"><CreditCard className="size-3" /> Approved Credit Limit</Label>
+                        <Input name="creditLimit" type="number" step="0.01" placeholder="0.00" className="font-bold" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Standard Billing Address</Label>
+                      <Textarea name="billingAddress" placeholder="Enter formal billing address for invoices..." className="min-h-[100px]" />
+                    </div>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5"><Calendar className="size-3" /> Birthday (Promo Trigger)</Label>
-                    <Input name="birthday" type="date" />
+                </TabsContent>
+
+                <TabsContent value="logistics" className="space-y-4">
+                  <div className="grid gap-4 py-4 text-xs">
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1.5 text-accent font-bold"><MapPin className="size-3" /> Primary Shipping Address</Label>
+                      <Input name="shippingAddress" placeholder="e.g. 4th Floor, Westlands Hub" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>City / Town</Label>
+                        <Input name="city" placeholder="Nairobi" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Region / County</Label>
+                        <Input name="region" placeholder="Nairobi County" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1.5"><Clock className="size-3" /> Preferred Delivery Window</Label>
+                        <Select name="preferredDeliveryTime" defaultValue="Morning">
+                          <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Morning">Morning (08:00 - 12:00)</SelectItem>
+                            <SelectItem value="Afternoon">Afternoon (12:00 - 17:00)</SelectItem>
+                            <SelectItem value="Evening">Evening (17:00 - 20:00)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1.5"><Truck className="size-3" /> Delivery Instructions</Label>
+                        <Input name="deliveryNotes" placeholder="e.g. Call upon arrival at gate" />
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5"><CreditCard className="size-3" /> Credit Limit</Label>
-                    <Input name="creditLimit" type="number" step="0.01" placeholder="0.00" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Initial Status</Label>
-                  <Select name="status" defaultValue="Lead">
-                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Lead">Lead (Awaiting verification)</SelectItem>
-                      <SelectItem value="Active">Active (Ready for billing)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+                </TabsContent>
+              </Tabs>
 
               <DialogFooter className="bg-secondary/10 p-6 -mx-6 -mb-6 rounded-b-lg">
                 <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs h-10 font-bold uppercase">Cancel</Button>
                 <Button type="submit" disabled={isProcessing} className="h-10 px-10 font-bold uppercase text-xs shadow-xl shadow-primary/20">
-                  {isProcessing ? <Loader2 className="size-3 animate-spin mr-2" /> : <CheckCircle2 className="size-3 mr-2" />} Finalize Profile
+                  {isProcessing ? <Loader2 className="size-3 animate-spin mr-2" /> : <CheckCircle2 className="size-3 mr-2" />} Finalize Global Profile
                 </Button>
               </DialogFooter>
             </form>

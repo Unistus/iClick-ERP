@@ -12,6 +12,13 @@ export interface CustomerPayload {
   tier?: 'Silver' | 'Gold' | 'Platinum';
   creditLimit?: number;
   birthday?: string;
+  taxPin?: string;
+  billingAddress?: string;
+  shippingAddress?: string;
+  city?: string;
+  region?: string;
+  preferredDeliveryTime?: 'Morning' | 'Afternoon' | 'Evening';
+  deliveryNotes?: string;
 }
 
 /**

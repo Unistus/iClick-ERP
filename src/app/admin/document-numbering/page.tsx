@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -83,7 +82,6 @@ export default function DocumentNumbering() {
     } catch (e) {
       toast({ variant: "destructive", title: "Initialization Failed" });
     } finally {
-      setIsLoading(false); // Force reload effect would be better but this is MVP
       setInitializing(false)
     }
   }

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -6,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, query, where, doc, orderBy } from "firebase/firestore";
 import { 
@@ -23,6 +25,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 export default function BudgetOverviewPage() {
   const db = useFirestore();
@@ -121,7 +124,6 @@ export default function BudgetOverviewPage() {
                   <div className="text-lg font-bold font-headline">{overallUtilization.toFixed(1)}%</div>
                   <Progress value={Math.min(overallUtilization, 100)} className="h-1 mt-2" />
                 </CardContent>
-              </Card>
 
               <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm relative overflow-hidden">
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-primary tracking-widest">Active Nodes</span></CardHeader>

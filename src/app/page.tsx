@@ -203,7 +203,7 @@ export default function HomePage() {
                     <stat.icon className="size-3.5 text-primary" />
                   </CardHeader>
                   <CardContent className="relative z-10">
-                    <div className="text-2xl font-bold font-headline">{stat.value}</div>
+                    <div className="text-lg font-bold font-headline">{stat.value}</div>
                     <div className="flex items-center gap-1 mt-1">
                       {stat.trend === 'up' ? <ArrowUpRight className="size-3 text-emerald-500" /> : <ArrowDownLeft className="size-3 text-destructive" />}
                       <span className={`text-[10px] font-bold ${stat.trend === 'up' ? 'text-emerald-500' : 'text-destructive'}`}>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import DashboardLayout from "@/components/layout/dashboard-layout"
@@ -44,7 +43,7 @@ export default function CashFlowOverview() {
               <Wallet className="size-3.5 text-emerald-500" />
             </CardHeader>
             <CardContent className="pt-4">
-              <div className="text-2xl font-bold font-headline">KES 2.4M</div>
+              <div className="text-lg font-bold font-headline">KES 2.4M</div>
               <div className="flex items-center gap-1.5 mt-1 text-emerald-500 font-bold text-[10px]">
                 <ArrowUpRight className="size-3" /> +18.4% SURPLUS
               </div>
@@ -56,7 +55,7 @@ export default function CashFlowOverview() {
               <PiggyBank className="size-3.5 text-primary" />
             </CardHeader>
             <CardContent className="pt-4">
-              <div className="text-2xl font-bold font-headline">KES 842k</div>
+              <div className="text-lg font-bold font-headline">KES 842k</div>
               <div className="text-[10px] text-muted-foreground font-bold mt-1 uppercase">12 Overdue Invoices</div>
             </CardContent>
           </Card>
@@ -66,7 +65,7 @@ export default function CashFlowOverview() {
               <Banknote className="size-3.5 text-destructive" />
             </CardHeader>
             <CardContent className="pt-4">
-              <div className="text-2xl font-bold font-headline">KES 1.1M</div>
+              <div className="text-lg font-bold font-headline">KES 1.1M</div>
               <div className="text-[10px] text-destructive font-bold mt-1 uppercase">Payroll & Suppliers</div>
             </CardContent>
           </Card>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -112,7 +111,7 @@ export default function SalesOverviewPage() {
               <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden relative group hover:ring-primary/30 transition-all">
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Monthly Revenue</span></CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-2xl font-bold font-headline text-emerald-500">{currency} 4.2M</div>
+                  <div className="text-lg font-bold font-headline text-emerald-500">{currency} 4.2M</div>
                   <div className="flex items-center gap-1.5 mt-1 text-emerald-500 font-bold text-[9px] uppercase">
                     <ArrowUpRight className="size-3" /> +12% Growth
                   </div>
@@ -122,7 +121,7 @@ export default function SalesOverviewPage() {
               <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden relative group hover:ring-accent/30 transition-all">
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-accent tracking-widest">Pending Orders</span></CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-2xl font-bold text-accent font-headline">12 ORDERS</div>
+                  <div className="text-lg font-bold text-accent font-headline">12 ORDERS</div>
                   <div className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Awaiting fulfillment</div>
                 </CardContent>
               </Card>
@@ -130,7 +129,7 @@ export default function SalesOverviewPage() {
               <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden relative group hover:ring-primary/30 transition-all">
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-primary tracking-widest">Conversion Rate</span></CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-2xl font-bold font-headline text-primary">68%</div>
+                  <div className="text-lg font-bold text-primary font-headline">68%</div>
                   <div className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Quotes to Invoices</div>
                 </CardContent>
               </Card>
@@ -138,7 +137,7 @@ export default function SalesOverviewPage() {
               <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm relative overflow-hidden">
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-primary tracking-widest">A/R Position</span></CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-2xl font-bold font-headline">{currency} 840k</div>
+                  <div className="text-lg font-bold text-primary font-headline">{currency} 840k</div>
                   <div className="flex items-center gap-1.5 mt-1 text-primary font-bold text-[9px] uppercase">
                     <History className="size-3" /> Debt Collection
                   </div>

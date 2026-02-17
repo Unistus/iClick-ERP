@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -228,27 +227,27 @@ export default function ExpiryControlPage() {
               <Card className="bg-card border-none ring-1 ring-border shadow-sm">
                 <CardContent className="pt-4">
                   <p className="text-[9px] font-bold text-muted-foreground uppercase mb-1 tracking-wider">Total Batches</p>
-                  <div className="text-xl font-bold">{batches?.length || 0}</div>
+                  <div className="text-lg font-bold">{batches?.length || 0}</div>
                 </CardContent>
               </Card>
               <Card className="bg-card border-none ring-1 ring-border shadow-sm">
                 <CardContent className="pt-4">
                   <p className="text-[9px] font-bold text-destructive uppercase mb-1 tracking-wider">Expired</p>
-                  <div className="text-xl font-bold text-destructive">{batches?.filter(b => isBefore(b.expiryDate?.toDate(), now)).length || 0}</div>
+                  <div className="text-lg font-bold text-destructive">{batches?.filter(b => isBefore(b.expiryDate?.toDate(), now)).length || 0}</div>
                 </CardContent>
               </Card>
               <Card className="bg-card border-none ring-1 ring-border shadow-sm">
                 <CardContent className="pt-4">
                   <p className="text-[9px] font-bold text-amber-500 uppercase mb-1 tracking-wider">Critical (&lt;30D)</p>
-                  <div className="text-xl font-bold text-amber-500">{batches?.filter(b => isBefore(b.expiryDate?.toDate(), criticalThreshold) && isAfter(b.expiryDate?.toDate(), now)).length || 0}</div>
+                  <div className="text-lg font-bold text-amber-500">{batches?.filter(b => isBefore(b.expiryDate?.toDate(), criticalThreshold) && isAfter(b.expiryDate?.toDate(), now)).length || 0}</div>
                 </CardContent>
               </Card>
               <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm overflow-hidden">
                 <CardContent className="pt-4">
                   <p className="text-[9px] font-bold text-primary uppercase mb-1 tracking-wider">Risk Exposure</p>
-                  <div className="text-xl font-bold text-primary">Live Monitoring</div>
+                  <div className="text-lg font-bold text-primary">Live Monitoring</div>
                 </CardContent>
-              </Card>
+              </div>
             </div>
 
             <div className="flex flex-col md:flex-row gap-4 justify-between items-end md:items-center">
@@ -366,7 +365,7 @@ export default function ExpiryControlPage() {
                     <div className="flex justify-between items-start relative z-10">
                       <div>
                         <p className="text-[9px] font-bold text-accent uppercase tracking-[0.2em]">Target Markdown</p>
-                        <p className="text-3xl font-black font-headline mt-1">{aiResult.recommendedMarkdownPct}% OFF</p>
+                        <p className="text-xl font-black font-headline mt-1">{aiResult.recommendedMarkdownPct}% OFF</p>
                       </div>
                       <Badge variant="outline" className={`h-5 text-[9px] font-black uppercase ${
                         aiResult.urgencyLevel === 'Critical' ? 'bg-destructive/10 text-destructive border-destructive/20' : 'bg-primary/10 text-primary'
@@ -462,7 +461,7 @@ export default function ExpiryControlPage() {
                     </Select>
                   </div>
                 </div>
-                <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg flex gap-3 items-start">
+                <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg flex items-start gap-3">
                   <Sparkles className="size-4 text-primary shrink-0 mt-0.5" />
                   <p className="text-[10px] text-muted-foreground leading-relaxed">
                     <strong>Predictive Hub:</strong> Selecting a product will automatically set the expiry date based on its standard shelf life. Leaving LOT number blank will use the sequence from <strong>Admin &gt; Document Numbering</strong> settings.
@@ -480,4 +479,10 @@ export default function ExpiryControlPage() {
       </div>
     </DashboardLayout>
   );
+}
+
+function addDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
 }

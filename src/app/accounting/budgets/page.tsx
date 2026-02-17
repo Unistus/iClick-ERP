@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -154,7 +153,7 @@ export default function BudgetManagementPage() {
               <Card className="bg-card border-none ring-1 ring-border shadow-sm">
                 <CardContent className="pt-4">
                   <p className="text-[9px] font-bold text-muted-foreground uppercase mb-1 tracking-wider">Ceiling Allocation</p>
-                  <div className="text-xl font-bold">{currency} {totalAllocated.toLocaleString()}</div>
+                  <div className="text-lg font-bold">{currency} {totalAllocated.toLocaleString()}</div>
                   <div className="flex items-center gap-1.5 mt-1 text-[9px] text-muted-foreground font-medium">
                     <Target className="size-3" /> Monthly Target
                   </div>
@@ -163,7 +162,7 @@ export default function BudgetManagementPage() {
               <Card className="bg-card border-none ring-1 ring-border shadow-sm">
                 <CardContent className="pt-4">
                   <p className="text-[9px] font-bold text-primary uppercase mb-1 tracking-wider">Burned Capital</p>
-                  <div className="text-xl font-bold text-primary">{currency} {totalActual.toLocaleString()}</div>
+                  <div className="text-lg font-bold text-primary">{currency} {totalActual.toLocaleString()}</div>
                   <div className="flex items-center gap-1.5 mt-1 text-emerald-500 font-bold text-[9px]">
                     <TrendingUp className="size-3" /> {((totalActual / (totalAllocated || 1)) * 100).toFixed(1)}% Usage
                   </div>
@@ -175,14 +174,14 @@ export default function BudgetManagementPage() {
                     <p className="text-[9px] font-bold text-accent uppercase tracking-wider">Threshold Risk</p>
                     <div className={`size-2 rounded-full animate-pulse ${overallUtilization > 90 ? 'bg-destructive' : overallUtilization > 70 ? 'bg-amber-500' : 'bg-emerald-500'}`} />
                   </div>
-                  <div className="text-xl font-bold">{overallUtilization.toFixed(1)}%</div>
+                  <div className="text-lg font-bold">{overallUtilization.toFixed(1)}%</div>
                   <Progress value={Math.min(overallUtilization, 100)} className={`h-1 mt-2 ${overallUtilization > 90 ? '[&>div]:bg-destructive' : ''}`} />
                 </CardContent>
               </Card>
               <Card className="bg-card border-none ring-1 ring-border shadow-sm">
                 <CardContent className="pt-4">
                   <p className="text-[9px] font-bold text-destructive uppercase mb-1 tracking-wider">Breached Nodes</p>
-                  <div className="text-xl font-bold text-destructive">{overBudgetCount} Accounts</div>
+                  <div className="text-lg font-bold text-destructive">{overBudgetCount} Accounts</div>
                   <p className="text-[9px] text-muted-foreground mt-1 flex items-center gap-1">
                     <AlertCircle className="size-2.5 text-amber-500" /> {warningCount} accounts near limit
                   </p>

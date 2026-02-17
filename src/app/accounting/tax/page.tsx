@@ -175,7 +175,7 @@ export default function TaxReturnsPage() {
                   <BadgeCent className="size-3 text-accent" />
                 </CardHeader>
                 <CardContent className="pb-3">
-                  <div className="text-xl font-bold text-accent">{currency} {currentVatLiability.toLocaleString()}</div>
+                  <div className="text-lg font-bold text-accent">{currency} {currentVatLiability.toLocaleString()}</div>
                   <p className="text-[9px] text-muted-foreground mt-1 uppercase font-medium">Estimated VAT Payable</p>
                 </CardContent>
               </Card>
@@ -185,7 +185,7 @@ export default function TaxReturnsPage() {
                   <ShieldCheck className="size-3 text-primary" />
                 </CardHeader>
                 <CardContent className="pb-3">
-                  <div className="text-xl font-bold">100%</div>
+                  <div className="text-lg font-bold">100%</div>
                   <p className="text-[9px] text-emerald-500 mt-1 uppercase font-bold">All Filings Up-to-date</p>
                 </CardContent>
               </Card>
@@ -195,7 +195,7 @@ export default function TaxReturnsPage() {
                   <History className="size-3 text-muted-foreground" />
                 </CardHeader>
                 <CardContent className="pb-3">
-                  <div className="text-xl font-bold">20th Prox.</div>
+                  <div className="text-lg font-bold">20th Prox.</div>
                   <p className="text-[9px] text-muted-foreground mt-1 uppercase font-medium">Standard Regulatory Cycle</p>
                 </CardContent>
               </Card>
@@ -371,7 +371,7 @@ export default function TaxReturnsPage() {
                 <div className="flex justify-between items-end relative z-10">
                   <div>
                     <p className="text-[10px] font-bold text-accent uppercase tracking-[0.2em]">Net Regulatory Payable</p>
-                    <p className="text-2xl font-bold font-headline mt-1">{currency} {selectedReturn?.netTaxPayable?.toLocaleString()}</p>
+                    <p className="text-lg font-bold font-headline mt-1">{currency} {selectedReturn?.netTaxPayable?.toLocaleString()}</p>
                   </div>
                   <Calculator className="size-8 text-accent opacity-20" />
                 </div>

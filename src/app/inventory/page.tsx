@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -125,7 +124,7 @@ export default function InventoryDashboardPage() {
                 <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform"><Banknote className="size-24" /></div>
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Book Valuation</span></CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-2xl font-bold font-headline">{currency} {totalAssetBase.toLocaleString()}</div>
+                  <div className="text-lg font-bold font-headline">{currency} {totalAssetBase.toLocaleString()}</div>
                   <div className="flex items-center gap-1.5 mt-1 text-emerald-500 font-bold text-[9px] uppercase">
                     <TrendingUp className="size-3" /> Balanced Asset Base
                   </div>
@@ -136,7 +135,7 @@ export default function InventoryDashboardPage() {
                 <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform"><AlertTriangle className="size-24" /></div>
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-destructive tracking-widest">Out of Stock</span></CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-2xl font-bold text-destructive font-headline">{lowStockCount} SKUs</div>
+                  <div className="text-lg font-bold text-destructive font-headline">{lowStockCount} SKUs</div>
                   <Progress value={lowStockCount > 0 ? 100 : 0} className="h-1 mt-2 [&>div]:bg-destructive" />
                 </CardContent>
               </Card>
@@ -145,7 +144,7 @@ export default function InventoryDashboardPage() {
                 <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform"><Timer className="size-24" /></div>
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-accent tracking-widest">Expiry Risk</span></CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-2xl font-bold text-accent font-headline">{expiryRiskCount} Batches</div>
+                  <div className="text-lg font-bold text-accent font-headline">{expiryRiskCount} Batches</div>
                   <div className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Expiring within 30D</div>
                 </CardContent>
               </Card>
@@ -154,7 +153,7 @@ export default function InventoryDashboardPage() {
                 <div className="absolute -right-4 -bottom-4 opacity-10"><RefreshCw className="size-24" /></div>
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-primary tracking-widest">Network Health</span></CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-2xl font-bold text-primary font-headline">99.8%</div>
+                  <div className="text-lg font-bold text-primary font-headline">99.8%</div>
                   <div className="flex items-center gap-1.5 mt-1 text-primary font-bold text-[9px] uppercase">
                     <CheckCircle2 className="size-3" /> Syncing from Edge
                   </div>

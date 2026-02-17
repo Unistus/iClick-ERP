@@ -9,8 +9,8 @@ service cloud.firestore {
 
     function isGlobalAdmin() {
       return isSignedIn() && (
-        exists(/databases/$(database)/documents/system_admins/$(request.auth.uid)) ||
-        request.auth.token.email == "enquiry@unistus.co.ke"
+        request.auth.token.email == "enquiry@unistus.co.ke" ||
+        exists(/databases/$(database)/documents/system_admins/$(request.auth.uid))
       );
     }
 
@@ -21,9 +21,14 @@ service cloud.firestore {
       );
     }
 
+    // Global Superuser Override - Absolute access for admin
+    match /{allPaths=**} {
+      allow read, write: if isGlobalAdmin();
+    }
+
     match /system_admins/{uid} {
       allow read: if isSignedIn();
-      allow write: if isGlobalAdmin() || (isSignedIn() && !exists(/databases/$(database)/documents/system_admins/$(request.auth.uid)));
+      allow write: if isGlobalAdmin();
     }
 
     match /users/{userId} {
@@ -42,14 +47,12 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update: if isInstitutionMember(institutionId);
       
-      // Recursive match for all institutional sub-collections
-      // This automatically covers coa, products, movements, batches, categories, etc.
+      // Recursive match for all institutional sub-collections (products, movements, batches, etc.)
       match /{allSubcollections=**} {
         allow read, write: if isInstitutionMember(institutionId);
       }
     }
     
-    // Global Collections
     match /currencies/{id} {
       allow read: if isSignedIn();
       allow write: if isGlobalAdmin();

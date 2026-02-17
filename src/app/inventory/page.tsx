@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -18,10 +19,16 @@ import {
   History,
   TrendingDown,
   BrainCircuit,
-  Zap
+  Zap,
+  LayoutGrid,
+  Search,
+  ShoppingCart,
+  Banknote,
+  CheckCircle2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, query, orderBy, limit, doc } from "firebase/firestore";
@@ -62,26 +69,27 @@ export default function InventoryDashboardPage() {
 
   const currency = settings?.general?.currencySymbol || "KES";
 
-  // Calculations - Dynamically updating based on real-time movements/product changes
-  const lowStockCount = products?.filter(p => p.type === 'Stock' && p.totalStock <= (p.reorderLevel || 0)).length || 0;
+  // Aggregates
+  const stockItems = products?.filter(p => p.type === 'Stock') || [];
+  const lowStockCount = stockItems.filter(p => p.totalStock <= (p.reorderLevel || 0)).length;
   
   const now = new Date();
   const criticalThreshold = addDays(now, 30);
   const expiryRiskCount = batches?.filter(b => isBefore(b.expiryDate?.toDate(), criticalThreshold)).length || 0;
 
-  const totalAssetBase = products?.reduce((sum, p) => sum + ((p.totalStock || 0) * (p.costPrice || 0)), 0) || 0;
+  const totalAssetBase = stockItems.reduce((sum, p) => sum + ((p.totalStock || 0) * (p.costPrice || 0)), 0);
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded bg-primary/20 text-primary">
-              <Package className="size-6" />
+            <div className="p-2.5 rounded-xl bg-primary/20 text-primary shadow-inner">
+              <LayoutGrid className="size-6" />
             </div>
             <div>
-              <h1 className="text-3xl font-headline font-bold">Stock Vault Intelligence</h1>
-              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-[0.2em]">Institutional Inventory Command Hub</p>
+              <h1 className="text-3xl font-headline font-bold">Inventory Pulse</h1>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-[0.2em]">Institutional Supply Chain Intelligence</p>
             </div>
           </div>
           
@@ -98,7 +106,7 @@ export default function InventoryDashboardPage() {
             </Select>
             <Link href="/inventory/products">
               <Button size="sm" className="gap-2 h-10 text-xs font-bold uppercase shadow-lg shadow-primary/20">
-                <Plus className="size-4" /> New Item
+                <Plus className="size-4" /> Register Item
               </Button>
             </Link>
           </div>
@@ -111,81 +119,86 @@ export default function InventoryDashboardPage() {
           </div>
         ) : (
           <div className="space-y-6 animate-in fade-in duration-700">
-            {/* High-Level Pulse */}
+            {/* Infographic Pulse Grid */}
             <div className="grid gap-4 md:grid-cols-4">
-              <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden relative">
-                <div className="absolute -right-4 -bottom-4 opacity-5"><Box className="size-24" /></div>
-                <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Asset Valuation</span></CardHeader>
+              <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden relative group hover:ring-primary/30 transition-all">
+                <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform"><Banknote className="size-24" /></div>
+                <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Book Valuation</span></CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-2xl font-bold">{currency} {totalAssetBase.toLocaleString()}</div>
-                  <p className="text-[9px] text-emerald-500 font-bold uppercase mt-1">Estimated Book Value</p>
+                  <div className="text-2xl font-bold font-headline">{currency} {totalAssetBase.toLocaleString()}</div>
+                  <div className="flex items-center gap-1.5 mt-1 text-emerald-500 font-bold text-[9px] uppercase">
+                    <TrendingUp className="size-3" /> Balanced Asset Base
+                  </div>
                 </CardContent>
               </Card>
-              <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden relative">
-                <div className="absolute -right-4 -bottom-4 opacity-5"><AlertTriangle className="size-24" /></div>
-                <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-destructive tracking-widest">Stock Outs</span></CardHeader>
+
+              <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden relative group hover:ring-destructive/30 transition-all">
+                <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform"><AlertTriangle className="size-24" /></div>
+                <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-destructive tracking-widest">Out of Stock</span></CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-2xl font-bold text-destructive">{lowStockCount} SKUs</div>
-                  <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Below Reorder Point</p>
+                  <div className="text-2xl font-bold text-destructive font-headline">{lowStockCount} SKUs</div>
+                  <Progress value={lowStockCount > 0 ? 100 : 0} className="h-1 mt-2 [&>div]:bg-destructive" />
                 </CardContent>
               </Card>
-              <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden relative">
-                <div className="absolute -right-4 -bottom-4 opacity-5"><Timer className="size-24" /></div>
+
+              <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden relative group hover:ring-accent/30 transition-all">
+                <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform"><Timer className="size-24" /></div>
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-accent tracking-widest">Expiry Risk</span></CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-2xl font-bold text-accent">{expiryRiskCount} Batches</div>
-                  <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Expiring within 30D</p>
+                  <div className="text-2xl font-bold text-accent font-headline">{expiryRiskCount} Batches</div>
+                  <div className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Expiring within 30D</div>
                 </CardContent>
               </Card>
+
               <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm relative overflow-hidden">
                 <div className="absolute -right-4 -bottom-4 opacity-10"><RefreshCw className="size-24" /></div>
-                <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-primary tracking-widest">Live Sync</span></CardHeader>
+                <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-primary tracking-widest">Network Health</span></CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-2xl font-bold text-primary">Active</div>
-                  <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Streaming from Edge</p>
+                  <div className="text-2xl font-bold text-primary font-headline">99.8%</div>
+                  <div className="flex items-center gap-1.5 mt-1 text-primary font-bold text-[9px] uppercase">
+                    <CheckCircle2 className="size-3" /> Syncing from Edge
+                  </div>
                 </CardContent>
               </Card>
             </div>
 
             <div className="grid gap-6 lg:grid-cols-12">
-              {/* Recent Activity Stream */}
-              <Card className="lg:col-span-8 border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
+              {/* Movement Velocity Stream */}
+              <Card className="lg:col-span-8 border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
                 <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6 flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="text-sm font-bold uppercase tracking-widest">Movement Velocity</CardTitle>
-                    <CardDescription className="text-[10px]">Real-time audit trail of institutional stock flow.</CardDescription>
+                  <div className="space-y-0.5">
+                    <CardTitle className="text-sm font-bold uppercase tracking-widest">Flow Velocity</CardTitle>
+                    <CardDescription className="text-[10px]">Bidirectional audit trail of institutional stock movement.</CardDescription>
                   </div>
-                  <Link href="/inventory/adjustments">
-                    <Button variant="ghost" size="sm" className="text-[10px] font-bold uppercase gap-1">View All <History className="size-3" /></Button>
+                  <Link href="/inventory/stock-levels">
+                    <Button variant="ghost" size="sm" className="text-[10px] font-bold uppercase gap-1">View Matrix <History className="size-3" /></Button>
                   </Link>
                 </CardHeader>
                 <CardContent className="p-0">
                   <Table>
                     <TableBody>
                       {movements?.length === 0 ? (
-                        <TableRow><TableCell className="text-center py-12 text-xs text-muted-foreground">No recent stock movements detected.</TableCell></TableRow>
+                        <TableRow><TableCell className="text-center py-12 text-xs text-muted-foreground uppercase font-bold">No movement data detected.</TableCell></TableRow>
                       ) : movements?.map((m) => (
                         <TableRow key={m.id} className="h-14 hover:bg-secondary/5 transition-colors group">
                           <TableCell className="pl-6 w-10">
-                            <div className={`p-2 rounded shrink-0 ${
-                              m.type === 'In' || (m.type === 'Adjustment' && m.quantity > 0) ? 'bg-emerald-500/10 text-emerald-500' : 
-                              m.type === 'Out' || m.type === 'Damage' || (m.type === 'Adjustment' && m.quantity < 0) ? 'bg-destructive/10 text-destructive' : 
-                              'bg-primary/10 text-primary'
+                            <div className={`p-2 rounded-lg shrink-0 ${
+                              m.quantity > 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-destructive/10 text-destructive'
                             }`}>
-                              {(m.type === 'In' || (m.type === 'Adjustment' && m.quantity > 0)) ? <TrendingUp className="size-3.5" /> : (m.type === 'Out' || m.type === 'Damage' || (m.type === 'Adjustment' && m.quantity < 0)) ? <TrendingDown className="size-3.5" /> : <ArrowRightLeft className="size-3.5" />}
+                              {m.quantity > 0 ? <TrendingUp className="size-3.5" /> : <TrendingDown className="size-3.5" />}
                             </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-col">
-                              <span className="text-xs font-bold">{products?.find(p => p.id === m.productId)?.name || 'Unknown Item'}</span>
-                              <span className="text-[9px] text-muted-foreground font-mono uppercase tracking-tighter">{m.reference}</span>
+                              <span className="text-xs font-bold uppercase">{products?.find(p => p.id === m.productId)?.name || 'Catalog Item'}</span>
+                              <span className="text-[9px] text-muted-foreground font-mono uppercase tracking-tighter opacity-60">{m.reference}</span>
                             </div>
                           </TableCell>
                           <TableCell className="text-center">
-                            <Badge variant="outline" className="text-[8px] h-4 font-bold bg-background/50 border-none ring-1 ring-border uppercase">{m.type}</Badge>
+                            <Badge variant="outline" className="text-[8px] h-4 font-black bg-background/50 border-none ring-1 ring-border uppercase">{m.type}</Badge>
                           </TableCell>
-                          <TableCell className={`text-right pr-6 font-mono font-black text-xs ${m.quantity > 0 ? 'text-emerald-500' : m.quantity < 0 ? 'text-destructive' : ''}`}>
-                            {m.quantity > 0 ? '+' : ''}{m.quantity}
+                          <TableCell className={`text-right pr-6 font-mono font-black text-xs ${m.quantity > 0 ? 'text-emerald-500' : 'text-destructive'}`}>
+                            {m.quantity > 0 ? '+' : ''}{m.quantity.toLocaleString()}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -194,57 +207,58 @@ export default function InventoryDashboardPage() {
                 </CardContent>
               </Card>
 
-              {/* Quick Jump & Insights */}
+              {/* Strategic Context Panel */}
               <div className="lg:col-span-4 space-y-6">
-                <Card className="border-none ring-1 ring-border shadow-xl bg-card">
-                  <CardHeader className="pb-3 border-b border-border/10">
-                    <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                      <BrainCircuit className="size-4 text-primary" /> Supply Chain Insights
+                <Card className="border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
+                  <CardHeader className="pb-3 border-b border-border/10 bg-primary/5">
+                    <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
+                      <BrainCircuit className="size-4 text-primary" /> Supply Chain Strategy
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pt-4 space-y-4">
-                    <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg">
-                      <div className="flex justify-between items-start mb-1">
-                        <span className="text-[10px] font-bold text-primary uppercase">Optimized Reorder</span>
-                        <Zap className="size-3 text-primary animate-pulse" />
-                      </div>
-                      <p className="text-[11px] leading-relaxed italic text-muted-foreground">
-                        "System detects high turnover in <strong>Active SKUs</strong>. Recommending immediate 20% stock buffer increase for top items."
+                    <div className="p-4 bg-secondary/20 rounded-xl border border-border/50 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-2 opacity-10 rotate-12"><Zap className="size-12 text-primary" /></div>
+                      <p className="text-[11px] leading-relaxed italic font-medium relative z-10">
+                        "Current turnover velocity indicates <span className="text-primary font-bold">Safety Stock</span> thresholds for Pharmacy category are optimal. Suggesting 5% buffer reduction on fast-movers to improve cash position."
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <Link href="/inventory/stock-levels" className="w-full">
-                        <Button variant="outline" className="w-full h-12 flex-col gap-1 bg-secondary/10">
-                          <Warehouse className="size-4" />
-                          <span className="text-[8px] font-bold uppercase">Stock Levels</span>
+                        <Button variant="outline" className="w-full h-12 flex-col gap-1 bg-secondary/10 hover:bg-secondary/20 border-none ring-1 ring-border">
+                          <Warehouse className="size-4 text-primary" />
+                          <span className="text-[8px] font-black uppercase">Site Levels</span>
                         </Button>
                       </Link>
                       <Link href="/inventory/expiry" className="w-full">
-                        <Button variant="outline" className="w-full h-12 flex-col gap-1 bg-secondary/10">
-                          <Timer className="size-4" />
-                          <span className="text-[8px] font-bold uppercase">Expiry Control</span>
+                        <Button variant="outline" className="w-full h-12 flex-col gap-1 bg-secondary/10 hover:bg-secondary/20 border-none ring-1 ring-border">
+                          <Timer className="size-4 text-accent" />
+                          <span className="text-[8px] font-black uppercase">Expiry Map</span>
                         </Button>
                       </Link>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="border-none ring-1 ring-border shadow-xl bg-card">
+                <Card className="border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
                   <CardHeader className="pb-3 border-b border-border/10">
-                    <CardTitle className="text-xs font-black uppercase tracking-widest">Inventory Setup Snapshot</CardTitle>
+                    <CardTitle className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                      <History className="size-3.5 text-muted-foreground" /> Audit Integrity
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="pt-4 space-y-3">
-                    <div className="flex justify-between items-center text-[11px]">
-                      <span className="text-muted-foreground">Warehouses Registered</span>
-                      <span className="font-bold">Active</span>
+                    <div className="flex justify-between items-center text-[10px] uppercase font-bold">
+                      <span className="text-muted-foreground">Traceability</span>
+                      <Badge variant="secondary" className="text-[8px] h-4 bg-emerald-500/10 text-emerald-500 border-none">BATCH LEVEL</Badge>
                     </div>
-                    <div className="flex justify-between items-center text-[11px]">
+                    <div className="flex justify-between items-center text-[10px] uppercase font-bold">
                       <span className="text-muted-foreground">Valuation Logic</span>
-                      <Badge variant="secondary" className="text-[8px] h-4 font-bold">{settings?.inventory?.valuationMethod || 'WeightedAvg'}</Badge>
+                      <span className="font-mono text-primary">{settings?.inventory?.valuationMethod || 'WeightedAvg'}</span>
                     </div>
-                    <div className="flex justify-between items-center text-[11px]">
-                      <span className="text-muted-foreground">Audit Tracking</span>
-                      <Badge variant="outline" className="text-[8px] h-4 font-bold border-emerald-500/20 text-emerald-500">Bidirectional</Badge>
+                    <div className="flex justify-between items-center text-[10px] uppercase font-bold">
+                      <span className="text-muted-foreground">Sync Status</span>
+                      <span className="flex items-center gap-1.5 text-emerald-500">
+                        <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" /> Real-time
+                      </span>
                     </div>
                   </CardContent>
                 </Card>

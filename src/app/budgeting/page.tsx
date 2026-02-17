@@ -19,7 +19,8 @@ import {
   Wallet,
   Scale,
   BrainCircuit,
-  ArrowRight
+  ArrowRight,
+  Activity
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -114,10 +115,10 @@ export default function BudgetOverviewPage() {
                 </CardContent>
               </Card>
 
-              <Card className={`border-none ring-1 shadow-sm transition-all ${overallUtilization > 90 ? 'bg-destructive/5 ring-destructive/20' : 'bg-card ring-border'}`}>
+              <Card className={cn("border-none ring-1 shadow-sm transition-all", overallUtilization > 90 ? 'bg-destructive/5 ring-destructive/20' : 'bg-card ring-border')}>
                 <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
                   <span className="text-[9px] font-black uppercase text-accent tracking-widest">Resource Pulse</span>
-                  <div className={`size-2 rounded-full animate-pulse ${overallUtilization > 90 ? 'bg-destructive' : 'bg-emerald-500'}`} />
+                  <div className={cn("size-2 rounded-full animate-pulse", overallUtilization > 90 ? 'bg-destructive' : 'bg-emerald-500')} />
                 </CardHeader>
                 <CardContent className="pb-4">
                   <div className="text-lg font-bold font-headline">{overallUtilization.toFixed(1)}%</div>

@@ -7,9 +7,27 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, serverTimestamp, setDoc } from "firebase/firestore";
-import { Settings, Save, Loader2, Info, Package, Factory, Scale } from "lucide-react";
+import { collection, doc, serverTimestamp, setDoc, deleteDoc } from "firebase/firestore";
+import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { 
+  Settings, 
+  Save, 
+  Loader2, 
+  Info, 
+  Package, 
+  Factory, 
+  Scale, 
+  Tag, 
+  Ruler, 
+  Banknote,
+  Plus,
+  Trash2,
+  ListTree
+} from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
 
@@ -19,6 +37,7 @@ export default function InventorySetupPage() {
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
 
+  // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instColRef);
 
@@ -26,17 +45,33 @@ export default function InventorySetupPage() {
     if (!selectedInstId) return null;
     return doc(db, 'institutions', selectedInstId, 'settings', 'inventory');
   }, [db, selectedInstId]);
-
   const { data: setup } = useDoc(setupRef);
 
   const coaRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return collection(db, 'institutions', selectedInstId, 'coa');
   }, [db, selectedInstId]);
-
   const { data: accounts } = useCollection(coaRef);
 
-  const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
+  const categoriesRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'categories');
+  }, [db, selectedInstId]);
+  const { data: categories } = useCollection(categoriesRef);
+
+  const uomsRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'uoms');
+  }, [db, selectedInstId]);
+  const { data: uoms } = useCollection(uomsRef);
+
+  const priceListsRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'price_lists');
+  }, [db, selectedInstId]);
+  const { data: priceLists } = useCollection(priceListsRef);
+
+  const handleSaveAutomation = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || !setupRef) return;
 
@@ -51,13 +86,42 @@ export default function InventorySetupPage() {
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      logSystemEvent(db, selectedInstId, user, 'INVENTORY', 'Update Setup', 'Inventory settings and account mappings were updated.');
-      toast({ title: "Setup Saved", description: "Inventory workflows are now synchronized with accounting." });
+      logSystemEvent(db, selectedInstId, user, 'INVENTORY', 'Update Setup', 'Inventory ledger mappings updated.');
+      toast({ title: "Setup Saved" });
     } catch (err) {
       toast({ variant: "destructive", title: "Save Failed" });
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleAddCategory = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedInstId) return;
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      name: formData.get('name'),
+      description: formData.get('description'),
+      createdAt: serverTimestamp()
+    };
+    addDocumentNonBlocking(collection(db, 'institutions', selectedInstId, 'categories'), data);
+    e.currentTarget.reset();
+    toast({ title: "Category Added" });
+  };
+
+  const handleAddUoM = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedInstId) return;
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      code: formData.get('code'),
+      name: formData.get('name'),
+      baseFactor: parseFloat(formData.get('factor') as string) || 1,
+      createdAt: serverTimestamp()
+    };
+    addDocumentNonBlocking(collection(db, 'institutions', selectedInstId, 'uoms'), data);
+    e.currentTarget.reset();
+    toast({ title: "UoM Registered" });
   };
 
   const AccountSelect = ({ name, label, description, typeFilter }: { name: string, label: string, description: string, typeFilter?: string[] }) => (
@@ -91,7 +155,7 @@ export default function InventorySetupPage() {
             </div>
             <div>
               <h1 className="text-2xl font-headline font-bold">Inventory Workflow</h1>
-              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Automation & Ledger Mappings</p>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Automation & Catalog Dictionaries</p>
             </div>
           </div>
           
@@ -110,108 +174,167 @@ export default function InventorySetupPage() {
         {!selectedInstId ? (
           <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed rounded-2xl bg-secondary/5">
             <Settings className="size-12 text-muted-foreground opacity-20 mb-3" />
-            <p className="text-sm font-medium text-muted-foreground">Select an institution to configure its inventory engine.</p>
+            <p className="text-sm font-medium text-muted-foreground">Select an institution to configure its inventory logic.</p>
           </div>
         ) : (
-          <form onSubmit={handleSave}>
-            <div className="grid gap-6 lg:grid-cols-12">
-              <div className="lg:col-span-8 space-y-6">
-                <Card className="border-none ring-1 ring-border shadow-2xl bg-card">
-                  <CardHeader className="border-b border-border/50">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Factory className="size-5 text-primary" /> Logic & Valuation
-                    </CardTitle>
-                    <CardDescription>Define how the system values stock and triggers purchases.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-6 grid gap-8 md:grid-cols-2">
-                    <div className="space-y-4">
-                      <Label className="text-[10px] font-black uppercase tracking-widest">Valuation Method</Label>
-                      <Select name="valuationMethod" defaultValue={setup?.valuationMethod || "WeightedAverage"}>
-                        <SelectTrigger className="h-10">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="FIFO">FIFO (First In, First Out)</SelectItem>
-                          <SelectItem value="LIFO">LIFO (Last In, First Out)</SelectItem>
-                          <SelectItem value="WeightedAverage">Weighted Average</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-[10px] text-muted-foreground italic">Weighted average is recommended for pharmacy/retail consumables.</p>
-                    </div>
+          <Tabs defaultValue="automation" className="w-full">
+            <TabsList className="bg-secondary/20 h-auto p-1 mb-6 flex-wrap justify-start gap-1">
+              <TabsTrigger value="automation" className="text-xs gap-2"><Factory className="size-3.5" /> Automation & Ledger</TabsTrigger>
+              <TabsTrigger value="catalog" className="text-xs gap-2"><ListTree className="size-3.5" /> Catalog Settings</TabsTrigger>
+              <TabsTrigger value="pricing" className="text-xs gap-2"><Banknote className="size-3.5" /> Price Lists</TabsTrigger>
+            </TabsList>
 
-                    <div className="space-y-4">
-                      <Label className="text-[10px] font-black uppercase tracking-widest">Stock Deduction Trigger</Label>
-                      <Select name="deductionTrigger" defaultValue={setup?.deductionTrigger || "SaleCompletion"}>
-                        <SelectTrigger className="h-10">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="SaleCompletion">On Sale Complete (Real-time)</SelectItem>
-                          <SelectItem value="KitchenDispatch">On Kitchen/Bar Dispatch</SelectItem>
-                          <SelectItem value="DailyReconcile">Daily Batch Reconcile</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </CardContent>
-                </Card>
+            <TabsContent value="automation">
+              <form onSubmit={handleSaveAutomation}>
+                <div className="grid gap-6 lg:grid-cols-12">
+                  <div className="lg:col-span-8 space-y-6">
+                    <Card className="border-none ring-1 ring-border shadow-2xl bg-card">
+                      <CardHeader className="border-b border-border/50">
+                        <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                          <Scale className="size-4 text-primary" /> Logic & Valuation
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-6 grid gap-8 md:grid-cols-2">
+                        <div className="space-y-4">
+                          <Label className="text-[10px] font-black uppercase tracking-widest">Valuation Method</Label>
+                          <Select name="valuationMethod" defaultValue={setup?.valuationMethod || "WeightedAverage"}>
+                            <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="FIFO" className="text-xs">FIFO</SelectItem>
+                              <SelectItem value="LIFO" className="text-xs">LIFO</SelectItem>
+                              <SelectItem value="WeightedAverage" className="text-xs">Weighted Average</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-4">
+                          <Label className="text-[10px] font-black uppercase tracking-widest">Stock Deduction</Label>
+                          <Select name="deductionTrigger" defaultValue={setup?.deductionTrigger || "SaleCompletion"}>
+                            <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="SaleCompletion" className="text-xs">Real-time on Sale</SelectItem>
+                              <SelectItem value="KitchenDispatch" className="text-xs">On Dispatch</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </CardContent>
+                    </Card>
 
-                <Card className="border-none ring-1 ring-border shadow-2xl bg-card">
-                  <CardHeader className="border-b border-border/50">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Scale className="size-5 text-accent" /> Financial Mapping
-                    </CardTitle>
-                    <CardDescription>Link inventory events to your Chart of Accounts nodes.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-6 grid gap-8 md:grid-cols-2">
-                    <AccountSelect 
-                      name="inventoryAssetAccountId" 
-                      label="Inventory Asset" 
-                      description="Balance Sheet account tracking total stock value."
-                      typeFilter={['Asset', 'Inventory']}
-                    />
-                    <AccountSelect 
-                      name="cogsAccountId" 
-                      label="Cost of Goods Sold" 
-                      description="Expense account debited when items are sold."
-                      typeFilter={['Expense', 'COGS']}
-                    />
-                    <AccountSelect 
-                      name="inventoryShrinkageAccountId" 
-                      label="Shrinkage & Write-offs" 
-                      description="Expense account for damages or stolen stock."
-                      typeFilter={['Expense']}
-                    />
-                    <AccountSelect 
-                      name="inventoryAdjustmentAccountId" 
-                      label="Adjustment Surplus/Deficit" 
-                      description="Clearing account for physical count corrections."
-                    />
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="lg:col-span-4 space-y-6">
-                <Card className="border-none ring-1 ring-border shadow bg-secondary/5">
-                  <CardHeader>
-                    <CardTitle className="text-xs font-black uppercase tracking-widest">Automation Pulse</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-[11px] space-y-4 leading-relaxed">
-                    <p>The "Automation King" engine uses these settings to maintain a pristine ledger.</p>
-                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded flex items-center gap-2">
-                      <div className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <span className="font-bold text-emerald-500">Auto-Journaling Active</span>
-                    </div>
-                    <p className="opacity-60 italic">Ensure your COA nodes are 'Active' before committing these mappings.</p>
-                  </CardContent>
-                  <div className="p-6 border-t">
-                    <Button type="submit" disabled={isSaving} className="w-full gap-2 h-10 font-bold uppercase text-[10px]">
-                      {isSaving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />} Commit Inventory Config
-                    </Button>
+                    <Card className="border-none ring-1 ring-border shadow-2xl bg-card">
+                      <CardHeader className="border-b border-border/50">
+                        <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                          <Scale className="size-4 text-accent" /> Financial Mapping
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-6 grid gap-8 md:grid-cols-2">
+                        <AccountSelect name="inventoryAssetAccountId" label="Inventory Asset" description="Stock balance sheet node." typeFilter={['Asset']} />
+                        <AccountSelect name="cogsAccountId" label="COGS" description="Cost of Goods Sold expense." typeFilter={['Expense']} />
+                        <AccountSelect name="inventoryShrinkageAccountId" label="Shrinkage" description="Losses and damages." typeFilter={['Expense']} />
+                        <AccountSelect name="inventoryAdjustmentAccountId" label="Adjustment Node" description="Audit reconciliation." />
+                      </CardContent>
+                    </Card>
                   </div>
+                  <div className="lg:col-span-4">
+                    <Card className="border-none ring-1 ring-border shadow bg-secondary/5 h-full">
+                      <CardHeader><CardTitle className="text-xs font-black uppercase tracking-widest">Automation Engine</CardTitle></CardHeader>
+                      <CardContent className="space-y-4">
+                        <p className="text-[11px] leading-relaxed opacity-70">
+                          Committing these settings will synchronize your inventory movements with the General Ledger. All stock-outs and adjustments will auto-generate double-entry journals.
+                        </p>
+                        <Button type="submit" disabled={isSaving} className="w-full h-10 font-bold uppercase text-[10px] gap-2">
+                          {isSaving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />} Commit Automation
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="catalog">
+              <div className="grid gap-6 lg:grid-cols-2">
+                {/* Categories Management */}
+                <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
+                  <CardHeader className="bg-secondary/10 border-b">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                        <Tag className="size-4 text-primary" /> Categories
+                      </CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="p-4 border-b bg-secondary/5">
+                      <form onSubmit={handleAddCategory} className="flex gap-2">
+                        <Input name="name" placeholder="Category Name (e.g. Antibiotics)" required className="h-9 text-xs" />
+                        <Button type="submit" size="sm" className="h-9 px-4 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
+                      </form>
+                    </div>
+                    <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                      <Table>
+                        <TableBody>
+                          {categories?.map(cat => (
+                            <TableRow key={cat.id} className="h-10 hover:bg-secondary/5 group">
+                              <TableCell className="text-xs font-bold pl-6">{cat.name}</TableCell>
+                              <TableCell className="text-right pr-6">
+                                <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'categories', cat.id))}>
+                                  <Trash2 className="size-3.5" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* UoM Management */}
+                <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
+                  <CardHeader className="bg-secondary/10 border-b">
+                    <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                      <Ruler className="size-4 text-accent" /> Units of Measure
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="p-4 border-b bg-secondary/5">
+                      <form onSubmit={handleAddUoM} className="grid grid-cols-3 gap-2">
+                        <Input name="code" placeholder="Code (e.g. PCS)" required className="h-9 text-xs" />
+                        <Input name="name" placeholder="Name (e.g. Pieces)" required className="h-9 text-xs" />
+                        <Button type="submit" size="sm" className="h-9 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
+                      </form>
+                    </div>
+                    <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                      <Table>
+                        <TableBody>
+                          {uoms?.map(uom => (
+                            <TableRow key={uom.id} className="h-10 hover:bg-secondary/5 group">
+                              <TableCell className="text-xs font-bold pl-6 font-mono text-primary">{uom.code}</TableCell>
+                              <TableCell className="text-xs">{uom.name}</TableCell>
+                              <TableCell className="text-right pr-6">
+                                <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'uoms', uom.id))}>
+                                  <Trash2 className="size-3.5" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
                 </Card>
               </div>
-            </div>
-          </form>
+            </TabsContent>
+
+            <TabsContent value="pricing">
+              <Card className="border-none ring-1 ring-border bg-card shadow-xl h-[400px] flex flex-col items-center justify-center text-center opacity-50">
+                <Banknote className="size-12 mb-4 text-muted-foreground" />
+                <h3 className="font-bold text-lg">Price List Management</h3>
+                <p className="text-xs max-w-sm">
+                  Configure institutional pricing tiers, wholesale markups, and insurance-specific rate cards here.
+                </p>
+                <Badge variant="outline" className="mt-4 uppercase text-[10px] font-black">Coming Soon</Badge>
+              </Card>
+            </TabsContent>
+          </Tabs>
         )}
       </div>
     </DashboardLayout>

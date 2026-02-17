@@ -48,25 +48,23 @@
         "monthlyLimit": { "type": "number" }
       }
     },
-    "JournalEntry": {
-      "title": "JournalEntry",
+    "ProductCategory": {
+      "title": "ProductCategory",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "date": { "type": "string", "format": "date-time" },
-        "description": { "type": "string" },
-        "reference": { "type": "string" },
-        "items": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "accountId": { "type": "string" },
-              "amount": { "type": "number" },
-              "type": { "type": "string", "enum": ["Debit", "Credit"] }
-            }
-          }
-        }
+        "name": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "UnitOfMeasure": {
+      "title": "UnitOfMeasure",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "baseFactor": { "type": "number" }
       }
     },
     "Product": {
@@ -97,32 +95,6 @@
         "location": { "type": "string" },
         "isDefault": { "type": "boolean" }
       }
-    },
-    "StockMovement": {
-      "title": "StockMovement",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "productId": { "type": "string" },
-        "warehouseId": { "type": "string" },
-        "type": { "type": "string", "enum": ["In", "Out", "Transfer", "Adjustment", "Damage"] },
-        "quantity": { "type": "number" },
-        "reference": { "type": "string" },
-        "batchId": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" }
-      }
-    },
-    "InventoryBatch": {
-      "title": "InventoryBatch",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "productId": { "type": "string" },
-        "batchNumber": { "type": "string" },
-        "expiryDate": { "type": "string", "format": "date" },
-        "warehouseId": { "type": "string" },
-        "quantity": { "type": "number" }
-      }
     }
   },
   "auth": {
@@ -139,6 +111,22 @@
         }
       },
       {
+        "path": "/institutions/{institutionId}/categories/{id}",
+        "definition": {
+          "entityName": "ProductCategory",
+          "schema": { "$ref": "#/backend/entities/ProductCategory" },
+          "description": "Product categories."
+        }
+      },
+      {
+        "path": "/institutions/{institutionId}/uoms/{id}",
+        "definition": {
+          "entityName": "UnitOfMeasure",
+          "schema": { "$ref": "#/backend/entities/UnitOfMeasure" },
+          "description": "Units of measure."
+        }
+      },
+      {
         "path": "/institutions/{institutionId}/products/{productId}",
         "definition": {
           "entityName": "Product",
@@ -152,22 +140,6 @@
           "entityName": "Warehouse",
           "schema": { "$ref": "#/backend/entities/Warehouse" },
           "description": "Storage locations."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/movements/{movementId}",
-        "definition": {
-          "entityName": "StockMovement",
-          "schema": { "$ref": "#/backend/entities/StockMovement" },
-          "description": "Ledger of all stock changes."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/batches/{batchId}",
-        "definition": {
-          "entityName": "InventoryBatch",
-          "schema": { "$ref": "#/backend/entities/InventoryBatch" },
-          "description": "Batch and expiry tracking."
         }
       }
     ]

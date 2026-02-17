@@ -18,12 +18,8 @@ import {
   Plus, 
   Search, 
   Tag, 
-  Stethoscope, 
-  Utensils, 
   MoreHorizontal,
   History,
-  AlertTriangle,
-  ArrowRight,
   Loader2,
   Trash2,
   Edit2
@@ -47,6 +43,7 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instColRef);
 
@@ -55,6 +52,18 @@ export default function ProductsPage() {
     return query(collection(db, 'institutions', selectedInstId, 'products'), orderBy('name', 'asc'));
   }, [db, selectedInstId]);
   const { data: products, isLoading } = useCollection(productsQuery);
+
+  const categoriesRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'categories');
+  }, [db, selectedInstId]);
+  const { data: categories } = useCollection(categoriesRef);
+
+  const uomsRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'uoms');
+  }, [db, selectedInstId]);
+  const { data: uoms } = useCollection(uomsRef);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -67,6 +76,7 @@ export default function ProductsPage() {
       sku: formData.get('sku') as string,
       type: formData.get('type') as string,
       categoryId: formData.get('categoryId') as string,
+      uomId: formData.get('uomId') as string,
       basePrice: parseFloat(formData.get('basePrice') as string),
       costPrice: parseFloat(formData.get('costPrice') as string),
       reorderLevel: parseFloat(formData.get('reorderLevel') as string) || 0,
@@ -147,20 +157,21 @@ export default function ProductsPage() {
                 <TableHeader className="bg-secondary/20">
                   <TableRow>
                     <TableHead className="h-10 text-[10px] uppercase font-bold pl-6">Item / SKU</TableHead>
-                    <TableHead className="h-10 text-[10px] uppercase font-bold text-center">Type</TableHead>
-                    <TableHead className="h-10 text-[10px] uppercase font-bold text-right">Cost</TableHead>
+                    <TableHead className="h-10 text-[10px] uppercase font-bold text-center">Category</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-bold text-right">Selling</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-bold text-right">On Hand</TableHead>
-                    <TableHead className="h-10 text-[10px] uppercase font-bold text-right pr-6">Status</TableHead>
+                    <TableHead className="h-10 text-[10px] uppercase font-bold text-right pr-6">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-12 text-xs uppercase font-bold animate-pulse opacity-50">Polling inventory...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs uppercase font-bold animate-pulse opacity-50">Polling inventory...</TableCell></TableRow>
                   ) : !products || products.length === 0 ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-12 text-xs text-muted-foreground font-bold">Catalog is empty.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs text-muted-foreground font-bold">Catalog is empty.</TableCell></TableRow>
                   ) : products.map((p) => {
                     const isLow = p.totalStock <= p.reorderLevel && p.type === 'Stock';
+                    const categoryName = categories?.find(c => c.id === p.categoryId)?.name || 'Uncategorized';
+                    const uomCode = uoms?.find(u => u.id === p.uomId)?.code || 'PCS';
                     return (
                       <TableRow key={p.id} className="h-14 hover:bg-secondary/5 group">
                         <TableCell className="pl-6">
@@ -170,16 +181,9 @@ export default function ProductsPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="outline" className={`text-[8px] h-4 uppercase font-bold ${
-                            p.type === 'Stock' ? 'border-primary/20 text-primary' : 
-                            p.type === 'Service' ? 'border-accent/20 text-accent' : 
-                            'border-emerald-500/20 text-emerald-500'
-                          }`}>
-                            {p.type}
+                          <Badge variant="outline" className="text-[8px] h-4 uppercase font-bold border-primary/20 text-primary">
+                            {categoryName}
                           </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs opacity-60">
-                          {p.costPrice?.toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs font-bold">
                           {p.basePrice?.toLocaleString()}
@@ -187,7 +191,7 @@ export default function ProductsPage() {
                         <TableCell className="text-right">
                           <div className="flex flex-col items-end">
                             <span className={`text-xs font-bold ${isLow ? 'text-destructive' : ''}`}>{p.totalStock?.toLocaleString() || 0}</span>
-                            <span className="text-[8px] text-muted-foreground uppercase">Units</span>
+                            <span className="text-[8px] text-muted-foreground uppercase">{uomCode}</span>
                           </div>
                         </TableCell>
                         <TableCell className="text-right pr-6">
@@ -202,7 +206,6 @@ export default function ProductsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuLabel className="text-[10px] font-bold uppercase">Operations</DropdownMenuLabel>
                                 <DropdownMenuItem className="text-xs gap-2" onClick={() => {
                                   setEditingProduct(p);
                                   setIsCreateOpen(true);
@@ -235,7 +238,7 @@ export default function ProductsPage() {
             <form onSubmit={handleSubmit}>
               <DialogHeader>
                 <DialogTitle>{editingProduct ? 'Update' : 'Register'} Catalog Item</DialogTitle>
-                <CardDescription>Configure stock behaviors and price points.</CardDescription>
+                <CardDescription>Link this item to institutional categories and measure units.</CardDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4 text-xs">
                 <div className="grid grid-cols-2 gap-4">
@@ -250,29 +253,49 @@ export default function ProductsPage() {
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
+                    <Label>Institutional Category</Label>
+                    <Select name="categoryId" defaultValue={editingProduct?.categoryId}>
+                      <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select Category" /></SelectTrigger>
+                      <SelectContent>
+                        {categories?.map(cat => <SelectItem key={cat.id} value={cat.id} className="text-xs">{cat.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Standard UoM</Label>
+                    <Select name="uomId" defaultValue={editingProduct?.uomId}>
+                      <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="e.g. PCS" /></SelectTrigger>
+                      <SelectContent>
+                        {uoms?.map(uom => <SelectItem key={uom.id} value={uom.id} className="text-xs">{uom.name} ({uom.code})</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
                     <Label>Item Type</Label>
                     <Select name="type" defaultValue={editingProduct?.type || "Stock"}>
                       <SelectTrigger className="text-xs h-9"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Stock" className="text-xs">Stock Item</SelectItem>
                         <SelectItem value="Service" className="text-xs">Service</SelectItem>
-                        <SelectItem value="Bundle" className="text-xs">Bundle / Recipe</SelectItem>
+                        <SelectItem value="Bundle" className="text-xs">Bundle / Combo</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Cost Price</Label>
+                    <Label>Unit Cost</Label>
                     <Input name="costPrice" type="number" step="0.01" defaultValue={editingProduct?.costPrice} required />
                   </div>
                   <div className="space-y-2">
-                    <Label>Selling Price</Label>
+                    <Label>Base Selling Price</Label>
                     <Input name="basePrice" type="number" step="0.01" defaultValue={editingProduct?.basePrice} required />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 pt-2 border-t mt-2">
                   <div className="space-y-2">
                     <Label>Re-order Point</Label>
-                    <Input name="reorderLevel" type="number" defaultValue={editingProduct?.reorderLevel} placeholder="Minimum Quantity" />
+                    <Input name="reorderLevel" type="number" defaultValue={editingProduct?.reorderLevel} placeholder="Min Qty" />
                   </div>
                   <div className="flex items-center justify-between p-3 border rounded bg-secondary/10 mt-4">
                     <Label className="text-[10px] uppercase font-bold">Track Expiry?</Label>

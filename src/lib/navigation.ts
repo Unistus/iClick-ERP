@@ -113,6 +113,7 @@ export const navConfig: NavItem[] = [
       { title: "Delivery Notes", icon: Truck, url: "/sales/delivery", id: "delivery" },
       { title: "Sales Reports", icon: ClipboardList, url: "/sales/reports", id: "reports" },
       { title: "Commission", icon: UserCheck, url: "/sales/commissions", id: "commissions" },
+      { title: "Sales Setup", icon: Settings, url: "/sales/setup", id: "setup" },
     ]
   },
   { 

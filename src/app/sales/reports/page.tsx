@@ -24,31 +24,35 @@ import {
   Clock,
   RefreshCw,
   Wallet,
-  Building2,
   Hourglass,
   Tag,
   Zap,
   Users,
-  ShoppingCart
+  ShoppingCart,
+  PieChart,
+  LayoutGrid,
+  FileText,
+  Activity
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 
-type SalesReportType = 'REVENUE' | 'PRODUCT_PERF' | 'CUSTOMER_AGING' | 'COMMISSIONS';
+type SalesReportType = 'REVENUE' | 'PIPELINE' | 'PRODUCT_PERF' | 'CUSTOMER_AGING' | 'COMMISSIONS';
 
 const REPORT_CATEGORIES = [
   {
-    title: "Financial Performance",
+    title: "Revenue & Collections",
     reports: [
-      { id: 'REVENUE', title: "Revenue Breakdown", description: "Daily & Monthly gross sales summary.", icon: Wallet },
-      { id: 'COMMISSIONS', title: "Commission Audit", description: "Calculated staff incentives by closed deals.", icon: Users },
+      { id: 'REVENUE', title: "Billing Summary", description: "Gross sales vs actual collections.", icon: Wallet },
+      { id: 'COMMISSIONS', title: "Staff Incentives", description: "Calculated earnings by sales agent.", icon: Users },
     ]
   },
   {
-    title: "Market Intelligence",
+    title: "Pipeline & Performance",
     reports: [
-      { id: 'PRODUCT_PERF', title: "Product Velocity", description: "Sales volume by individual catalog item.", icon: TrendingUp },
-      { id: 'CUSTOMER_AGING', title: "A/R Aging", description: "Credit sales maturity analysis.", icon: Hourglass },
+      { id: 'PIPELINE', title: "Sales Funnel", description: "Quotes vs Orders vs Final Invoices.", icon: LayoutGrid },
+      { id: 'PRODUCT_PERF', title: "Item Velocity", description: "Top performing catalog items.", icon: TrendingUp },
+      { id: 'CUSTOMER_AGING', title: "A/R Aging", description: "Credit term maturity analysis.", icon: Hourglass },
     ]
   }
 ];
@@ -73,49 +77,116 @@ export default function SalesReportsPage() {
   }, [db, selectedInstId]);
   const { data: invoices, isLoading: salesLoading } = useCollection(invoicesQuery);
 
-  const RevenueReport = () => (
+  const quotesQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'sales_quotations');
+  }, [db, selectedInstId]);
+  const { data: quotes } = useCollection(quotesQuery);
+
+  const ordersQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'sales_orders');
+  }, [db, selectedInstId]);
+  const { data: orders } = useCollection(ordersQuery);
+
+  const settingsRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return doc(db, 'institutions', selectedInstId, 'settings', 'global');
+  }, [db, selectedInstId]);
+  const { data: settings } = useDoc(settingsRef);
+
+  const currency = settings?.general?.currencySymbol || "KES";
+
+  const RevenueReport = () => {
+    const totalBilled = invoices?.reduce((sum, i) => sum + i.total, 0) || 0;
+    const totalPaid = invoices?.filter(i => i.isPaid).reduce((sum, i) => sum + i.total, 0) || 0;
+    const totalAr = totalBilled - totalPaid;
+
+    return (
+      <div className="space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-primary/5 border-primary/20">
+            <CardHeader className="p-4"><p className="text-[10px] font-black uppercase text-primary tracking-widest">Gross Billing</p></CardHeader>
+            <CardContent className="px-4 pb-4">
+              <p className="text-2xl font-bold font-headline">{currency} {totalBilled.toLocaleString()}</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-emerald-500/5 border-emerald-500/20">
+            <CardHeader className="p-4"><p className="text-[10px] font-black uppercase text-emerald-500">Collected</p></CardHeader>
+            <CardContent className="px-4 pb-4">
+              <p className="text-2xl font-bold font-headline">{currency} {totalPaid.toLocaleString()}</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-destructive/5 border-destructive/20">
+            <CardHeader className="p-4"><p className="text-[10px] font-black uppercase text-destructive">Debt Position</p></CardHeader>
+            <CardContent className="px-4 pb-4">
+              <p className="text-2xl font-bold font-headline">{currency} {totalAr.toLocaleString()}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Table>
+          <TableHeader className="bg-secondary/30">
+            <TableRow>
+              <TableHead className="text-[10px] uppercase font-black pl-6">Reference</TableHead>
+              <TableHead className="text-[10px] uppercase font-black">Customer</TableHead>
+              <TableHead className="text-[10px] uppercase font-black text-center">Status</TableHead>
+              <TableHead className="text-[10px] uppercase font-black text-right pr-6">Final Total</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {invoices?.map(i => (
+              <TableRow key={i.id} className="h-12 hover:bg-secondary/5 transition-colors border-b-border/30">
+                <TableCell className="pl-6 font-mono text-[11px] font-bold text-primary">{i.invoiceNumber}</TableCell>
+                <TableCell className="text-xs font-bold uppercase">{i.customerName}</TableCell>
+                <TableCell className="text-center">
+                  <Badge variant="outline" className={cn("text-[8px] h-4", i.isPaid ? "bg-emerald-500/10 text-emerald-500" : "bg-primary/10 text-primary")}>
+                    {i.status}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right pr-6 font-mono text-xs font-black text-primary">{currency} {i.total?.toLocaleString()}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    );
+  };
+
+  const PipelineReport = () => (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-primary/5 border-primary/20">
-          <CardHeader className="p-4"><p className="text-[10px] font-black uppercase text-primary tracking-widest">Gross Billing</p></CardHeader>
-          <CardContent className="px-4 pb-4">
-            <p className="text-2xl font-bold font-headline">KES {invoices?.reduce((sum, i) => sum + i.total, 0).toLocaleString()}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-emerald-500/5 border-emerald-500/20">
-          <CardHeader className="p-4"><p className="text-[10px] font-black uppercase text-emerald-500">Collected</p></CardHeader>
-          <CardContent className="px-4 pb-4">
-            <p className="text-2xl font-bold font-headline">KES {invoices?.filter(i => i.isPaid).reduce((sum, i) => sum + i.total, 0).toLocaleString()}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-destructive/5 border-destructive/20">
-          <CardHeader className="p-4"><p className="text-[10px] font-black uppercase text-destructive">Outstanding</p></CardHeader>
-          <CardContent className="px-4 pb-4">
-            <p className="text-2xl font-bold font-headline">KES {invoices?.filter(i => !i.isPaid).reduce((sum, i) => sum + i.balance, 0).toLocaleString()}</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+        <div className="p-6 rounded-2xl bg-secondary/10 border space-y-1">
+          <p className="text-[10px] font-black uppercase opacity-50">Open Quotes</p>
+          <p className="text-3xl font-black font-headline text-primary">{quotes?.filter(q => q.status === 'Sent').length || 0}</p>
+        </div>
+        <div className="p-6 rounded-2xl bg-secondary/10 border space-y-1">
+          <p className="text-[10px] font-black uppercase opacity-50">Confirmed Orders</p>
+          <p className="text-3xl font-black font-headline text-accent">{orders?.filter(o => o.status === 'Confirmed').length || 0}</p>
+        </div>
+        <div className="p-6 rounded-2xl bg-secondary/10 border space-y-1">
+          <p className="text-[10px] font-black uppercase opacity-50">Invoiced</p>
+          <p className="text-3xl font-black font-headline text-emerald-500">{invoices?.length || 0}</p>
+        </div>
       </div>
 
-      <Table>
-        <TableHeader className="bg-secondary/30">
-          <TableRow>
-            <TableHead className="text-[10px] uppercase font-black pl-6">Reference</TableHead>
-            <TableHead className="text-[10px] uppercase font-black">Customer</TableHead>
-            <TableHead className="text-[10px] uppercase font-black text-right">Net</TableHead>
-            <TableHead className="text-[10px] uppercase font-black text-right pr-6">Total (Inc Tax)</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {invoices?.map(i => (
-            <TableRow key={i.id} className="h-12 hover:bg-secondary/5 transition-colors border-b-border/30">
-              <TableCell className="pl-6 font-mono text-[11px] font-bold text-primary">{i.invoiceNumber}</TableCell>
-              <TableCell className="text-xs font-bold uppercase">{i.customerName}</TableCell>
-              <TableCell className="text-right font-mono text-xs opacity-60">KES {i.subtotal?.toLocaleString()}</TableCell>
-              <TableCell className="text-right pr-6 font-mono text-xs font-black text-primary">KES {i.total?.toLocaleString()}</TableCell>
-            </TableRow>
+      <section className="space-y-4">
+        <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b pb-2">Funnel Conversion Stream</h3>
+        <div className="space-y-3">
+          {quotes?.filter(q => q.status === 'Confirmed').slice(0, 5).map(q => (
+            <div key={q.id} className="flex items-center justify-between p-4 bg-secondary/5 rounded-xl border border-dashed">
+              <div className="flex items-center gap-4">
+                <div className="p-2 rounded bg-primary/10 text-primary"><Tag className="size-4" /></div>
+                <div>
+                  <p className="text-xs font-bold uppercase">{q.customerName}</p>
+                  <p className="text-[9px] text-muted-foreground font-mono">Converted from {q.quoteNumber}</p>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-[8px] bg-emerald-500/10 text-emerald-500">SUCCESS</Badge>
+            </div>
           ))}
-        </TableBody>
-      </Table>
+        </div>
+      </section>
     </div>
   );
 
@@ -134,14 +205,16 @@ export default function SalesReportsPage() {
           </div>
           
           <div className="flex gap-2 w-full md:w-auto">
-            <select 
-              value={selectedInstId} 
-              onChange={(e) => setSelectedInstId(e.target.value)}
-              className="w-[220px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold rounded-md px-3"
-            >
-              <option value="">Select Institution</option>
-              {institutions?.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-            </select>
+            <Select value={selectedInstId} onValueChange={setSelectedInstId}>
+              <SelectTrigger className="w-[220px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold">
+                <SelectValue placeholder="Select Institution" />
+              </SelectTrigger>
+              <SelectContent>
+                {institutions?.map(i => (
+                  <SelectItem key={i.id} value={i.id} className="text-xs">{i.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button variant="outline" size="sm" className="h-9 gap-2 text-xs font-bold uppercase shadow-lg shadow-primary/20">
               <Download className="size-3.5" /> Export PDF
             </Button>
@@ -211,13 +284,14 @@ export default function SalesReportsPage() {
                 <ScrollArea className="flex-1 p-8">
                   {salesLoading ? (
                     <div className="h-64 flex flex-col items-center justify-center space-y-4">
-                      <RefreshCw className="size-8 animate-spin text-primary opacity-30" />
+                      <Activity className="size-8 animate-spin text-primary opacity-30" />
                       <p className="text-[10px] font-black uppercase tracking-widest opacity-50">Polling Transaction Hub...</p>
                     </div>
                   ) : (
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-700">
                       {activeReport === 'REVENUE' && <RevenueReport />}
-                      {activeReport !== 'REVENUE' && (
+                      {activeReport === 'PIPELINE' && <PipelineReport />}
+                      {activeReport !== 'REVENUE' && activeReport !== 'PIPELINE' && (
                         <div className="h-96 flex flex-col items-center justify-center space-y-4 border-2 border-dashed rounded-3xl opacity-20 italic">
                           <Zap className="size-12" />
                           <p className="font-bold uppercase tracking-widest text-xs">Computing Intelligence Data...</p>

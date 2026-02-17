@@ -24,6 +24,7 @@ export interface SalesInvoicePayload {
   taxTotal: number;
   total: number;
   paymentMethod: 'Credit' | 'Cash' | 'Bank';
+  orderId?: string;
 }
 
 /**
@@ -42,36 +43,63 @@ export async function createSalesInvoice(db: Firestore, institutionId: string, p
   // 1. Generate Sequence
   const invoiceNumber = await getNextSequence(db, institutionId, 'sales_invoice');
 
-  // 2. Post to Ledger
-  // DR: A/R or Bank (Total)
-  // CR: Sales Revenue (Subtotal)
-  // CR: VAT Payable (Tax)
-  const debitAccountId = payload.paymentMethod === 'Credit' 
-    ? setup.accountsReceivableAccountId 
-    : setup.cashOnHandAccountId;
-
-  await postJournalEntry(db, institutionId, {
-    date: new Date(),
-    description: `Sales Invoice ${invoiceNumber} to ${payload.customerName}`,
-    reference: invoiceNumber,
-    items: [
-      { accountId: debitAccountId, amount: payload.total, type: 'Debit' },
-      { accountId: setup.salesRevenueAccountId, amount: payload.subtotal, type: 'Credit' },
-      { accountId: setup.vatPayableAccountId, amount: payload.taxTotal, type: 'Credit' },
-    ]
-  });
-
-  // 3. Save Invoice Record
+  // 2. Initial Save as Draft (No Posting Yet)
   const invoiceRef = collection(db, 'institutions', institutionId, 'sales_invoices');
   return addDoc(invoiceRef, {
     ...payload,
     invoiceNumber,
-    status: 'Finalized',
-    isPaid: payload.paymentMethod !== 'Credit',
-    balance: payload.paymentMethod === 'Credit' ? payload.total : 0,
+    status: 'Draft',
+    isPaid: false,
+    balance: payload.total,
     createdBy: userId,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
+  });
+}
+
+/**
+ * Finalizes an invoice, transitioning it to 'Finalized' and posting to the GL.
+ */
+export async function finalizeInvoice(db: Firestore, institutionId: string, invoiceId: string) {
+  const invoiceRef = doc(db, 'institutions', institutionId, 'sales_invoices', invoiceId);
+  const setupRef = doc(db, 'institutions', institutionId, 'settings', 'accounting');
+  
+  return runTransaction(db, async (transaction) => {
+    const [invSnap, setupSnap] = await Promise.all([
+      transaction.get(invoiceRef),
+      transaction.get(setupRef)
+    ]);
+
+    if (!invSnap.exists()) throw new Error("Invoice not found");
+    if (!setupSnap.exists()) throw new Error("Accounting setup incomplete");
+
+    const inv = invSnap.data();
+    const setup = setupSnap.data();
+
+    if (inv.status !== 'Draft') throw new Error("Only draft invoices can be finalized.");
+
+    // Post to Ledger
+    const debitAccountId = inv.paymentMethod === 'Credit' 
+      ? setup.accountsReceivableAccountId 
+      : setup.cashOnHandAccountId;
+
+    await postJournalEntry(db, institutionId, {
+      date: new Date(),
+      description: `Sales Invoice ${inv.invoiceNumber} finalized`,
+      reference: inv.invoiceNumber,
+      items: [
+        { accountId: debitAccountId, amount: inv.total, type: 'Debit' },
+        { accountId: setup.salesRevenueAccountId, amount: inv.subtotal, type: 'Credit' },
+        { accountId: setup.vatPayableAccountId, amount: inv.taxTotal, type: 'Credit' },
+      ]
+    });
+
+    transaction.update(invoiceRef, {
+      status: 'Finalized',
+      isPaid: inv.paymentMethod !== 'Credit',
+      balance: inv.paymentMethod === 'Credit' ? inv.total : 0,
+      updatedAt: serverTimestamp()
+    });
   });
 }
 
@@ -88,6 +116,41 @@ export async function createQuotation(db: Firestore, institutionId: string, payl
   });
 }
 
+export async function updateQuotationStatus(db: Firestore, institutionId: string, quoteId: string, status: 'Sent' | 'Confirmed') {
+  const quoteRef = doc(db, 'institutions', institutionId, 'sales_quotations', quoteId);
+  
+  if (status === 'Confirmed') {
+    return runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(quoteRef);
+      if (!snap.exists()) throw new Error("Quote not found");
+      const data = snap.data();
+
+      // Update Quote
+      transaction.update(quoteRef, { status: 'Confirmed', updatedAt: serverTimestamp() });
+
+      // Create Sales Order Automatically
+      const orderNumber = await getNextSequence(db, institutionId, 'sales_order');
+      const orderRef = doc(collection(db, 'institutions', institutionId, 'sales_orders'));
+      transaction.set(orderRef, {
+        customerName: data.customerName,
+        customerId: data.customerId || `CUST-${Date.now()}`,
+        items: data.items || [],
+        total: data.total || 0,
+        subtotal: data.subtotal || 0,
+        taxTotal: data.taxTotal || 0,
+        quoteId: quoteId,
+        orderNumber,
+        status: 'Draft',
+        createdBy: data.createdBy,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    });
+  }
+
+  return updateDoc(quoteRef, { status, updatedAt: serverTimestamp() });
+}
+
 export async function createSalesOrder(db: Firestore, institutionId: string, payload: any, userId: string) {
   const orderNumber = await getNextSequence(db, institutionId, 'sales_order');
   const ref = collection(db, 'institutions', institutionId, 'sales_orders');
@@ -99,6 +162,11 @@ export async function createSalesOrder(db: Firestore, institutionId: string, pay
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   });
+}
+
+export async function confirmSalesOrder(db: Firestore, institutionId: string, orderId: string) {
+  const orderRef = doc(db, 'institutions', institutionId, 'sales_orders', orderId);
+  return updateDoc(orderRef, { status: 'Confirmed', updatedAt: serverTimestamp() });
 }
 
 export async function createDeliveryNote(db: Firestore, institutionId: string, payload: {

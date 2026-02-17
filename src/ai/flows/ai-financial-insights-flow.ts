@@ -1,42 +1,34 @@
 'use server';
 /**
- * @fileOverview An AI-powered financial insights tool that analyzes sales, inventory, and accounting data
- * to provide business trend summaries, re-order point predictions, and answers to specific operational questions.
- *
- * - aiFinancialInsights - A function that orchestrates the AI financial insights generation process.
- * - AiFinancialInsightsInput - The input type for the aiFinancialInsights function.
- * - AiFinancialInsightsOutput - The return type for the aiFinancialInsights function.
+ * @fileOverview An advanced AI-powered business strategist.
+ * Analyzes live ERP data (Sales, Inventory, Accounting, Budgets, Aging) 
+ * to provide trend summaries, re-order predictions, and specific tactical actions.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 
 const AiFinancialInsightsInputSchema = z.object({
-  salesData: z
-    .string()
-    .describe('Serialized sales data, e.g., JSON array or summary of sales records.'),
-  inventoryData: z
-    .string()
-    .describe(
-      'Serialized inventory data, e.g., JSON array or summary of inventory items with quantities and re-order levels.'
-    ),
-  accountingData: z
-    .string()
-    .describe(
-      'Serialized accounting data, e.g., JSON representation of ledger entries or financial statements.'
-    ),
+  salesData: z.string().describe('Serialized recent sales/transaction data.'),
+  inventoryData: z.string().describe('Serialized stock levels and reorder points.'),
+  accountingData: z.string().describe('Serialized ledger balances.'),
+  budgetData: z.string().describe('Serialized budget utilization metrics.'),
+  agingData: z.string().describe('Serialized accounts receivable and payable aging reports.'),
   userQuery: z.string().describe('The specific business question the user wants answered.'),
 });
 export type AiFinancialInsightsInput = z.infer<typeof AiFinancialInsightsInputSchema>;
 
 const AiFinancialInsightsOutputSchema = z.object({
-  summaryOfTrends: z
-    .string()
-    .describe('A comprehensive summary of key business trends identified from the provided data.'),
-  reorderRecommendations: z
-    .string()
-    .describe('Actionable recommendations for optimal re-order points for inventory items.'),
-  answerToQuery: z.string().describe('The precise answer to the specific operational question asked by the user.'),
+  summaryOfTrends: z.string().describe('Executive summary of business performance.'),
+  reorderRecommendations: z.string().describe('Specific inventory procurement advice.'),
+  answerToQuery: z.string().describe('Direct response to the user query.'),
+  strategicActions: z.array(z.object({
+    title: z.string().describe('Short name of the action.'),
+    description: z.string().describe('Why this action is needed.'),
+    module: z.string().describe('The ERP module this relates to (e.g. Accounting, Inventory).'),
+    priority: z.enum(['High', 'Medium', 'Low']),
+    link: z.string().describe('The internal path to execute this action (e.g. /accounting/ap).')
+  })).describe('A list of specific, clickable tactical actions the user should take in the ERP.')
 });
 export type AiFinancialInsightsOutput = z.infer<typeof AiFinancialInsightsOutputSchema>;
 
@@ -48,25 +40,30 @@ const prompt = ai.definePrompt({
   name: 'aiFinancialInsightsPrompt',
   input: { schema: AiFinancialInsightsInputSchema },
   output: { schema: AiFinancialInsightsOutputSchema },
-  prompt: `You are an expert financial analyst and business strategist. Your goal is to provide insightful summaries and actionable recommendations based on the provided business data.
+  prompt: `You are the "Senior Strategist" for iClick ERP, a high-performance business management system.
+Your goal is to provide deep financial insight and tactical ERP actions based on real-time data.
 
-Here is the data for analysis:
+### DATA CONTEXT:
+---
+SALES: {{{salesData}}}
+INVENTORY: {{{inventoryData}}}
+LEDGER: {{{accountingData}}}
+BUDGETS: {{{budgetData}}}
+AGING DEBT: {{{agingData}}}
+---
 
-Sales Data:
-{{{salesData}}}
+### MISSION:
+1. **Trend Synthesis**: Identify patterns in revenue vs. expense. Are we overspending? Is cash flow healthy?
+2. **Inventory Optimization**: Find items that need urgent re-ordering OR items that are "dead stock" tying up capital.
+3. **Budget Control**: Highlight specific budget nodes that are in danger of being breached.
+4. **Tactical Action Plan**: Provide 3-5 specific "One-Click Actions" the user can take in this ERP to improve the situation. 
+   - Map actions to modules like: "Accounting", "Inventory", "POS", "Admin".
+   - Assign priorities based on financial risk.
 
-Inventory Data:
-{{{inventoryData}}}
+### USER QUERY:
+"{{{userQuery}}}"
 
-Accounting Data:
-{{{accountingData}}}
-
-Based on this data, perform the following tasks:
-1.  **Summarize Business Trends**: Identify and summarize key business trends, including sales performance, cost fluctuations, and profitability.
-2.  **Predict Optimal Re-order Points**: Analyze the inventory data to suggest optimal re-order points for items that might be running low or have high turnover.
-3.  **Answer User Query**: Address the following specific operational question: "{{{userQuery}}}"
-
-Provide your output in a structured JSON format as described by the output schema.`,
+Provide your output in the structured JSON format specified.`,
 });
 
 const aiFinancialInsightsFlow = ai.defineFlow(

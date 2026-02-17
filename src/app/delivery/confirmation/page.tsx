@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -7,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CheckCircle2, Search, Truck, MapPin, Loader2, ArrowUpRight, DollarSign } from "lucide-react";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy, where } from "firebase/firestore";
@@ -93,7 +93,7 @@ export default function DeliveryConfirmationPage() {
                     Once marked as delivered, the assigned driver and vehicle are instantly returned to the <strong>Available</strong> resource pool.
                   </p>
                 </CardContent>
-              </Card>
+              </div>
             </div>
 
             <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">

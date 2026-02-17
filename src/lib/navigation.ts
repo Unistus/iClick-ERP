@@ -1,4 +1,3 @@
-
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -152,7 +151,6 @@ export const navConfig: NavItem[] = [
       { title: "GRN Hub", icon: PackageCheck, url: "/purchases/grn", id: "grn" },
       { title: "Vendor Invoices", icon: FileText, url: "/purchases/invoices", id: "invoices" },
       { title: "Purchase Returns", icon: ArrowLeftRight, url: "/purchases/returns", id: "returns" },
-      { title: "Supplier Aging", icon: Hourglass, url: "/purchases/aging", id: "aging" },
       { title: "Procurement Setup", icon: Settings, url: "/purchases/setup", id: "setup" },
       { title: "Purchases Reports", icon: ClipboardList, url: "/purchases/reports", id: "reports" },
     ]

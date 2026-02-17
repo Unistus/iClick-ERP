@@ -28,14 +28,13 @@ import {
   Sparkles,
   Calendar,
   Layers,
-  ArrowRight,
   Filter,
-  RefreshCw,
   LayoutGrid,
   Info,
   Clock,
   Barcode,
-  Boxes
+  Boxes,
+  Timer
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -423,7 +422,7 @@ export default function ProductsPage() {
                 <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg flex items-start gap-3">
                   <Info className="size-4 text-primary shrink-0 mt-0.5" />
                   <p className="text-[10px] text-muted-foreground leading-relaxed italic">
-                    <strong>Automation King:</strong> Leaving the ID or SKU fields empty will trigger the sequence generator based on your <strong>Admin > Doc Numbering</strong> settings.
+                    <strong>Automation King:</strong> Leaving the ID or SKU fields empty will trigger the sequence generator based on your <strong>Admin &gt; Doc Numbering</strong> settings.
                   </p>
                 </div>
               </div>

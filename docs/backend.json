@@ -34,70 +34,43 @@
         }
       }
     },
-    "ChartOfAccount": {
-      "title": "ChartOfAccount",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "code": { "type": "string" },
-        "name": { "type": "string" },
-        "type": { "type": "string", "enum": ["Asset", "Liability", "Equity", "Income", "Expense"] },
-        "subtype": { "type": "string" },
-        "balance": { "type": "number" },
-        "isActive": { "type": "boolean" },
-        "isTrackedForBudget": { "type": "boolean" },
-        "monthlyLimit": { "type": "number" }
-      }
-    },
-    "FiscalPeriod": {
-      "title": "FiscalPeriod",
+    "Customer": {
+      "title": "Customer",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "startDate": { "type": "string", "format": "date" },
-        "endDate": { "type": "string", "format": "date" },
-        "status": { "type": "string", "enum": ["Open", "Closed"] }
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "status": { "type": "string", "enum": ["Lead", "Active", "Blocked"] },
+        "tier": { "type": "string", "enum": ["Silver", "Gold", "Platinum"] },
+        "loyaltyPoints": { "type": "number" },
+        "walletBalance": { "type": "number" },
+        "creditLimit": { "type": "number" },
+        "birthday": { "type": "string", "format": "date" }
       }
     },
-    "BudgetAllocation": {
-      "title": "BudgetAllocation",
-      "type": "object",
-      "description": "A period-specific expenditure target for a ledger node.",
-      "properties": {
-        "accountId": { "type": "string" },
-        "limit": { "type": "number" },
-        "updatedAt": { "type": "string", "format": "date-time" }
-      }
-    },
-    "Product": {
-      "title": "Product",
+    "LoyaltyLog": {
+      "title": "LoyaltyLog",
       "type": "object",
       "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "sku": { "type": "string" },
-        "type": { "type": "string", "enum": ["Stock", "Service", "Bundle"] },
-        "categoryId": { "type": "string" },
-        "uomId": { "type": "string" },
-        "basePrice": { "type": "number" },
-        "costPrice": { "type": "number" },
-        "reorderLevel": { "type": "number" },
-        "shelfLifeDays": { "type": "number" },
-        "trackExpiry": { "type": "boolean" },
-        "trackSerials": { "type": "boolean" },
-        "totalStock": { "type": "number" }
+        "customerId": { "type": "string" },
+        "points": { "type": "number" },
+        "type": { "type": "string", "enum": ["Earn", "Redeem", "Adjust"] },
+        "reference": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
       }
     },
-    "Warehouse": {
-      "title": "Warehouse",
+    "MarketingCampaign": {
+      "title": "MarketingCampaign",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "name": { "type": "string" },
-        "code": { "type": "string" },
-        "location": { "type": "string" },
-        "isDefault": { "type": "boolean" }
+        "title": { "type": "string" },
+        "channel": { "type": "string", "enum": ["SMS", "Email", "System"] },
+        "status": { "type": "string", "enum": ["Draft", "Active", "Completed"] },
+        "budget": { "type": "number" },
+        "reach": { "type": "number" }
       }
     }
   },
@@ -107,51 +80,19 @@
   "firestore": {
     "structure": [
       {
-        "path": "/institutions/{institutionId}/coa/{accountId}",
+        "path": "/institutions/{institutionId}/customers/{customerId}",
         "definition": {
-          "entityName": "ChartOfAccount",
-          "schema": { "$ref": "#/backend/entities/ChartOfAccount" },
-          "description": "Chart of Accounts ledger nodes."
+          "entityName": "Customer",
+          "schema": { "$ref": "#/backend/entities/Customer" },
+          "description": "Unified customer profiles and loyalty metadata."
         }
       },
       {
-        "path": "/institutions/{institutionId}/fiscal_periods/{periodId}",
+        "path": "/institutions/{institutionId}/campaigns/{id}",
         "definition": {
-          "entityName": "FiscalPeriod",
-          "schema": { "$ref": "#/backend/entities/FiscalPeriod" },
-          "description": "Auditing cycles."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/fiscal_periods/{periodId}/allocations/{accountId}",
-        "definition": {
-          "entityName": "BudgetAllocation",
-          "schema": { "$ref": "#/backend/entities/BudgetAllocation" },
-          "description": "Period-specific spend targets."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/products/{productId}",
-        "definition": {
-          "entityName": "Product",
-          "schema": { "$ref": "#/backend/entities/Product" },
-          "description": "Stock items and services."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/journal_entries/{id}",
-        "definition": {
-          "entityName": "JournalEntry",
-          "schema": {
-            "type": "object",
-            "properties": {
-              "date": { "type": "string", "format": "date-time" },
-              "description": { "type": "string" },
-              "reference": { "type": "string" },
-              "items": { "type": "array" }
-            }
-          },
-          "description": "Double-entry accounting records."
+          "entityName": "MarketingCampaign",
+          "schema": { "$ref": "#/backend/entities/MarketingCampaign" },
+          "description": "Marketing outreach tracking."
         }
       }
     ]

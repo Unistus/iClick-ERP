@@ -1,3 +1,4 @@
+
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -69,7 +70,11 @@ import {
   Target,
   LineChart,
   FilePlus2,
-  ListTree
+  ListTree,
+  Star,
+  Gift,
+  Mail,
+  UserCircle
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -109,6 +114,21 @@ export const navConfig: NavItem[] = [
     url: "/pos", 
     pattern: /^\/pos/,
     id: "pos"
+  },
+  {
+    title: "Client Care", 
+    icon: HeartHandshake, 
+    url: "/crm", 
+    pattern: /^\/crm/,
+    id: "crm",
+    submenus: [
+      { title: "Client Directory", icon: Users, url: "/crm/customers", id: "customers" },
+      { title: "Loyalty Hub", icon: Star, url: "/crm/loyalty", id: "loyalty" },
+      { title: "Stored Value", icon: Wallet, url: "/crm/wallet", id: "wallet" },
+      { title: "Marketing Cloud", icon: Mail, url: "/crm/marketing", id: "marketing" },
+      { title: "Promo Manager", icon: Percent, url: "/crm/promos", id: "promos" },
+      { title: "Gift Cards", icon: Gift, url: "/crm/gift-cards", id: "gift_cards" },
+    ]
   },
   {
     title: "Sales Hub",
@@ -231,13 +251,6 @@ export const navConfig: NavItem[] = [
       { title: "Leave Requests", icon: CalendarDays, url: "/hr/leave", id: "leave" },
       { title: "Recruitment", icon: UserPlus, url: "/hr/recruitment", id: "recruitment" },
     ]
-  },
-  { 
-    title: "Client Care", 
-    icon: HeartHandshake, 
-    url: "/crm", 
-    pattern: /^\/crm/,
-    id: "crm"
   },
   { 
     title: "Administration", 

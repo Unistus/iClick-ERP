@@ -22,28 +22,27 @@ service cloud.firestore {
     }
 
     // GLOBAL SUPERUSER OVERRIDE
-    // This must evaluate first to ensure the primary admin is never blocked.
     match /{allPaths=**} {
       allow read, write: if isGlobalAdmin();
     }
 
     match /institutions {
-      // Allow signed-in users to list institutions for selection
       allow list: if isSignedIn();
-      // Any signed-in user can register an institution (onboarding)
       allow create: if isSignedIn();
     }
 
     match /institutions/{institutionId} {
-      // Any signed-in user can read an institution profile
       allow get: if isSignedIn();
-      // Only members/admins can update profile
       allow update: if isInstitutionMember(institutionId);
       
-      // EXPLICIT SUB-COLLECTION RULES
-      // Note: While the global override exists, explicit matching prevents 
-      // intermittent failures during specific list operations.
+      // CRM COLLECTIONS
+      match /customers { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /campaigns { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /gift_cards { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /wallets { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /promo_codes { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
 
+      // ACCOUNTING & BUDGETING
       match /fiscal_periods {
         allow list: if isInstitutionMember(institutionId);
         match /{periodId} {

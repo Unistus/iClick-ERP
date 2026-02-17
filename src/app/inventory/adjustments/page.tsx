@@ -86,7 +86,7 @@ export default function StockAdjustmentsPage() {
       type,
       quantity: qty,
       reference: `ADJ: ${reasonName}`,
-      unitCost: 0 // Will pull from product service in service layer
+      unitCost: 0 
     }).then(() => {
       logSystemEvent(db, selectedInstId, user, 'INVENTORY', 'Stock Adjustment', `Adjustment of ${qty} units for reason: ${reasonName}.`);
       toast({ title: "Stock Corrected" });
@@ -183,7 +183,6 @@ export default function StockAdjustmentsPage() {
           </Card>
         )}
 
-        {/* Create Adjustment Dialog */}
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogContent className="max-w-md">
             <form onSubmit={handleAdjustment}>

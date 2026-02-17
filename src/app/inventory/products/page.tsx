@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -22,7 +21,9 @@ import {
   History,
   Loader2,
   Trash2,
-  Edit2
+  Edit2,
+  Hash,
+  Sparkles
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -34,6 +35,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
+import { getNextSequence } from "@/lib/sequence-service";
 
 export default function ProductsPage() {
   const db = useFirestore();
@@ -65,16 +67,34 @@ export default function ProductsPage() {
   }, [db, selectedInstId]);
   const { data: uoms } = useCollection(uomsRef);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || isProcessing) return;
     setIsProcessing(true);
 
     const formData = new FormData(e.currentTarget);
+    const type = formData.get('type') as string;
+    let sku = formData.get('sku') as string;
+    let productId = formData.get('productId') as string;
+
+    // AUTOMATION KING: Generate sequences if fields are left empty
+    try {
+      if (!sku && !editingProduct) {
+        sku = await getNextSequence(db, selectedInstId, 'product_sku');
+      }
+      if (!productId && !editingProduct) {
+        const seqId = type === 'Stock' ? 'product_id' : 'service_id';
+        productId = await getNextSequence(db, selectedInstId, seqId);
+      }
+    } catch (err) {
+      console.warn("Sequence generation failed, using fallback.");
+    }
+
     const data = {
       name: formData.get('name') as string,
-      sku: formData.get('sku') as string,
-      type: formData.get('type') as string,
+      sku: sku || `SKU-${Date.now()}`,
+      productId: productId || `ID-${Date.now()}`,
+      type: type,
       categoryId: formData.get('categoryId') as string,
       uomId: formData.get('uomId') as string,
       basePrice: parseFloat(formData.get('basePrice') as string),
@@ -88,10 +108,10 @@ export default function ProductsPage() {
 
     if (editingProduct) {
       updateDocumentNonBlocking(doc(colRef, editingProduct.id), data);
-      toast({ title: "Product Updated" });
+      toast({ title: "Catalog Updated" });
     } else {
       addDocumentNonBlocking(colRef, { ...data, totalStock: 0, createdAt: serverTimestamp() });
-      toast({ title: "Product Created" });
+      toast({ title: "Item Registered", description: `Assigned SKU: ${data.sku}` });
     }
 
     setIsCreateOpen(false);
@@ -125,7 +145,7 @@ export default function ProductsPage() {
               </SelectContent>
             </Select>
 
-            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase" disabled={!selectedInstId} onClick={() => setIsCreateOpen(true)}>
+            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase shadow-lg shadow-primary/20" disabled={!selectedInstId} onClick={() => setIsCreateOpen(true)}>
               <Plus className="size-4" /> New Item
             </Button>
           </div>
@@ -141,22 +161,20 @@ export default function ProductsPage() {
             <CardHeader className="py-3 px-6 border-b border-border/50 flex flex-row items-center justify-between">
               <div className="relative max-w-sm w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-                <Input placeholder="Search by name or SKU..." className="pl-9 h-8 text-[10px] bg-secondary/20 border-none" />
+                <Input placeholder="Search catalog..." className="pl-9 h-8 text-[10px] bg-secondary/20 border-none" />
               </div>
               <div className="flex gap-4">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase">
-                  <Box className="size-3 text-primary" /> Stock
-                </div>
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase">
-                  <Tag className="size-3 text-accent" /> Service
-                </div>
+                <Badge variant="outline" className="text-[9px] h-5 bg-primary/5 border-primary/20 text-primary uppercase font-bold">
+                  {products?.length || 0} Registered Items
+                </Badge>
               </div>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader className="bg-secondary/20">
                   <TableRow>
-                    <TableHead className="h-10 text-[10px] uppercase font-bold pl-6">Item / SKU</TableHead>
+                    <TableHead className="h-10 text-[10px] uppercase font-bold pl-6">Identifier / SKU</TableHead>
+                    <TableHead className="h-10 text-[10px] uppercase font-bold">Product Name</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-bold text-center">Category</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-bold text-right">Selling</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-bold text-right">On Hand</TableHead>
@@ -165,21 +183,20 @@ export default function ProductsPage() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs uppercase font-bold animate-pulse opacity-50">Polling inventory...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="text-center py-12 text-xs uppercase font-bold animate-pulse">Syncing catalog...</TableCell></TableRow>
                   ) : !products || products.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs text-muted-foreground font-bold">Catalog is empty.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="text-center py-12 text-xs text-muted-foreground font-bold">Catalog is empty.</TableCell></TableRow>
                   ) : products.map((p) => {
-                    const isLow = p.totalStock <= p.reorderLevel && p.type === 'Stock';
                     const categoryName = categories?.find(c => c.id === p.categoryId)?.name || 'Uncategorized';
-                    const uomCode = uoms?.find(u => u.id === p.uomId)?.code || 'PCS';
                     return (
-                      <TableRow key={p.id} className="h-14 hover:bg-secondary/5 group">
+                      <TableRow key={p.id} className="h-14 hover:bg-secondary/5 group transition-colors">
                         <TableCell className="pl-6">
                           <div className="flex flex-col">
-                            <span className="text-xs font-bold">{p.name}</span>
-                            <span className="text-[9px] font-mono text-primary uppercase">{p.sku}</span>
+                            <span className="text-[9px] font-mono text-primary font-bold uppercase tracking-tighter">ID: {p.productId || 'N/A'}</span>
+                            <span className="text-[10px] font-mono font-bold">{p.sku}</span>
                           </div>
                         </TableCell>
+                        <TableCell className="text-xs font-bold uppercase">{p.name}</TableCell>
                         <TableCell className="text-center">
                           <Badge variant="outline" className="text-[8px] h-4 uppercase font-bold border-primary/20 text-primary">
                             {categoryName}
@@ -189,39 +206,27 @@ export default function ProductsPage() {
                           {p.basePrice?.toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex flex-col items-end">
-                            <span className={`text-xs font-bold ${isLow ? 'text-destructive' : ''}`}>{p.totalStock?.toLocaleString() || 0}</span>
-                            <span className="text-[8px] text-muted-foreground uppercase">{uomCode}</span>
-                          </div>
+                          <span className={`text-xs font-bold ${p.totalStock <= p.reorderLevel ? 'text-destructive' : ''}`}>{p.totalStock?.toLocaleString() || 0}</span>
                         </TableCell>
                         <TableCell className="text-right pr-6">
-                          <div className="flex items-center justify-end gap-2">
-                            {isLow && (
-                              <Badge variant="destructive" className="text-[8px] h-4 animate-pulse">RE-ORDER</Badge>
-                            )}
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100">
-                                  <MoreHorizontal className="size-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuItem className="text-xs gap-2" onClick={() => {
-                                  setEditingProduct(p);
-                                  setIsCreateOpen(true);
-                                }}>
-                                  <Edit2 className="size-3.5" /> Edit Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="text-xs gap-2">
-                                  <History className="size-3.5" /> Stock Movement
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-xs gap-2 text-destructive">
-                                  <Trash2 className="size-3.5" /> Archive Item
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100">
+                                <MoreHorizontal className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem className="text-xs gap-2" onClick={() => {
+                                setEditingProduct(p);
+                                setIsCreateOpen(true);
+                              }}>
+                                <Edit2 className="size-3.5" /> Edit Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-xs gap-2"><History className="size-3.5" /> History</DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-xs gap-2 text-destructive"><Trash2 className="size-3.5" /> Delete</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     );
@@ -238,20 +243,49 @@ export default function ProductsPage() {
             <form onSubmit={handleSubmit}>
               <DialogHeader>
                 <DialogTitle>{editingProduct ? 'Update' : 'Register'} Catalog Item</DialogTitle>
-                <CardDescription>Link this item to institutional categories and measure units.</CardDescription>
+                <CardDescription>Leave ID/SKU empty to use institutional sequences.</CardDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4 text-xs">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Product Name</Label>
-                    <Input name="name" defaultValue={editingProduct?.name} required />
+                    <Input name="name" defaultValue={editingProduct?.name} required placeholder="e.g. Panadol 500mg" />
                   </div>
                   <div className="space-y-2">
-                    <Label>SKU / Barcode</Label>
-                    <Input name="sku" defaultValue={editingProduct?.sku} required className="font-mono" />
+                    <Label className="flex items-center gap-1.5">
+                      <Hash className="size-3 text-primary" /> Internal ID
+                    </Label>
+                    <Input name="productId" defaultValue={editingProduct?.productId} placeholder="Auto-generated" className="font-mono bg-secondary/10" />
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1.5">
+                      <Sparkles className="size-3 text-accent" /> SKU / Barcode
+                    </Label>
+                    <Input name="sku" defaultValue={editingProduct?.sku} placeholder="Auto-generated" className="font-mono bg-secondary/10" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Item Type</Label>
+                    <Select name="type" defaultValue={editingProduct?.type || "Stock"}>
+                      <SelectTrigger className="text-xs h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Stock" className="text-xs">Stock Item</SelectItem>
+                        <SelectItem value="Service" className="text-xs">Service</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Measure Unit</Label>
+                    <Select name="uomId" defaultValue={editingProduct?.uomId}>
+                      <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Unit" /></SelectTrigger>
+                      <SelectContent>
+                        {uoms?.map(uom => <SelectItem key={uom.id} value={uom.id} className="text-xs">{uom.code}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Institutional Category</Label>
                     <Select name="categoryId" defaultValue={editingProduct?.categoryId}>
@@ -261,46 +295,22 @@ export default function ProductsPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Standard UoM</Label>
-                    <Select name="uomId" defaultValue={editingProduct?.uomId}>
-                      <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="e.g. PCS" /></SelectTrigger>
-                      <SelectContent>
-                        {uoms?.map(uom => <SelectItem key={uom.id} value={uom.id} className="text-xs">{uom.name} ({uom.code})</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Item Type</Label>
-                    <Select name="type" defaultValue={editingProduct?.type || "Stock"}>
-                      <SelectTrigger className="text-xs h-9"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Stock" className="text-xs">Stock Item</SelectItem>
-                        <SelectItem value="Service" className="text-xs">Service</SelectItem>
-                        <SelectItem value="Bundle" className="text-xs">Bundle / Combo</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-2">
+                      <Label>Selling Price</Label>
+                      <Input name="basePrice" type="number" step="0.01" defaultValue={editingProduct?.basePrice} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Unit Cost</Label>
+                      <Input name="costPrice" type="number" step="0.01" defaultValue={editingProduct?.costPrice} required />
+                    </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Unit Cost</Label>
-                    <Input name="costPrice" type="number" step="0.01" defaultValue={editingProduct?.costPrice} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Base Selling Price</Label>
-                    <Input name="basePrice" type="number" step="0.01" defaultValue={editingProduct?.basePrice} required />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4 pt-2 border-t mt-2">
-                  <div className="space-y-2">
-                    <Label>Re-order Point</Label>
-                    <Input name="reorderLevel" type="number" defaultValue={editingProduct?.reorderLevel} placeholder="Min Qty" />
-                  </div>
-                  <div className="flex items-center justify-between p-3 border rounded bg-secondary/10 mt-4">
-                    <Label className="text-[10px] uppercase font-bold">Track Expiry?</Label>
-                    <input type="checkbox" name="trackExpiry" defaultChecked={editingProduct?.trackExpiry} className="size-4" />
-                  </div>
+                <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg flex items-start gap-3">
+                  <Sparkles className="size-4 text-primary shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    <strong>Automation Hub:</strong> Leaving the ID or SKU fields blank will trigger the sequence generator. The system will use the prefix and numbering defined in your <strong>Admin > Document Numbering</strong> settings.
+                  </p>
                 </div>
               </div>
               <DialogFooter>

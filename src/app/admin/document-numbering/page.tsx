@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -15,11 +14,14 @@ import { toast } from "@/hooks/use-toast"
 
 /**
  * Registry of document types requiring sequences.
- * This can be expanded as new modules are added.
+ * Refactored to include Catalog and Service numbering.
  */
 const SEQUENCE_DEFINITIONS = [
   { id: "sales_invoice", title: "Sales Invoice", prefix: "INV-", nextNumber: 1001, padding: 4 },
   { id: "purchase_order", title: "Purchase Order", prefix: "PO-", nextNumber: 500, padding: 4 },
+  { id: "product_sku", title: "Product SKU", prefix: "SKU-", nextNumber: 1000, padding: 5 },
+  { id: "product_id", title: "Physical Product ID", prefix: "PROD-", nextNumber: 100, padding: 4 },
+  { id: "service_id", title: "Service Asset ID", prefix: "SERV-", nextNumber: 100, padding: 4 },
   { id: "grn", title: "Goods Received Note", prefix: "GRN-", nextNumber: 100, padding: 4 },
   { id: "stock_transfer", title: "Stock Transfer", prefix: "TR-", nextNumber: 100, padding: 4 },
   { id: "stock_adjustment", title: "Stock Adjustment", prefix: "ADJ-", nextNumber: 100, padding: 4 },
@@ -62,7 +64,6 @@ export default function DocumentNumbering() {
     
     try {
       const promises = SEQUENCE_DEFINITIONS.map(def => {
-        // Check if sequence already exists to avoid overwriting
         const existing = sequences?.find(s => s.id === def.id);
         if (existing) return Promise.resolve();
 
@@ -111,7 +112,10 @@ export default function DocumentNumbering() {
             <div className="p-1.5 rounded bg-primary/20 text-primary">
               <Hash className="size-5" />
             </div>
-            <h1 className="text-2xl font-headline font-bold">Document Numbering</h1>
+            <div>
+              <h1 className="text-2xl font-headline font-bold">Document Numbering</h1>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">Institutional Identifier Standards</p>
+            </div>
           </div>
           
           <div className="flex gap-2 w-full md:w-auto">
@@ -147,71 +151,69 @@ export default function DocumentNumbering() {
               <div className="col-span-full py-12 text-center text-xs opacity-50 animate-pulse uppercase font-bold tracking-widest">
                 Retrieving Sequence Registry...
               </div>
-            ) : sequences?.length === 0 ? (
-              <div className="col-span-full py-12 text-center text-muted-foreground bg-secondary/5 rounded-xl border border-dashed">
-                <p className="text-xs">No sequences found. Click "Sync Definitions" to populate defaults.</p>
-              </div>
-            ) : sequences?.map((seq) => (
-              <Card key={seq.id} className="bg-card border-none ring-1 ring-border shadow-sm hover:ring-primary/30 transition-all flex flex-col">
-                <CardHeader className="py-2.5 px-4 flex flex-row items-center justify-between border-b border-border/50 bg-secondary/5">
-                  <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-primary truncate max-w-[150px]">
-                    {seq.title}
-                  </CardTitle>
-                  <Settings2 className="size-3 text-muted-foreground/50" />
-                </CardHeader>
-                <CardContent className="p-4 flex-1 flex flex-col gap-4">
-                  <div className="p-2.5 bg-background rounded-lg border border-primary/10 ring-4 ring-primary/5">
-                    <p className="text-[9px] text-muted-foreground uppercase font-bold text-center mb-1">Generated Preview</p>
-                    <p className="text-lg font-mono font-bold text-foreground text-center tracking-wider">
-                      {formatPreview(seq.prefix, seq.nextNumber, seq.padding)}
-                    </p>
-                  </div>
+            ) : (
+              sequences?.map((seq) => (
+                <Card key={seq.id} className="bg-card border-none ring-1 ring-border shadow-sm hover:ring-primary/30 transition-all flex flex-col">
+                  <CardHeader className="py-2.5 px-4 flex flex-row items-center justify-between border-b border-border/50 bg-secondary/5">
+                    <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-primary truncate max-w-[150px]">
+                      {seq.title}
+                    </CardTitle>
+                    <Settings2 className="size-3 text-muted-foreground/50" />
+                  </CardHeader>
+                  <CardContent className="p-4 flex-1 flex flex-col gap-4">
+                    <div className="p-2.5 bg-background rounded-lg border border-primary/10 ring-4 ring-primary/5">
+                      <p className="text-[9px] text-muted-foreground uppercase font-bold text-center mb-1">Generated Preview</p>
+                      <p className="text-lg font-mono font-bold text-foreground text-center tracking-wider">
+                        {formatPreview(seq.prefix, seq.nextNumber, seq.padding)}
+                      </p>
+                    </div>
 
-                  <form 
-                    className="grid gap-3"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      handleUpdate(seq.id, new FormData(e.currentTarget));
-                    }}
-                  >
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-[9px] uppercase font-bold opacity-60">Prefix</Label>
-                        <Input 
-                          name="prefix" 
-                          defaultValue={seq.prefix} 
-                          className="h-8 text-xs font-mono bg-secondary/20 border-none ring-1 ring-border"
-                        />
+                    <form 
+                      className="grid gap-3"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleUpdate(seq.id, new FormData(e.currentTarget));
+                      }}
+                    >
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-[9px] uppercase font-bold opacity-60">Prefix</Label>
+                          <Input 
+                            name="prefix" 
+                            defaultValue={seq.prefix} 
+                            className="h-8 text-xs font-mono bg-secondary/20 border-none ring-1 ring-border"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-[9px] uppercase font-bold opacity-60">Padding</Label>
+                          <Input 
+                            name="padding" 
+                            type="number"
+                            min="1"
+                            max="10"
+                            defaultValue={seq.padding} 
+                            className="h-8 text-xs font-mono bg-secondary/20 border-none ring-1 ring-border"
+                          />
+                        </div>
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-[9px] uppercase font-bold opacity-60">Padding</Label>
+                        <Label className="text-[9px] uppercase font-bold opacity-60">Next Incremental Number</Label>
                         <Input 
-                          name="padding" 
+                          name="next" 
                           type="number"
-                          min="1"
-                          max="10"
-                          defaultValue={seq.padding} 
+                          defaultValue={seq.nextNumber} 
                           className="h-8 text-xs font-mono bg-secondary/20 border-none ring-1 ring-border"
                         />
                       </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-[9px] uppercase font-bold opacity-60">Next Incremental Number</Label>
-                      <Input 
-                        name="next" 
-                        type="number"
-                        defaultValue={seq.nextNumber} 
-                        className="h-8 text-xs font-mono bg-secondary/20 border-none ring-1 ring-border"
-                      />
-                    </div>
-                    
-                    <Button type="submit" size="sm" className="w-full h-8 text-[10px] font-bold uppercase gap-2 mt-1">
-                      <Save className="size-3" /> Save Sequence
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-            ))}
+                      
+                      <Button type="submit" size="sm" className="w-full h-8 text-[10px] font-bold uppercase gap-2 mt-1">
+                        <Save className="size-3" /> Save Sequence
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
         )}
       </div>

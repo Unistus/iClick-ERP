@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -11,13 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, query, orderBy, limit } from "firebase/firestore";
+import { collection, query, orderBy, doc, updateDoc } from "firebase/firestore";
 import { format } from "date-fns";
 import { Quote, Plus, Search, Filter, History, MoreVertical, Loader2, Send, CheckCircle2, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { createQuotation, updateQuotationStatus } from "@/lib/sales/sales.service";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
+import { cn } from "@/lib/utils";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 

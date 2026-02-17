@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -17,7 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { createSalesOrder, confirmSalesOrder } from "@/lib/sales/sales.service";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function SalesOrdersPage() {
   const db = useFirestore();

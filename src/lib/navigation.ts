@@ -51,7 +51,8 @@ import {
   AlertTriangle,
   Boxes,
   Tags,
-  Barcode
+  Barcode,
+  ClipboardList
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -112,6 +113,7 @@ export const navConfig: NavItem[] = [
       { title: "Reorder Levels", icon: AlertTriangle, url: "/inventory/reorder", id: "reorder" },
       { title: "Damage & Loss", icon: Skull, url: "/inventory/damages", id: "damages" },
       { title: "Stock Valuation", icon: Scale, url: "/inventory/valuation", id: "valuation" },
+      { title: "Inventory Reports", icon: ClipboardList, url: "/inventory/reports", id: "reports" },
       { title: "Inventory Setup", icon: Settings, url: "/inventory/setup", id: "setup" },
     ]
   },

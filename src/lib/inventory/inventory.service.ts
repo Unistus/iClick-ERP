@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Firestore, collection, doc, serverTimestamp, increment, runTransaction, getDoc, addDoc } from 'firebase/firestore';
@@ -8,7 +7,7 @@ export interface MovementPayload {
   productId: string;
   warehouseId: string;
   type: 'In' | 'Out' | 'Transfer' | 'Adjustment' | 'Damage';
-  quantity: number;
+  quantity: number; // For Adjustment, this can be signed (+ for increase, - for decrease)
   reference: string;
   unitCost: number;
   batchId?: string;
@@ -38,22 +37,28 @@ export async function recordStockMovement(db: Firestore, institutionId: string, 
     const product = productSnap.data();
     const setup = setupSnap.data();
 
-    // 1. Update Product Totals
-    // Transfers are handled as separate Out/In pairs by the transferStock service
-    const qtyChange = (payload.type === 'In') ? payload.quantity : -payload.quantity;
+    // 1. Calculate Quantity Change
+    // 'In' is always +, 'Out'/'Damage' is always -, 'Adjustment' uses its own sign
+    let qtyChange = 0;
+    if (payload.type === 'In') qtyChange = payload.quantity;
+    else if (payload.type === 'Out' || payload.type === 'Damage') qtyChange = -payload.quantity;
+    else if (payload.type === 'Adjustment') qtyChange = payload.quantity;
+
+    // 2. Update Product Totals
     transaction.update(productRef, {
       totalStock: increment(qtyChange),
       updatedAt: serverTimestamp()
     });
 
-    // 2. Log Movement
+    // 3. Log Movement
     const moveDocRef = doc(movementsRef);
     transaction.set(moveDocRef, {
       ...payload,
+      quantity: qtyChange, // Store the signed change for audit
       timestamp: serverTimestamp()
     });
 
-    // 3. Update Batch if applicable
+    // 4. Update Batch if applicable
     if (payload.batchId) {
       const batchRef = doc(db, 'institutions', institutionId, 'batches', payload.batchId);
       transaction.update(batchRef, {
@@ -62,21 +67,41 @@ export async function recordStockMovement(db: Firestore, institutionId: string, 
       });
     }
 
-    // 4. Automated Accounting (if Adjustment/Damage)
-    if ((payload.type === 'Adjustment' || payload.type === 'Damage') && setup?.inventoryAssetAccountId && setup?.inventoryShrinkageAccountId) {
-      const totalAmount = payload.quantity * (payload.unitCost || product.costPrice || 0);
-      
-      // DR: Inventory Shrinkage (Expense)
-      // CR: Inventory Asset (Asset)
-      await postJournalEntry(db, institutionId, {
-        date: new Date(),
-        description: `Stock ${payload.type}: ${product.name} (${payload.reference})`,
-        reference: `INV-ADJ-${Date.now()}`,
-        items: [
-          { accountId: setup.inventoryShrinkageAccountId, amount: totalAmount, type: 'Debit' },
-          { accountId: setup.inventoryAssetAccountId, amount: totalAmount, type: 'Credit' },
-        ]
-      });
+    // 5. Automated Accounting
+    if (setup?.inventoryAssetAccountId) {
+      const absQty = Math.abs(qtyChange);
+      const totalAmount = absQty * (payload.unitCost || product.costPrice || 0);
+
+      if (totalAmount > 0) {
+        if (qtyChange < 0 && (payload.type === 'Adjustment' || payload.type === 'Damage')) {
+          // DECREASE: DR Shrinkage (Expense), CR Asset
+          if (setup.inventoryShrinkageAccountId) {
+            await postJournalEntry(db, institutionId, {
+              date: new Date(),
+              description: `Stock Reduction (${payload.type}): ${product.name}`,
+              reference: `INV-RED-${Date.now()}`,
+              items: [
+                { accountId: setup.inventoryShrinkageAccountId, amount: totalAmount, type: 'Debit' },
+                { accountId: setup.inventoryAssetAccountId, amount: totalAmount, type: 'Credit' },
+              ]
+            });
+          }
+        } else if (qtyChange > 0 && payload.type === 'Adjustment') {
+          // INCREASE: DR Asset, CR Adjustment/Equity Node
+          const creditAccountId = setup.inventoryAdjustmentAccountId || setup.openingBalanceEquityAccountId;
+          if (creditAccountId) {
+            await postJournalEntry(db, institutionId, {
+              date: new Date(),
+              description: `Stock Increase (Adjustment): ${product.name}`,
+              reference: `INV-INC-${Date.now()}`,
+              items: [
+                { accountId: setup.inventoryAssetAccountId, amount: totalAmount, type: 'Debit' },
+                { accountId: creditAccountId, amount: totalAmount, type: 'Credit' },
+              ]
+            });
+          }
+        }
+      }
     }
   });
 }
@@ -132,9 +157,6 @@ export async function transferStock(db: Firestore, institutionId: string, payloa
       throw new Error(`Insufficient stock. Current total: ${product.totalStock}`);
     }
 
-    // Transfers don't change TOTAL stock for the institution, 
-    // but we log the specific warehouse movements.
-    
     // Log Dispatch (Out from Source)
     const outMoveRef = doc(movementsRef);
     transaction.set(outMoveRef, {

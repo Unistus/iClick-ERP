@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -21,9 +20,12 @@ import {
   History, 
   CheckCircle2, 
   MinusCircle, 
+  PlusCircle,
   Package,
   Activity,
-  ArrowUpRight
+  ArrowUpRight,
+  ArrowDownRight,
+  Loader2
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { recordStockMovement } from "@/lib/inventory/inventory.service";
@@ -36,6 +38,7 @@ export default function StockAdjustmentsPage() {
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [direction, setDirection] = useState<'increase' | 'decrease'>('decrease');
 
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instColRef);
@@ -76,7 +79,8 @@ export default function StockAdjustmentsPage() {
     const formData = new FormData(e.currentTarget);
     const productId = formData.get('productId') as string;
     const type = formData.get('type') as any;
-    const qty = parseFloat(formData.get('quantity') as string);
+    const rawQty = parseFloat(formData.get('quantity') as string);
+    const signedQty = direction === 'increase' ? rawQty : -rawQty;
     const reasonId = formData.get('reasonId') as string;
     const reasonName = reasons?.find(r => r.id === reasonId)?.name || "General Adjustment";
 
@@ -84,11 +88,11 @@ export default function StockAdjustmentsPage() {
       productId,
       warehouseId: formData.get('warehouseId') as string,
       type,
-      quantity: qty,
+      quantity: signedQty,
       reference: `ADJ: ${reasonName}`,
       unitCost: 0 
     }).then(() => {
-      logSystemEvent(db, selectedInstId, user, 'INVENTORY', 'Stock Adjustment', `Adjustment of ${qty} units for reason: ${reasonName}.`);
+      logSystemEvent(db, selectedInstId, user, 'INVENTORY', 'Stock Adjustment', `${direction.toUpperCase()} of ${rawQty} units for reason: ${reasonName}.`);
       toast({ title: "Stock Corrected" });
       setIsCreateOpen(false);
     }).catch(err => {
@@ -106,7 +110,7 @@ export default function StockAdjustmentsPage() {
             </div>
             <div>
               <h1 className="text-2xl font-headline font-bold">Stock Corrections</h1>
-              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Adjustments & Damage Reconciliation</p>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Bidirectional Audit & Damage Reconciliation</p>
             </div>
           </div>
           
@@ -122,8 +126,8 @@ export default function StockAdjustmentsPage() {
               </SelectContent>
             </Select>
 
-            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase" disabled={!selectedInstId} onClick={() => setIsCreateOpen(true)}>
-              <Plus className="size-4" /> Log Correction
+            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase shadow-lg shadow-primary/20" disabled={!selectedInstId} onClick={() => setIsCreateOpen(true)}>
+              <Plus className="size-4" /> New Correction
             </Button>
           </div>
         </div>
@@ -136,7 +140,7 @@ export default function StockAdjustmentsPage() {
         ) : (
           <Card className="border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
             <CardHeader className="py-3 px-6 border-b border-border/50 bg-secondary/10">
-              <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em]">Adjustment Audit Trail</CardTitle>
+              <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em]">Institutional Correction Log</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -151,7 +155,7 @@ export default function StockAdjustmentsPage() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse opacity-50 uppercase font-bold">Streaming movements...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse opacity-50 uppercase font-bold">Syncing hub...</TableCell></TableRow>
                   ) : movements?.filter(m => m.type === 'Adjustment' || m.type === 'Damage').length === 0 ? (
                     <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs text-muted-foreground font-bold">No corrections recorded.</TableCell></TableRow>
                   ) : movements?.filter(m => m.type === 'Adjustment' || m.type === 'Damage').map((m) => (
@@ -169,10 +173,10 @@ export default function StockAdjustmentsPage() {
                           {m.type}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right font-mono text-xs font-black">
-                        {m.quantity}
+                      <TableCell className={`text-right font-mono text-xs font-black ${m.quantity > 0 ? 'text-emerald-500' : 'text-destructive'}`}>
+                        {m.quantity > 0 ? `+${m.quantity}` : m.quantity}
                       </TableCell>
-                      <TableCell className="pl-6 text-[11px] text-muted-foreground italic">
+                      <TableCell className="pl-6 text-[11px] text-muted-foreground italic truncate max-w-[250px]">
                         {m.reference}
                       </TableCell>
                     </TableRow>
@@ -187,10 +191,36 @@ export default function StockAdjustmentsPage() {
           <DialogContent className="max-w-md">
             <form onSubmit={handleAdjustment}>
               <DialogHeader>
-                <DialogTitle>Physical Count Correction</DialogTitle>
-                <CardDescription>Adjust on-hand quantities based on audit or damage.</CardDescription>
+                <div className="flex items-center gap-2 mb-2">
+                  <Activity className="size-5 text-primary" />
+                  <DialogTitle className="text-sm font-bold uppercase tracking-wider">Log Physical Variance</DialogTitle>
+                </div>
+                <CardDescription className="text-xs">Adjust on-hand quantities based on institutional audit findings.</CardDescription>
               </DialogHeader>
+              
               <div className="grid gap-4 py-4 text-xs">
+                <div className="space-y-2">
+                  <Label>Direction of Variance</Label>
+                  <div className="flex gap-2 p-1 bg-secondary/20 rounded-lg">
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      className={`flex-1 h-9 text-[10px] font-bold uppercase gap-2 transition-all ${direction === 'increase' ? 'bg-background shadow-sm text-emerald-500' : 'opacity-50'}`}
+                      onClick={() => setDirection('increase')}
+                    >
+                      <PlusCircle className="size-3.5" /> Increase (Surplus)
+                    </Button>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      className={`flex-1 h-9 text-[10px] font-bold uppercase gap-2 transition-all ${direction === 'decrease' ? 'bg-background shadow-sm text-destructive' : 'opacity-50'}`}
+                      onClick={() => setDirection('decrease')}
+                    >
+                      <MinusCircle className="size-3.5" /> Decrease (Shrinkage)
+                    </Button>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label>Target Product</Label>
                   <Select name="productId" required>
@@ -206,34 +236,41 @@ export default function StockAdjustmentsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Warehouse / Node</Label>
                     <Select name="warehouseId" required>
-                      <SelectTrigger className="h-9"><SelectValue placeholder="Source Site" /></SelectTrigger>
+                      <SelectTrigger className="h-9"><SelectValue placeholder="Site" /></SelectTrigger>
                       <SelectContent>
                         {warehouses?.map(w => <SelectItem key={w.id} value={w.id} className="text-xs">{w.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Adjustment Type</Label>
+                    <Label>Correction Type</Label>
                     <Select name="type" defaultValue="Adjustment">
                       <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Adjustment" className="text-xs">Inventory Audit</SelectItem>
+                        <SelectItem value="Adjustment" className="text-xs">General Audit</SelectItem>
                         <SelectItem value="Damage" className="text-xs">Physical Damage</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
+
                 <div className="space-y-2">
-                  <Label>Quantity to Remove (Absolute)</Label>
+                  <Label>Quantity Variance</Label>
                   <div className="relative">
-                    <MinusCircle className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-destructive" />
-                    <Input name="quantity" type="number" step="0.01" placeholder="0.00" className="pl-10 h-10 font-bold" required />
+                    {direction === 'increase' ? (
+                      <PlusCircle className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-emerald-500" />
+                    ) : (
+                      <MinusCircle className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-destructive" />
+                    )}
+                    <Input name="quantity" type="number" step="0.01" placeholder="0.00" className="pl-10 h-10 font-black text-lg" required />
                   </div>
                 </div>
+
                 <div className="space-y-2">
                   <Label>Adjustment Reason</Label>
                   <Select name="reasonId" required>
@@ -244,18 +281,23 @@ export default function StockAdjustmentsPage() {
                       {reasons?.map(r => (
                         <SelectItem key={r.id} value={r.id} className="text-xs">{r.name}</SelectItem>
                       ))}
-                      {reasons?.length === 0 && <SelectItem value="none" disabled>No reasons defined in Setup</SelectItem>}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
-                  <p className="text-[10px] text-destructive font-black uppercase flex items-center gap-1.5"><AlertTriangle className="size-3" /> Automation King Alert</p>
-                  <p className="text-[10px] text-muted-foreground mt-1">This will auto-post a shrinkage journal entry using your mapped accounts.</p>
+
+                <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg flex gap-3 items-start">
+                  <AlertTriangle className="size-4 text-primary shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-muted-foreground leading-relaxed italic">
+                    <strong>Automation King:</strong> This will auto-post a corrective journal entry. {direction === 'increase' ? 'Asset will be debited and Adjustment account credited.' : 'Shrinkage expense will be debited and Asset credited.'}
+                  </p>
                 </div>
               </div>
+
               <DialogFooter>
-                <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={isProcessing} className="h-10 font-bold uppercase text-xs">Commit Adjustment</Button>
+                <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs h-9">Cancel</Button>
+                <Button type="submit" disabled={isProcessing} className="h-10 font-bold uppercase text-xs px-8 shadow-lg shadow-primary/20">
+                  {isProcessing ? <Loader2 className="size-3 animate-spin mr-2" /> : <CheckCircle2 className="size-3 mr-2" />} Commit Variance
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>

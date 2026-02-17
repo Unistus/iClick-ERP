@@ -34,7 +34,8 @@ import {
   Clock,
   Barcode,
   Boxes,
-  Timer
+  Timer,
+  BellRing
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -349,7 +350,7 @@ export default function ProductsPage() {
                 </div>
 
                 {/* section 3: Financials & Measurement */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label className="uppercase font-bold tracking-widest text-muted-foreground">Category</Label>
                     <Select name="categoryId" defaultValue={editingProduct?.categoryId || "none"}>
@@ -368,6 +369,12 @@ export default function ProductsPage() {
                         {uoms?.map(uom => <SelectItem key={uom.id} value={uom.id}>{uom.code}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="uppercase font-bold tracking-widest text-amber-500 flex items-center gap-1.5">
+                      <BellRing className="size-3" /> Reorder Level
+                    </Label>
+                    <Input name="reorderLevel" type="number" step="0.01" defaultValue={editingProduct?.reorderLevel || 0} placeholder="Min. Stock" className="h-9 font-bold" />
                   </div>
                   <div className="space-y-2">
                     <Label className="uppercase font-bold tracking-widest text-primary">Base Price</Label>

@@ -42,20 +42,20 @@ export default function StockAdjustmentsPage() {
 
   const productsRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
-    return collection(db, 'institutions', selectedInstId, 'inventory', 'products');
+    return collection(db, 'institutions', selectedInstId, 'products');
   }, [db, selectedInstId]);
   const { data: products } = useCollection(productsRef);
 
   const warehousesRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
-    return collection(db, 'institutions', selectedInstId, 'inventory', 'warehouses');
+    return collection(db, 'institutions', selectedInstId, 'warehouses');
   }, [db, selectedInstId]);
   const { data: warehouses } = useCollection(warehousesRef);
 
   const movementsQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return query(
-      collection(db, 'institutions', selectedInstId, 'inventory', 'movements'),
+      collection(db, 'institutions', selectedInstId, 'movements'),
       orderBy('timestamp', 'desc'),
       limit(50)
     );

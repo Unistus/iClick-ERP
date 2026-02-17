@@ -32,7 +32,7 @@ export default function AIInsightsPage() {
 
   const productsQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null
-    return collection(db, 'institutions', selectedInstId, 'inventory', 'products')
+    return collection(db, 'institutions', selectedInstId, 'products')
   }, [db, selectedInstId])
   const { data: products } = useCollection(productsQuery)
 
@@ -135,7 +135,7 @@ export default function AIInsightsPage() {
                 >
                   {loading ? (
                     <>
-                      <RefreshCw className="size-4 animate-spin" />
+                      <RefreshCcw className="size-4 animate-spin" />
                       Analyzing Live Data...
                     </>
                   ) : (

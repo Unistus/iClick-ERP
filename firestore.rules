@@ -76,8 +76,17 @@ service cloud.firestore {
         allow read, write: if isInstitutionMember(institutionId);
       }
 
-      // Inventory Sub-collections
-      match /inventory/{allPaths=**} {
+      // Inventory Flattened Collections
+      match /products/{id} {
+        allow read, write: if isInstitutionMember(institutionId);
+      }
+      match /movements/{id} {
+        allow read, write: if isInstitutionMember(institutionId);
+      }
+      match /warehouses/{id} {
+        allow read, write: if isInstitutionMember(institutionId);
+      }
+      match /batches/{id} {
         allow read, write: if isInstitutionMember(institutionId);
       }
 

@@ -28,7 +28,7 @@ export default function WarehousesPage() {
 
   const warehouseQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
-    return query(collection(db, 'institutions', selectedInstId, 'inventory', 'warehouses'));
+    return query(collection(db, 'institutions', selectedInstId, 'warehouses'));
   }, [db, selectedInstId]);
   const { data: warehouses, isLoading } = useCollection(warehouseQuery);
 
@@ -46,7 +46,7 @@ export default function WarehousesPage() {
       updatedAt: serverTimestamp(),
     };
 
-    const colRef = collection(db, 'institutions', selectedInstId, 'inventory', 'warehouses');
+    const colRef = collection(db, 'institutions', selectedInstId, 'warehouses');
     addDocumentNonBlocking(colRef, { ...data, createdAt: serverTimestamp() });
 
     toast({ title: "Storage Site Registered" });

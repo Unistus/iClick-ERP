@@ -17,8 +17,8 @@ export interface MovementPayload {
  * Handles all stock movements and automated accounting integration.
  */
 export async function recordStockMovement(db: Firestore, institutionId: string, payload: MovementPayload) {
-  const productRef = doc(db, 'institutions', institutionId, 'inventory', 'products', payload.productId);
-  const movementsRef = collection(db, 'institutions', institutionId, 'inventory', 'movements');
+  const productRef = doc(db, 'institutions', institutionId, 'products', payload.productId);
+  const movementsRef = collection(db, 'institutions', institutionId, 'movements');
   const setupRef = doc(db, 'institutions', institutionId, 'settings', 'accounting');
 
   return runTransaction(db, async (transaction) => {

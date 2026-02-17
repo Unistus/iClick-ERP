@@ -139,7 +139,7 @@
         }
       },
       {
-        "path": "/institutions/{institutionId}/inventory/products/{productId}",
+        "path": "/institutions/{institutionId}/products/{productId}",
         "definition": {
           "entityName": "Product",
           "schema": { "$ref": "#/backend/entities/Product" },
@@ -147,7 +147,7 @@
         }
       },
       {
-        "path": "/institutions/{institutionId}/inventory/warehouses/{warehouseId}",
+        "path": "/institutions/{institutionId}/warehouses/{warehouseId}",
         "definition": {
           "entityName": "Warehouse",
           "schema": { "$ref": "#/backend/entities/Warehouse" },
@@ -155,7 +155,7 @@
         }
       },
       {
-        "path": "/institutions/{institutionId}/inventory/movements/{movementId}",
+        "path": "/institutions/{institutionId}/movements/{movementId}",
         "definition": {
           "entityName": "StockMovement",
           "schema": { "$ref": "#/backend/entities/StockMovement" },
@@ -163,7 +163,7 @@
         }
       },
       {
-        "path": "/institutions/{institutionId}/inventory/batches/{batchId}",
+        "path": "/institutions/{institutionId}/batches/{batchId}",
         "definition": {
           "entityName": "InventoryBatch",
           "schema": { "$ref": "#/backend/entities/InventoryBatch" },

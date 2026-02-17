@@ -52,7 +52,7 @@ export default function ProductsPage() {
 
   const productsQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
-    return query(collection(db, 'institutions', selectedInstId, 'inventory', 'products'), orderBy('name', 'asc'));
+    return query(collection(db, 'institutions', selectedInstId, 'products'), orderBy('name', 'asc'));
   }, [db, selectedInstId]);
   const { data: products, isLoading } = useCollection(productsQuery);
 
@@ -74,7 +74,7 @@ export default function ProductsPage() {
       updatedAt: serverTimestamp(),
     };
 
-    const colRef = collection(db, 'institutions', selectedInstId, 'inventory', 'products');
+    const colRef = collection(db, 'institutions', selectedInstId, 'products');
 
     if (editingProduct) {
       updateDocumentNonBlocking(doc(colRef, editingProduct.id), data);

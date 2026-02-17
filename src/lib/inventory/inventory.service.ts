@@ -1,7 +1,6 @@
-
 'use client';
 
-import { Firestore, collection, doc, serverTimestamp, increment, runTransaction, getDoc } from 'firebase/firestore';
+import { Firestore, collection, doc, serverTimestamp, increment, runTransaction, getDoc, addDoc } from 'firebase/firestore';
 import { postJournalEntry } from '../accounting/journal.service';
 
 export interface MovementPayload {
@@ -11,6 +10,15 @@ export interface MovementPayload {
   quantity: number;
   reference: string;
   unitCost: number;
+  batchId?: string;
+}
+
+export interface BatchPayload {
+  productId: string;
+  warehouseId: string;
+  batchNumber: string;
+  expiryDate: Date;
+  quantity: number;
 }
 
 /**
@@ -43,7 +51,16 @@ export async function recordStockMovement(db: Firestore, institutionId: string, 
       timestamp: serverTimestamp()
     });
 
-    // 3. Automated Accounting (if Adjustment/Damage)
+    // 3. Update Batch if applicable
+    if (payload.batchId) {
+      const batchRef = doc(db, 'institutions', institutionId, 'batches', payload.batchId);
+      transaction.update(batchRef, {
+        quantity: increment(qtyChange),
+        updatedAt: serverTimestamp()
+      });
+    }
+
+    // 4. Automated Accounting (if Adjustment/Damage)
     if ((payload.type === 'Adjustment' || payload.type === 'Damage') && setup?.inventoryAssetAccountId && setup?.inventoryShrinkageAccountId) {
       const totalAmount = payload.quantity * (payload.unitCost || product.costPrice || 0);
       
@@ -63,6 +80,34 @@ export async function recordStockMovement(db: Firestore, institutionId: string, 
 }
 
 /**
+ * Registers a new inventory batch.
+ */
+export async function registerInventoryBatch(db: Firestore, institutionId: string, payload: BatchPayload) {
+  const batchesRef = collection(db, 'institutions', institutionId, 'batches');
+  
+  // 1. Create the batch record
+  const newBatch = await addDoc(batchesRef, {
+    ...payload,
+    expiryDate: payload.expiryDate, // Firestore handles JS Date
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+
+  // 2. Record the movement to initialize stock
+  await recordStockMovement(db, institutionId, {
+    productId: payload.productId,
+    warehouseId: payload.warehouseId,
+    type: 'In',
+    quantity: payload.quantity,
+    reference: `Batch Init: ${payload.batchNumber}`,
+    unitCost: 0,
+    batchId: newBatch.id
+  });
+
+  return newBatch;
+}
+
+/**
  * Transfers stock between warehouses.
  */
 export async function transferStock(db: Firestore, institutionId: string, payload: {
@@ -72,15 +117,13 @@ export async function transferStock(db: Firestore, institutionId: string, payloa
   quantity: number;
   reference: string;
 }) {
-  // Logic for multi-warehouse balance update would go here in a full implementation.
-  // For MVP, we record two movements: Out from source, In to destination.
   await recordStockMovement(db, institutionId, {
     productId: payload.productId,
     warehouseId: payload.fromWarehouseId,
     type: 'Out',
     quantity: payload.quantity,
     reference: `TRF-OUT: ${payload.reference}`,
-    unitCost: 0 // Transfers don't affect value in a simple model
+    unitCost: 0
   });
 
   await recordStockMovement(db, institutionId, {

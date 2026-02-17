@@ -67,6 +67,15 @@
         "baseFactor": { "type": "number" }
       }
     },
+    "AdjustmentReason": {
+      "title": "AdjustmentReason",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
     "Product": {
       "title": "Product",
       "type": "object",
@@ -136,6 +145,14 @@
           "entityName": "UnitOfMeasure",
           "schema": { "$ref": "#/backend/entities/UnitOfMeasure" },
           "description": "Units of measure."
+        }
+      },
+      {
+        "path": "/institutions/{institutionId}/adjustment_reasons/{id}",
+        "definition": {
+          "entityName": "AdjustmentReason",
+          "schema": { "$ref": "#/backend/entities/AdjustmentReason" },
+          "description": "Custom reasons for stock adjustments."
         }
       },
       {

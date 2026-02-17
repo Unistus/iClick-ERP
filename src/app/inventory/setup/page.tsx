@@ -29,7 +29,8 @@ import {
   Trash2,
   ListTree,
   Edit2,
-  CheckCircle2
+  CheckCircle2,
+  Activity
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
@@ -41,7 +42,6 @@ export default function InventorySetupPage() {
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
   const [isPriceListOpen, setIsPriceListOpen] = useState(false);
-  const [selectedPriceList, setSelectedPriceList] = useState<any>(null);
 
   // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
@@ -70,6 +70,12 @@ export default function InventorySetupPage() {
     return collection(db, 'institutions', selectedInstId, 'uoms');
   }, [db, selectedInstId]);
   const { data: uoms } = useCollection(uomsRef);
+
+  const reasonsRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'adjustment_reasons');
+  }, [db, selectedInstId]);
+  const { data: reasons } = useCollection(reasonsRef);
 
   const priceListsRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -128,6 +134,20 @@ export default function InventorySetupPage() {
     addDocumentNonBlocking(collection(db, 'institutions', selectedInstId, 'uoms'), data);
     e.currentTarget.reset();
     toast({ title: "UoM Registered" });
+  };
+
+  const handleAddReason = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedInstId) return;
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      name: formData.get('name'),
+      description: formData.get('description'),
+      createdAt: serverTimestamp()
+    };
+    addDocumentNonBlocking(collection(db, 'institutions', selectedInstId, 'adjustment_reasons'), data);
+    e.currentTarget.reset();
+    toast({ title: "Reason Added" });
   };
 
   const handleAddPriceList = (e: React.FormEvent<HTMLFormElement>) => {
@@ -272,7 +292,7 @@ export default function InventorySetupPage() {
             </TabsContent>
 
             <TabsContent value="catalog">
-              <div className="grid gap-6 lg:grid-cols-2">
+              <div className="grid gap-6 lg:grid-cols-3">
                 <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
                   <CardHeader className="bg-secondary/10 border-b">
                     <div className="flex items-center justify-between">
@@ -288,7 +308,7 @@ export default function InventorySetupPage() {
                         <Button type="submit" size="sm" className="h-9 px-4 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
                       </form>
                     </div>
-                    <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
                       <Table>
                         <TableBody>
                           {categories?.map(cat => (
@@ -321,7 +341,7 @@ export default function InventorySetupPage() {
                         <Button type="submit" size="sm" className="h-9 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
                       </form>
                     </div>
-                    <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
                       <Table>
                         <TableBody>
                           {uoms?.map(uom => (
@@ -330,6 +350,38 @@ export default function InventorySetupPage() {
                               <TableCell className="text-xs">{uom.name}</TableCell>
                               <TableCell className="text-right pr-6">
                                 <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'uoms', uom.id))}>
+                                  <Trash2 className="size-3.5" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
+                  <CardHeader className="bg-secondary/10 border-b">
+                    <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                      <Activity className="size-4 text-emerald-500" /> Adjustment Reasons
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="p-4 border-b bg-secondary/5">
+                      <form onSubmit={handleAddReason} className="flex gap-2">
+                        <Input name="name" placeholder="Reason (e.g. Theft)" required className="h-9 text-xs" />
+                        <Button type="submit" size="sm" className="h-9 px-4 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
+                      </form>
+                    </div>
+                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                      <Table>
+                        <TableBody>
+                          {reasons?.map(reason => (
+                            <TableRow key={reason.id} className="h-10 hover:bg-secondary/5 group">
+                              <TableCell className="text-xs font-bold pl-6">{reason.name}</TableCell>
+                              <TableCell className="text-right pr-6">
+                                <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'adjustment_reasons', reason.id))}>
                                   <Trash2 className="size-3.5" />
                                 </Button>
                               </TableCell>

@@ -52,6 +52,12 @@ export default function StockAdjustmentsPage() {
   }, [db, selectedInstId]);
   const { data: warehouses } = useCollection(warehousesRef);
 
+  const reasonsRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'adjustment_reasons');
+  }, [db, selectedInstId]);
+  const { data: reasons } = useCollection(reasonsRef);
+
   const movementsQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return query(
@@ -71,17 +77,18 @@ export default function StockAdjustmentsPage() {
     const productId = formData.get('productId') as string;
     const type = formData.get('type') as any;
     const qty = parseFloat(formData.get('quantity') as string);
-    const reason = formData.get('reason') as string;
+    const reasonId = formData.get('reasonId') as string;
+    const reasonName = reasons?.find(r => r.id === reasonId)?.name || "General Adjustment";
 
     recordStockMovement(db, selectedInstId, {
       productId,
       warehouseId: formData.get('warehouseId') as string,
       type,
       quantity: qty,
-      reference: `ADJ: ${reason}`,
+      reference: `ADJ: ${reasonName}`,
       unitCost: 0 // Will pull from product service in service layer
     }).then(() => {
-      logSystemEvent(db, selectedInstId, user, 'INVENTORY', 'Stock Adjustment', `Adjustment of ${qty} units for product ${productId}.`);
+      logSystemEvent(db, selectedInstId, user, 'INVENTORY', 'Stock Adjustment', `Adjustment of ${qty} units for reason: ${reasonName}.`);
       toast({ title: "Stock Corrected" });
       setIsCreateOpen(false);
     }).catch(err => {
@@ -229,8 +236,18 @@ export default function StockAdjustmentsPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Reason / Memo</Label>
-                  <Input name="reason" placeholder="e.g. Expired on shelf or Audit shortfall" required />
+                  <Label>Adjustment Reason</Label>
+                  <Select name="reasonId" required>
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Select institutional reason" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {reasons?.map(r => (
+                        <SelectItem key={r.id} value={r.id} className="text-xs">{r.name}</SelectItem>
+                      ))}
+                      {reasons?.length === 0 && <SelectItem value="none" disabled>No reasons defined in Setup</SelectItem>}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="p-3 bg-destructive/5 border border-destructive/20 rounded-lg">
                   <p className="text-[10px] text-destructive font-black uppercase flex items-center gap-1.5"><AlertTriangle className="size-3" /> Automation King Alert</p>

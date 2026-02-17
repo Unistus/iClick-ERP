@@ -46,6 +46,7 @@ service cloud.firestore {
       match /coa/{id} { allow read, write: if isInstitutionMember(institutionId); }
       match /categories/{id} { allow read, write: if isInstitutionMember(institutionId); }
       match /uoms/{id} { allow read, write: if isInstitutionMember(institutionId); }
+      match /adjustment_reasons/{id} { allow read, write: if isInstitutionMember(institutionId); }
       match /price_lists/{id} { allow read, write: if isInstitutionMember(institutionId); }
       
       // Operational

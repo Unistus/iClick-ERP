@@ -63,10 +63,10 @@ import {
   Hourglass,
   BadgeCent,
   Navigation,
-  SteeringWheel,
   CarFront,
   CheckCircle2,
-  Route
+  Route,
+  Zap
 } from "lucide-react"
 
 export interface NavSubmenu {

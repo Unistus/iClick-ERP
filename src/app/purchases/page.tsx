@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -87,7 +88,7 @@ export default function PurchasesOverviewPage() {
               <Card className="bg-card border-none ring-1 ring-border shadow-sm">
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Active POs</span></CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-xl font-bold font-headline">14 ORDERS</div>
+                  <div className="text-lg font-bold font-headline">14 ORDERS</div>
                   <p className="text-[9px] text-primary font-bold mt-1 uppercase">Awaiting Delivery</p>
                 </CardContent>
               </Card>
@@ -95,7 +96,7 @@ export default function PurchasesOverviewPage() {
               <Card className="bg-card border-none ring-1 ring-border shadow-sm">
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-destructive tracking-widest">Payables</span></CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-xl font-bold text-destructive font-headline">{currency} 1.2M</div>
+                  <div className="text-lg font-bold text-destructive font-headline">{currency} 1.2M</div>
                   <p className="text-[9px] text-muted-foreground font-bold mt-1 uppercase">Due next 30 days</p>
                 </CardContent>
               </Card>
@@ -103,7 +104,7 @@ export default function PurchasesOverviewPage() {
               <Card className="bg-card border-none ring-1 ring-border shadow-sm">
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-emerald-500 tracking-widest">Received (MTD)</span></CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-xl font-bold text-emerald-500 font-headline">{currency} 4.8M</div>
+                  <div className="text-lg font-bold text-emerald-500 font-headline">{currency} 4.8M</div>
                   <p className="text-[9px] text-muted-foreground font-bold mt-1 uppercase">Physical Stock Value</p>
                 </CardContent>
               </Card>
@@ -111,7 +112,7 @@ export default function PurchasesOverviewPage() {
               <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm relative overflow-hidden">
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-primary tracking-widest">Lead Time</span></CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-xl font-bold text-primary font-headline">4.2 DAYS</div>
+                  <div className="text-lg font-bold text-primary font-headline">4.2 DAYS</div>
                   <div className="flex items-center gap-1.5 mt-1 text-primary font-bold text-[9px] uppercase">
                     <TrendingDown className="size-3" /> Optimizing flow
                   </div>

@@ -470,7 +470,7 @@ export default function ExpiryControlPage() {
               </div>
               <DialogFooter>
                 <Button type="submit" disabled={isProcessing} className="h-10 font-bold uppercase text-xs px-8">
-                  {isProcessing ? <Loader2 className="size-3 animate-spin mr-2" /> : <Plus className="size-3 mr-2" />} Commit Batch
+                  {isProcessing ? <Loader2 className="size-4 animate-spin mr-2" /> : <Plus className="size-3 mr-2" />} Commit Batch
                 </Button>
               </DialogFooter>
             </form>
@@ -479,10 +479,4 @@ export default function ExpiryControlPage() {
       </div>
     </DashboardLayout>
   );
-}
-
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
 }

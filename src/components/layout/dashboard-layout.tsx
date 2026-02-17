@@ -40,7 +40,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* FLOATING TOP BAR - Medium Height (h-12) */}
           <header className="flex h-12 shrink-0 items-center justify-between gap-4 border-b px-4 md:px-6 bg-card/40 backdrop-blur-xl sticky top-0 z-10 w-full shadow-sm">
             <div className="flex items-center gap-2 md:gap-4">
-              <SidebarTrigger className="text-primary hover:bg-primary/10" />
+              {/* SidebarTrigger only visible on mobile (hidden on md and up) */}
+              <SidebarTrigger className="text-primary hover:bg-primary/10 md:hidden" />
               <div className="flex items-center gap-2">
                 <Sparkles className="size-3 text-accent animate-pulse" />
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest hidden sm:inline">Enterprise Mode</span>

@@ -36,6 +36,7 @@ export default function SystemHealth() {
   const [cpuLoad, setCpuLoad] = useState(24.2);
   const [memLoad, setMemLoad] = useState(62.8);
   const [diskLoad, setDiskLoad] = useState(12.1);
+  const [trafficLoads, setTrafficLoads] = useState<number[]>([]);
 
   // 1. Fetch Institutions for the context selector
   const instCollectionRef = useMemoFirebase(() => collection(db, 'institutions'), [db])
@@ -60,6 +61,14 @@ export default function SystemHealth() {
   useEffect(() => {
     setLastCheck(new Date().toLocaleTimeString());
     
+    // Initialize stable traffic loads to prevent hydration mismatches
+    setTrafficLoads([
+      Math.floor(Math.random() * 100),
+      12,
+      8,
+      100
+    ]);
+
     // Simulate live metrics fluctuations
     const interval = setInterval(() => {
       setCpuLoad(prev => Math.min(100, Math.max(5, prev + (Math.random() - 0.5) * 2)));
@@ -86,6 +95,13 @@ export default function SystemHealth() {
       setLastCheck(new Date().toLocaleTimeString());
     }, 1000);
   }
+
+  const trafficRegions = [
+    "Nairobi HQ Node",
+    "Mombasa Edge Cache",
+    "Western Kenya API Gateway",
+    "Global Management Console"
+  ];
 
   return (
     <DashboardLayout>
@@ -247,21 +263,16 @@ export default function SystemHealth() {
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row gap-8 items-center">
               <div className="flex-1 space-y-4 w-full">
-                {[
-                  { region: "Nairobi HQ Node", load: institutions?.length ? Math.floor(Math.random() * 100) : 0 },
-                  { region: "Mombasa Edge Cache", load: 12 },
-                  { region: "Western Kenya API Gateway", load: 8 },
-                  { region: "Global Management Console", load: 100 },
-                ].map(r => (
-                  <div key={r.region} className="space-y-1.5">
+                {trafficRegions.map((region, idx) => (
+                  <div key={region} className="space-y-1.5">
                     <div className="flex justify-between text-[10px]">
-                      <span className="font-bold">{r.region}</span>
-                      <span className="text-muted-foreground">{r.load}% Load Distribution</span>
+                      <span className="font-bold">{region}</span>
+                      <span className="text-muted-foreground">{trafficLoads[idx] || 0}% Load Distribution</span>
                     </div>
                     <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-primary transition-all duration-1000" 
-                        style={{ width: `${r.load}%` }} 
+                        style={{ width: `${trafficLoads[idx] || 0}%` }} 
                       />
                     </div>
                   </div>

@@ -12,7 +12,8 @@
           "properties": {
             "timezone": { "type": "string" },
             "fiscalYearStart": { "type": "string" },
-            "language": { "type": "string" }
+            "language": { "type": "string" },
+            "currencySymbol": { "type": "string" }
           }
         },
         "pos": {
@@ -48,32 +49,25 @@
         "monthlyLimit": { "type": "number" }
       }
     },
-    "ProductCategory": {
-      "title": "ProductCategory",
+    "FiscalPeriod": {
+      "title": "FiscalPeriod",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "description": { "type": "string" }
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["Open", "Closed"] }
       }
     },
-    "UnitOfMeasure": {
-      "title": "UnitOfMeasure",
+    "BudgetAllocation": {
+      "title": "BudgetAllocation",
       "type": "object",
+      "description": "A period-specific expenditure target for a ledger node.",
       "properties": {
-        "id": { "type": "string" },
-        "code": { "type": "string" },
-        "name": { "type": "string" },
-        "baseFactor": { "type": "number" }
-      }
-    },
-    "AdjustmentReason": {
-      "title": "AdjustmentReason",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "description": { "type": "string" }
+        "accountId": { "type": "string" },
+        "limit": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       }
     },
     "Product": {
@@ -89,7 +83,7 @@
         "basePrice": { "type": "number" },
         "costPrice": { "type": "number" },
         "reorderLevel": { "type": "number" },
-        "shelfLifeDays": { "type": "number", "description": "Standard shelf life in days for predictive batch expiry." },
+        "shelfLifeDays": { "type": "number" },
         "trackExpiry": { "type": "boolean" },
         "trackSerials": { "type": "boolean" },
         "totalStock": { "type": "number" }
@@ -103,17 +97,6 @@
         "name": { "type": "string" },
         "code": { "type": "string" },
         "location": { "type": "string" },
-        "isDefault": { "type": "boolean" }
-      }
-    },
-    "PriceList": {
-      "title": "PriceList",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "description": { "type": "string" },
-        "isActive": { "type": "boolean" },
         "isDefault": { "type": "boolean" }
       }
     }
@@ -132,27 +115,19 @@
         }
       },
       {
-        "path": "/institutions/{institutionId}/categories/{id}",
+        "path": "/institutions/{institutionId}/fiscal_periods/{periodId}",
         "definition": {
-          "entityName": "ProductCategory",
-          "schema": { "$ref": "#/backend/entities/ProductCategory" },
-          "description": "Product categories."
+          "entityName": "FiscalPeriod",
+          "schema": { "$ref": "#/backend/entities/FiscalPeriod" },
+          "description": "Auditing cycles."
         }
       },
       {
-        "path": "/institutions/{institutionId}/uoms/{id}",
+        "path": "/institutions/{institutionId}/fiscal_periods/{periodId}/allocations/{accountId}",
         "definition": {
-          "entityName": "UnitOfMeasure",
-          "schema": { "$ref": "#/backend/entities/UnitOfMeasure" },
-          "description": "Units of measure."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/adjustment_reasons/{id}",
-        "definition": {
-          "entityName": "AdjustmentReason",
-          "schema": { "$ref": "#/backend/entities/AdjustmentReason" },
-          "description": "Custom reasons for stock adjustments."
+          "entityName": "BudgetAllocation",
+          "schema": { "$ref": "#/backend/entities/BudgetAllocation" },
+          "description": "Period-specific spend targets."
         }
       },
       {
@@ -164,50 +139,19 @@
         }
       },
       {
-        "path": "/institutions/{institutionId}/warehouses/{warehouseId}",
+        "path": "/institutions/{institutionId}/journal_entries/{id}",
         "definition": {
-          "entityName": "Warehouse",
-          "schema": { "$ref": "#/backend/entities/Warehouse" },
-          "description": "Storage locations."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/batches/{batchId}",
-        "definition": {
-          "entityName": "Batch",
+          "entityName": "JournalEntry",
           "schema": {
             "type": "object",
             "properties": {
-              "productId": { "type": "string" },
-              "warehouseId": { "type": "string" },
-              "batchNumber": { "type": "string" },
-              "expiryDate": { "type": "string", "format": "date-time" },
-              "quantity": { "type": "number" }
+              "date": { "type": "string", "format": "date-time" },
+              "description": { "type": "string" },
+              "reference": { "type": "string" },
+              "items": { "type": "array" }
             }
           },
-          "description": "Individual stock batches with expiry tracking."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/price_lists/{id}",
-        "definition": {
-          "entityName": "PriceList",
-          "schema": { "$ref": "#/backend/entities/PriceList" },
-          "description": "Tiered pricing lists."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/price_lists/{id}/items/{productId}",
-        "definition": {
-          "entityName": "PriceListItem",
-          "schema": {
-            "type": "object",
-            "properties": {
-              "productId": { "type": "string" },
-              "price": { "type": "number" }
-            }
-          },
-          "description": "Product price overrides within a list."
+          "description": "Double-entry accounting records."
         }
       }
     ]

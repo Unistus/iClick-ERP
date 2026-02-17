@@ -30,11 +30,80 @@ service cloud.firestore {
     match /institutions {
       // Allow signed-in users to list institutions for selection
       allow list: if isSignedIn();
+      // Any signed-in user can register an institution (onboarding)
+      allow create: if isSignedIn();
     }
 
-    match /system_admins/{uid} {
-      allow read: if isSignedIn();
-      allow write: if isGlobalAdmin();
+    match /institutions/{institutionId} {
+      // Any signed-in user can read an institution profile
+      allow get: if isSignedIn();
+      // Only members/admins can update profile
+      allow update: if isInstitutionMember(institutionId);
+      
+      // EXPLICIT SUB-COLLECTION RULES
+      // Note: While the global override exists, explicit matching prevents 
+      // intermittent failures during specific list operations.
+
+      match /fiscal_periods {
+        allow list: if isInstitutionMember(institutionId);
+        match /{periodId} {
+          allow read, write: if isInstitutionMember(institutionId);
+          match /allocations {
+            allow list: if isInstitutionMember(institutionId);
+            match /{allocId} {
+              allow read, write: if isInstitutionMember(institutionId);
+            }
+          }
+        }
+      }
+
+      match /coa { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /journal_entries { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /products { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /warehouses { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /batches { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /movements { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /categories { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /uoms { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /adjustment_reasons { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /document_sequences { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /settings { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /audit_logs { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /notification_templates { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /api_keys { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /branches { 
+        allow list: if isInstitutionMember(institutionId); 
+        match /{id} { 
+          allow read, write: if isInstitutionMember(institutionId); 
+          match /departments { allow list: if isInstitutionMember(institutionId); match /{deptId} { allow read, write: if isInstitutionMember(institutionId); } }
+        } 
+      }
+      match /roles { 
+        allow list: if isInstitutionMember(institutionId); 
+        match /{id} { 
+          allow read, write: if isInstitutionMember(institutionId); 
+          match /members { allow list: if isInstitutionMember(institutionId); match /{uid} { allow read, write: if isInstitutionMember(institutionId); } }
+        } 
+      }
+      match /sales_orders { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /sales_quotations { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /sales_invoices { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /sales_returns { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /delivery_orders { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /delivery_notes { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /drivers { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /vehicles { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /purchase_orders { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /grns { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /vendor_invoices { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /purchase_returns { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /suppliers { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /payables { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /invoices { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /expenses { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /assets { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /tax_returns { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+      match /tax_settings { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
     }
 
     match /users/{userId} {
@@ -48,18 +117,9 @@ service cloud.firestore {
       allow write: if isSignedIn();
     }
 
-    match /institutions/{institutionId} {
-      // Any signed-in user can read an institution profile
+    match /system_admins/{uid} {
       allow read: if isSignedIn();
-      // Any signed-in user can register an institution (multi-tenancy onboarding)
-      allow create: if isSignedIn();
-      // Only members/admins can update profile
-      allow update: if isInstitutionMember(institutionId);
-      
-      // All institutional sub-collections (coa, products, payables, invoices, fiscal_periods, etc.)
-      match /{allSubcollections=**} {
-        allow read, write: if isInstitutionMember(institutionId);
-      }
+      allow write: if isGlobalAdmin();
     }
     
     match /currencies/{id} {

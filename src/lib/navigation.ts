@@ -45,7 +45,8 @@ import {
   Factory,
   Database,
   BrainCircuit,
-  Sparkles
+  Sparkles,
+  SearchCode
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -93,7 +94,8 @@ export const navConfig: NavItem[] = [
     pattern: /^\/inventory/,
     id: "inventory",
     submenus: [
-      { title: "Products & Services", icon: Box, url: "/inventory", id: "products" },
+      { title: "Products & Services", icon: Box, url: "/inventory/products", id: "products" },
+      { title: "Stock Levels", icon: SearchCode, url: "/inventory/stock-levels", id: "stock_levels" },
       { title: "Warehouses", icon: Database, url: "/inventory/warehouses", id: "warehouses" },
       { title: "Stock Transfers", icon: Truck, url: "/inventory/transfers", id: "transfers" },
       { title: "Adjustments", icon: Layers, url: "/inventory/adjustments", id: "adjustments" },

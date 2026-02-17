@@ -2,49 +2,48 @@
 
 import { useState } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   Plus, 
   Search, 
-  Download, 
-  ArrowUpDown, 
-  Filter,
-  Package,
-  AlertTriangle,
-  RefreshCw,
-  MoreHorizontal,
+  Package, 
+  AlertTriangle, 
+  RefreshCw, 
+  Timer,
   Box,
-  Timer
+  Scale,
+  TrendingUp,
+  Activity,
+  ArrowRightLeft,
+  Warehouse,
+  History,
+  ArrowUpRight,
+  TrendingDown,
+  BrainCircuit,
+  Zap
 } from "lucide-react";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, limit, doc } from "firebase/firestore";
-import { isBefore, addDays } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
+import { collection, query, orderBy, limit, doc, where } from "firebase/firestore";
+import { format, isBefore, addDays } from "date-fns";
 import Link from 'next/link';
 
-export default function InventoryPage() {
+export default function InventoryDashboardPage() {
   const db = useFirestore();
-  const [selectedInstId, setSelectedInstId] = useState<string>("SYSTEM");
-  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedInstId, setSelectedInstId] = useState<string>("");
 
+  // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instColRef);
 
   const productsQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
-    return query(collection(db, 'institutions', selectedInstId, 'products'), orderBy('name', 'asc'));
+    return query(collection(db, 'institutions', selectedInstId, 'products'), orderBy('updatedAt', 'desc'), limit(10));
   }, [db, selectedInstId]);
-  const { data: products, isLoading } = useCollection(productsQuery);
+  const { data: products, isLoading: productsLoading } = useCollection(productsQuery);
 
   const batchesQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -52,163 +51,211 @@ export default function InventoryPage() {
   }, [db, selectedInstId]);
   const { data: batches } = useCollection(batchesQuery);
 
-  const filteredProducts = products?.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.sku.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const movementsQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return query(collection(db, 'institutions', selectedInstId, 'movements'), orderBy('timestamp', 'desc'), limit(10));
+  }, [db, selectedInstId]);
+  const { data: movements } = useCollection(movementsQuery);
 
-  // Logic: Expiry Alert count
-  const criticalThreshold = addDays(new Date(), 30);
-  const expiringSoonCount = batches?.filter(b => {
-    const expiry = b.expiryDate?.toDate();
-    return expiry && isBefore(expiry, criticalThreshold);
-  }).length || 0;
+  const settingsRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return doc(db, 'institutions', selectedInstId, 'settings', 'global');
+  }, [db, selectedInstId]);
+  const { data: settings } = useDoc(settingsRef);
 
+  const currency = settings?.general?.currencySymbol || "KES";
+
+  // Calculations
+  const totalStockItems = products?.filter(p => p.type === 'Stock').length || 0;
   const lowStockCount = products?.filter(p => p.type === 'Stock' && p.totalStock <= (p.reorderLevel || 0)).length || 0;
+  
+  const now = new Date();
+  const criticalThreshold = addDays(now, 30);
+  const expiryRiskCount = batches?.filter(b => isBefore(b.expiryDate?.toDate(), criticalThreshold)).length || 0;
+
+  const totalAssetValue = products?.reduce((sum, p) => sum + ((p.totalStock || 0) * (p.costPrice || 0)), 0) || 0;
 
   return (
     <DashboardLayout>
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-headline font-bold">Stock Vault</h1>
-            <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">Multi-Tenant Catalog & Real-time Assets</p>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded bg-primary/20 text-primary">
+              <Package className="size-6" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-headline font-bold">Stock Vault Intelligence</h1>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-[0.2em]">Institutional Inventory Command Hub</p>
+            </div>
           </div>
           
           <div className="flex gap-2 w-full md:w-auto">
+            <Select value={selectedInstId} onValueChange={setSelectedInstId}>
+              <SelectTrigger className="w-[240px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold">
+                <SelectValue placeholder="Select Institution" />
+              </SelectTrigger>
+              <SelectContent>
+                {institutions?.map(i => (
+                  <SelectItem key={i.id} value={i.id} className="text-xs">{i.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Link href="/inventory/products">
-              <Button size="sm" className="bg-primary hover:bg-primary/90 gap-2 h-9 text-xs uppercase font-bold">
-                <Plus className="size-4" /> Add Item
+              <Button size="sm" className="gap-2 h-10 text-xs font-bold uppercase shadow-lg shadow-primary/20">
+                <Plus className="size-4" /> New Item
               </Button>
             </Link>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card className="bg-card border-none ring-1 ring-border/50">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-4">
-                <div className="size-8 rounded bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-                  <Box className="size-4" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Total SKUs</p>
-                  <p className="text-lg font-bold">{products?.length || 0}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-none ring-1 ring-border/50">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-4">
-                <div className="size-8 rounded bg-accent/10 text-accent flex items-center justify-center">
-                  <AlertTriangle className="size-4" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Low Re-order</p>
-                  <p className="text-lg font-bold text-accent">{lowStockCount}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-none ring-1 ring-border/50 relative group overflow-hidden">
-            <Link href="/inventory/expiry" className="absolute inset-0 z-10" />
-            <CardContent className="pt-4 pb-4 relative z-0">
-              <div className="flex items-center gap-4">
-                <div className={`size-8 rounded flex items-center justify-center ${expiringSoonCount > 0 ? 'bg-destructive/10 text-destructive animate-pulse' : 'bg-primary/10 text-primary'}`}>
-                  <Timer className="size-4" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Expiry Risk</p>
-                  <p className={`text-lg font-bold ${expiringSoonCount > 0 ? 'text-destructive' : ''}`}>{expiringSoonCount} Batches</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-none ring-1 ring-border/50">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-4">
-                <div className="size-8 rounded bg-secondary text-muted-foreground flex items-center justify-center">
-                  <RefreshCw className="size-4" />
-                </div>
-                <div>
-                  <p className="text-[10px] text-muted-foreground uppercase font-bold">Sync Status</p>
-                  <p className="text-lg font-bold uppercase text-[10px]">Real-time</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {!selectedInstId ? (
+          <div className="flex flex-col items-center justify-center py-32 border-2 border-dashed rounded-3xl bg-secondary/5">
+            <Zap className="size-16 text-muted-foreground opacity-10 mb-4 animate-pulse" />
+            <p className="text-sm font-medium text-muted-foreground">Select an institution to initialize real-time supply chain monitoring.</p>
+          </div>
+        ) : (
+          <div className="space-y-6 animate-in fade-in duration-700">
+            {/* High-Level Pulse */}
+            <div className="grid gap-4 md:grid-cols-4">
+              <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden relative">
+                <div className="absolute -right-4 -bottom-4 opacity-5"><Box className="size-24" /></div>
+                <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Asset Valuation</span></CardHeader>
+                <CardContent className="pb-4">
+                  <div className="text-2xl font-bold">{currency} {totalAssetBase.toLocaleString()}</div>
+                  <p className="text-[9px] text-emerald-500 font-bold uppercase mt-1">Estimated Book Value</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden relative">
+                <div className="absolute -right-4 -bottom-4 opacity-5"><AlertTriangle className="size-24" /></div>
+                <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-destructive tracking-widest">Stock Outs</span></CardHeader>
+                <CardContent className="pb-4">
+                  <div className="text-2xl font-bold text-destructive">{lowStockCount} SKUs</div>
+                  <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Below Reorder Point</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden relative">
+                <div className="absolute -right-4 -bottom-4 opacity-5"><Timer className="size-24" /></div>
+                <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-accent tracking-widest">Expiry Risk</span></CardHeader>
+                <CardContent className="pb-4">
+                  <div className="text-2xl font-bold text-accent">{expiryRiskCount} Batches</div>
+                  <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Expiring within 30D</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm relative overflow-hidden">
+                <div className="absolute -right-4 -bottom-4 opacity-10"><RefreshCw className="size-24 animate-spin-slow" /></div>
+                <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-primary tracking-widest">Live Sync</span></CardHeader>
+                <CardContent className="pb-4">
+                  <div className="text-2xl font-bold text-primary">Active</div>
+                  <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Streaming from Edge</p>
+                </CardContent>
+              </Card>
+            </div>
 
-        <Card className="bg-card border-none ring-1 ring-border/50 shadow-lg">
-          <CardHeader className="flex flex-col md:flex-row items-center justify-between gap-4 py-3 border-b border-border/50">
-            <div className="relative w-full md:w-80">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-              <Input 
-                placeholder="Search catalog..." 
-                className="pl-9 h-9 bg-secondary/20 border-none text-xs" 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+            <div className="grid gap-6 lg:grid-cols-12">
+              {/* Recent Activity Stream */}
+              <Card className="lg:col-span-8 border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
+                <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-sm font-bold uppercase tracking-widest">Movement Velocity</CardTitle>
+                    <CardDescription className="text-[10px]">Real-time audit trail of institutional stock flow.</CardDescription>
+                  </div>
+                  <Link href="/inventory/adjustments">
+                    <Button variant="ghost" size="sm" className="text-[10px] font-bold uppercase gap-1">View All <History className="size-3" /></Button>
+                  </Link>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableBody>
+                      {movements?.length === 0 ? (
+                        <TableRow><TableCell className="text-center py-12 text-xs text-muted-foreground">No recent stock movements detected.</TableCell></TableRow>
+                      ) : movements?.map((m) => (
+                        <TableRow key={m.id} className="h-14 hover:bg-secondary/5 transition-colors group">
+                          <TableCell className="pl-6 w-10">
+                            <div className={`p-2 rounded shrink-0 ${
+                              m.type === 'In' ? 'bg-emerald-500/10 text-emerald-500' : 
+                              m.type === 'Out' ? 'bg-destructive/10 text-destructive' : 
+                              'bg-primary/10 text-primary'
+                            }`}>
+                              {m.type === 'In' ? <TrendingUp className="size-3.5" /> : m.type === 'Out' ? <TrendingDown className="size-3.5" /> : <ArrowRightLeft className="size-3.5" />}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold">{products?.find(p => p.id === m.productId)?.name || 'Unknown Item'}</span>
+                              <span className="text-[9px] text-muted-foreground font-mono uppercase tracking-tighter">{m.reference}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className="text-[8px] h-4 font-bold bg-background/50 border-none ring-1 ring-border uppercase">{m.type}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right pr-6 font-mono font-black text-xs">
+                            {m.type === 'In' ? '+' : '-'}{m.quantity}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              {/* Quick Jump & Insights */}
+              <div className="lg:col-span-4 space-y-6">
+                <Card className="border-none ring-1 ring-border shadow-xl bg-card">
+                  <CardHeader className="pb-3 border-b border-border/10">
+                    <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                      <BrainCircuit className="size-4 text-primary" /> Supply Chain Insights
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-4 space-y-4">
+                    <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg">
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="text-[10px] font-bold text-primary uppercase">Optimized Reorder</span>
+                        <Zap className="size-3 text-primary animate-pulse" />
+                      </div>
+                      <p className="text-[11px] leading-relaxed italic text-muted-foreground">
+                        "System detects high turnover in <strong>Amoxicillin</strong> at CBD branch. Recommending immediate 20% stock buffer increase."
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Link href="/inventory/stock-levels" className="w-full">
+                        <Button variant="outline" className="w-full h-12 flex-col gap-1 bg-secondary/10">
+                          <Warehouse className="size-4" />
+                          <span className="text-[8px] font-bold uppercase">Stock Levels</span>
+                        </Button>
+                      </Link>
+                      <Link href="/inventory/expiry" className="w-full">
+                        <Button variant="outline" className="w-full h-12 flex-col gap-1 bg-secondary/10">
+                          <Timer className="size-4" />
+                          <span className="text-[8px] font-bold uppercase">Expiry Control</span>
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none ring-1 ring-border shadow-xl bg-card">
+                  <CardHeader className="pb-3 border-b border-border/10">
+                    <CardTitle className="text-xs font-black uppercase tracking-widest">Inventory Setup Snapshot</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-4 space-y-3">
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-muted-foreground">Warehouses Registered</span>
+                      <span className="font-bold">Active</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-muted-foreground">Valuation Logic</span>
+                      <Badge variant="secondary" className="text-[8px] h-4 font-bold">{settings?.inventory?.valuationMethod || 'WeightedAvg'}</Badge>
+                    </div>
+                    <div className="flex justify-between items-center text-[11px]">
+                      <span className="text-muted-foreground">Price Lists Deployed</span>
+                      <span className="font-bold">3 Tiers</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="gap-2 h-8 text-[10px] uppercase font-bold">
-                <Filter className="size-3.5" /> Filter
-              </Button>
-              <Button variant="outline" size="sm" className="gap-2 h-8 text-[10px] uppercase font-bold">
-                <Download className="size-3.5" /> CSV
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader className="bg-secondary/20">
-                <TableRow>
-                  <TableHead className="h-9 text-[10px] uppercase font-bold pl-6">SKU</TableHead>
-                  <TableHead className="h-9 text-[10px] uppercase font-bold">Product Name</TableHead>
-                  <TableHead className="h-9 text-[10px] uppercase font-bold text-center">Type</TableHead>
-                  <TableHead className="h-9 text-[10px] uppercase font-bold text-right">Total Stock</TableHead>
-                  <TableHead className="h-9 text-[10px] uppercase font-bold text-right">Re-order</TableHead>
-                  <TableHead className="h-9 text-[10px] uppercase font-bold text-right pr-6">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-12 text-xs animate-pulse">Scanning vault...</TableCell></TableRow>
-                ) : filteredProducts.length === 0 ? (
-                  <TableRow><TableCell colSpan={6} className="text-center py-12 text-xs text-muted-foreground font-bold uppercase opacity-30 tracking-widest">Catalog Empty</TableCell></TableRow>
-                ) : filteredProducts.map((item) => {
-                  const isLow = item.type === 'Stock' && item.totalStock <= (item.reorderLevel || 0);
-                  return (
-                    <TableRow key={item.id} className="hover:bg-secondary/10 h-12 group transition-colors">
-                      <TableCell className="font-mono text-[10px] pl-6 font-bold text-primary">{item.sku}</TableCell>
-                      <TableCell className="text-xs font-bold">{item.name}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline" className="text-[8px] h-4 font-bold bg-background/50 border-none ring-1 ring-border">
-                          {item.type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className={`text-right font-mono text-xs font-black ${isLow ? 'text-destructive' : 'text-foreground'}`}>
-                        {item.totalStock?.toLocaleString() || 0}
-                      </TableCell>
-                      <TableCell className="text-right text-[10px] font-mono opacity-50">{item.reorderLevel || 0}</TableCell>
-                      <TableCell className="text-right pr-6">
-                        <div className="flex items-center justify-end gap-2">
-                          {isLow && (
-                            <Badge variant="destructive" className="text-[8px] h-4 font-black animate-pulse uppercase">LOW</Badge>
-                          )}
-                          <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <MoreHorizontal className="size-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

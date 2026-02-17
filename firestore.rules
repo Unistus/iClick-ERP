@@ -51,6 +51,21 @@ service cloud.firestore {
       // Only members/admins can update profile
       allow update: if isInstitutionMember(institutionId);
       
+      // Explicitly allow institutional payables
+      match /payables/{docId} {
+        allow read, write: if isInstitutionMember(institutionId);
+      }
+      
+      // Explicitly allow vendor invoices
+      match /vendor_invoices/{docId} {
+        allow read, write: if isInstitutionMember(institutionId);
+      }
+
+      // Explicitly allow sales invoices
+      match /sales_invoices/{docId} {
+        allow read, write: if isInstitutionMember(institutionId);
+      }
+
       // All institutional sub-collections (coa, products, payables, invoices, etc.)
       match /{allSubcollections=**} {
         allow read, write: if isInstitutionMember(institutionId);

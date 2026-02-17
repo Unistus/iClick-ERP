@@ -32,7 +32,8 @@ import {
   Building2,
   History,
   Hourglass,
-  LayoutGrid
+  LayoutGrid,
+  MapPin
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, startOfMonth, endOfMonth, differenceInDays } from "date-fns";
@@ -248,8 +249,7 @@ export default function AccountingReportsPage() {
                   <TableCell className="text-right pr-4 font-mono text-xs">{currency} {totalLiabs.toLocaleString()}</TableCell>
                 </TableRow>
               </TableBody>
-            </Table>
-          </section>
+            </section>
 
           <section>
             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500 mb-4">Equity</h3>
@@ -266,8 +266,7 @@ export default function AccountingReportsPage() {
                   <TableCell className="text-right pr-4 font-mono text-xs">{currency} {totalEquity.toLocaleString()}</TableCell>
                 </TableRow>
               </TableBody>
-            </Table>
-          </section>
+            </section>
         </div>
       </div>
     );
@@ -568,7 +567,7 @@ export default function AccountingReportsPage() {
                   <div className="pt-2 border-t border-accent/10 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
-                        <Label className="text-[10px] font-bold uppercase">Comparison</Label>
+                        <Label className="text-10px font-bold uppercase">Comparison</Label>
                         <p className="text-[8px] text-muted-foreground">Prev. Period</p>
                       </div>
                       <Switch checked={comparisonMode} onCheckedChange={setComparisonMode} />

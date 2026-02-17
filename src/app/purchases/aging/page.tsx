@@ -1,10 +1,11 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, query, where, orderBy, doc } from "firebase/firestore";
 import { Hourglass, Search, Filter, RefreshCw, AlertCircle } from "lucide-react";
@@ -18,6 +19,11 @@ export default function SupplierAgingPage() {
   const db = useFirestore();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [dataTimestamp, setDataTimestamp] = useState<string>("");
+
+  useEffect(() => {
+    setDataTimestamp(new Date().toLocaleTimeString());
+  }, []);
 
   // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
@@ -57,7 +63,16 @@ export default function SupplierAgingPage() {
     const now = new Date();
 
     bills.forEach(bill => {
-      const dueDate = bill.dueDate?.toDate ? bill.dueDate.toDate() : new Date(bill.dueDate);
+      // Robust date handling for various Firestore/JS formats
+      let dueDate: Date;
+      if (bill.dueDate?.toDate) {
+        dueDate = bill.dueDate.toDate();
+      } else if (bill.dueDate instanceof Date) {
+        dueDate = bill.dueDate;
+      } else {
+        dueDate = new Date(bill.dueDate);
+      }
+
       const daysOverdue = differenceInDays(now, dueDate);
       const amount = bill.balance || 0;
 
@@ -87,7 +102,7 @@ export default function SupplierAgingPage() {
               <Hourglass className="size-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-headline font-bold">Supplier Aging</h1>
+              <h1 className="text-2xl font-headline font-bold text-foreground">Supplier Aging</h1>
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">Debt Maturity Analysis</p>
             </div>
           </div>
@@ -103,7 +118,7 @@ export default function SupplierAgingPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon" className="size-9" disabled={!selectedInstId}>
+            <Button variant="outline" size="icon" className="size-9" disabled={!selectedInstId} onClick={() => setDataTimestamp(new Date().toLocaleTimeString())}>
               <RefreshCw className="size-4" />
             </Button>
           </div>

@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle2, Search, Truck, MapPin, Loader2, ArrowUpRight, DollarSign } from "lucide-react";
+import { CheckCircle2, Search, Truck, MapPin, Loader2, ArrowUpRight, DollarSign, Users } from "lucide-react";
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy, where } from "firebase/firestore";
 import { confirmDelivery } from "@/lib/delivery/delivery.service";
@@ -70,7 +70,7 @@ export default function DeliveryConfirmationPage() {
 
         {!selectedInstId ? (
           <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed rounded-2xl bg-secondary/5">
-            <CheckCircle2 className="size-12 text-muted-foreground opacity-20 mb-3" />
+            <Users className="size-12 text-muted-foreground opacity-20 mb-3" />
             <p className="text-sm font-medium text-muted-foreground">Select an institution to confirm deliveries.</p>
           </div>
         ) : (
@@ -93,7 +93,7 @@ export default function DeliveryConfirmationPage() {
                     Once marked as delivered, the assigned driver and vehicle are instantly returned to the <strong>Available</strong> resource pool.
                   </p>
                 </CardContent>
-              </div>
+              </Card>
             </div>
 
             <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">

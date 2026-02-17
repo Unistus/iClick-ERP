@@ -95,6 +95,17 @@
         "location": { "type": "string" },
         "isDefault": { "type": "boolean" }
       }
+    },
+    "PriceList": {
+      "title": "PriceList",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "isDefault": { "type": "boolean" }
+      }
     }
   },
   "auth": {
@@ -140,6 +151,28 @@
           "entityName": "Warehouse",
           "schema": { "$ref": "#/backend/entities/Warehouse" },
           "description": "Storage locations."
+        }
+      },
+      {
+        "path": "/institutions/{institutionId}/price_lists/{id}",
+        "definition": {
+          "entityName": "PriceList",
+          "schema": { "$ref": "#/backend/entities/PriceList" },
+          "description": "Tiered pricing lists."
+        }
+      },
+      {
+        "path": "/institutions/{institutionId}/price_lists/{id}/items/{productId}",
+        "definition": {
+          "entityName": "PriceListItem",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "productId": { "type": "string" },
+              "price": { "type": "number" }
+            }
+          },
+          "description": "Product price overrides within a list."
         }
       }
     ]

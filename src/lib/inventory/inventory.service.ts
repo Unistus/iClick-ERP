@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Firestore, collection, doc, serverTimestamp, increment, runTransaction, getDoc, addDoc } from 'firebase/firestore';
@@ -38,7 +39,8 @@ export async function recordStockMovement(db: Firestore, institutionId: string, 
     const setup = setupSnap.data();
 
     // 1. Update Product Totals
-    const qtyChange = (payload.type === 'In' || payload.type === 'Transfer') ? payload.quantity : -payload.quantity;
+    // Transfers are handled as separate Out/In pairs by the transferStock service
+    const qtyChange = (payload.type === 'In') ? payload.quantity : -payload.quantity;
     transaction.update(productRef, {
       totalStock: increment(qtyChange),
       updatedAt: serverTimestamp()
@@ -109,6 +111,7 @@ export async function registerInventoryBatch(db: Firestore, institutionId: strin
 
 /**
  * Transfers stock between warehouses.
+ * Executes as a single transaction to maintain stock integrity.
  */
 export async function transferStock(db: Firestore, institutionId: string, payload: {
   productId: string;
@@ -117,21 +120,45 @@ export async function transferStock(db: Firestore, institutionId: string, payloa
   quantity: number;
   reference: string;
 }) {
-  await recordStockMovement(db, institutionId, {
-    productId: payload.productId,
-    warehouseId: payload.fromWarehouseId,
-    type: 'Out',
-    quantity: payload.quantity,
-    reference: `TRF-OUT: ${payload.reference}`,
-    unitCost: 0
-  });
+  const productRef = doc(db, 'institutions', institutionId, 'products', payload.productId);
+  const movementsRef = collection(db, 'institutions', institutionId, 'movements');
 
-  await recordStockMovement(db, institutionId, {
-    productId: payload.productId,
-    warehouseId: payload.toWarehouseId,
-    type: 'In',
-    quantity: payload.quantity,
-    reference: `TRF-IN: ${payload.reference}`,
-    unitCost: 0
+  return runTransaction(db, async (transaction) => {
+    const productSnap = await transaction.get(productRef);
+    if (!productSnap.exists()) throw new Error("Product not found");
+    
+    const product = productSnap.data();
+    if (product.totalStock < payload.quantity) {
+      throw new Error(`Insufficient stock. Current total: ${product.totalStock}`);
+    }
+
+    // Transfers don't change TOTAL stock for the institution, 
+    // but we log the specific warehouse movements.
+    
+    // Log Dispatch (Out from Source)
+    const outMoveRef = doc(movementsRef);
+    transaction.set(outMoveRef, {
+      productId: payload.productId,
+      warehouseId: payload.fromWarehouseId,
+      type: 'Out',
+      quantity: payload.quantity,
+      reference: `TRF-OUT: ${payload.reference}`,
+      timestamp: serverTimestamp()
+    });
+
+    // Log Receipt (In at Destination)
+    const inMoveRef = doc(movementsRef);
+    transaction.set(inMoveRef, {
+      productId: payload.productId,
+      warehouseId: payload.toWarehouseId,
+      type: 'In',
+      quantity: payload.quantity,
+      reference: `TRF-IN: ${payload.reference}`,
+      timestamp: serverTimestamp()
+    });
+
+    transaction.update(productRef, {
+      updatedAt: serverTimestamp()
+    });
   });
 }

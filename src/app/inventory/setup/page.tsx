@@ -10,9 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, serverTimestamp, setDoc, deleteDoc } from "firebase/firestore";
-import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { addDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { 
   Settings, 
   Save, 
@@ -26,16 +27,21 @@ import {
   Banknote,
   Plus,
   Trash2,
-  ListTree
+  ListTree,
+  Edit2,
+  CheckCircle2
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
+import { Badge } from "@/components/ui/badge";
 
 export default function InventorySetupPage() {
   const db = useFirestore();
   const { user } = useUser();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isPriceListOpen, setIsPriceListOpen] = useState(false);
+  const [selectedPriceList, setSelectedPriceList] = useState<any>(null);
 
   // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
@@ -122,6 +128,21 @@ export default function InventorySetupPage() {
     addDocumentNonBlocking(collection(db, 'institutions', selectedInstId, 'uoms'), data);
     e.currentTarget.reset();
     toast({ title: "UoM Registered" });
+  };
+
+  const handleAddPriceList = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedInstId) return;
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      name: formData.get('name'),
+      description: formData.get('description'),
+      isActive: true,
+      createdAt: serverTimestamp()
+    };
+    addDocumentNonBlocking(collection(db, 'institutions', selectedInstId, 'price_lists'), data);
+    setIsPriceListOpen(false);
+    toast({ title: "Price List Created" });
   };
 
   const AccountSelect = ({ name, label, description, typeFilter }: { name: string, label: string, description: string, typeFilter?: string[] }) => (
@@ -252,7 +273,6 @@ export default function InventorySetupPage() {
 
             <TabsContent value="catalog">
               <div className="grid gap-6 lg:grid-cols-2">
-                {/* Categories Management */}
                 <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
                   <CardHeader className="bg-secondary/10 border-b">
                     <div className="flex items-center justify-between">
@@ -264,7 +284,7 @@ export default function InventorySetupPage() {
                   <CardContent className="p-0">
                     <div className="p-4 border-b bg-secondary/5">
                       <form onSubmit={handleAddCategory} className="flex gap-2">
-                        <Input name="name" placeholder="Category Name (e.g. Antibiotics)" required className="h-9 text-xs" />
+                        <Input name="name" placeholder="Category Name" required className="h-9 text-xs" />
                         <Button type="submit" size="sm" className="h-9 px-4 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
                       </form>
                     </div>
@@ -287,7 +307,6 @@ export default function InventorySetupPage() {
                   </CardContent>
                 </Card>
 
-                {/* UoM Management */}
                 <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
                   <CardHeader className="bg-secondary/10 border-b">
                     <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
@@ -297,8 +316,8 @@ export default function InventorySetupPage() {
                   <CardContent className="p-0">
                     <div className="p-4 border-b bg-secondary/5">
                       <form onSubmit={handleAddUoM} className="grid grid-cols-3 gap-2">
-                        <Input name="code" placeholder="Code (e.g. PCS)" required className="h-9 text-xs" />
-                        <Input name="name" placeholder="Name (e.g. Pieces)" required className="h-9 text-xs" />
+                        <Input name="code" placeholder="Code" required className="h-9 text-xs" />
+                        <Input name="name" placeholder="Name" required className="h-9 text-xs" />
                         <Button type="submit" size="sm" className="h-9 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
                       </form>
                     </div>
@@ -325,14 +344,75 @@ export default function InventorySetupPage() {
             </TabsContent>
 
             <TabsContent value="pricing">
-              <Card className="border-none ring-1 ring-border bg-card shadow-xl h-[400px] flex flex-col items-center justify-center text-center opacity-50">
-                <Banknote className="size-12 mb-4 text-muted-foreground" />
-                <h3 className="font-bold text-lg">Price List Management</h3>
-                <p className="text-xs max-w-sm">
-                  Configure institutional pricing tiers, wholesale markups, and insurance-specific rate cards here.
-                </p>
-                <Badge variant="outline" className="mt-4 uppercase text-[10px] font-black">Coming Soon</Badge>
-              </Card>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-lg font-bold">Pricing Tiers</h2>
+                  <Dialog open={isPriceListOpen} onOpenChange={setIsPriceListOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase">
+                        <Plus className="size-4" /> New Price List
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <form onSubmit={handleAddPriceList}>
+                        <DialogHeader>
+                          <DialogTitle>Create Pricing Strategy</DialogTitle>
+                          <CardDescription>Define a new price list for customer segments or specific institutions.</CardDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4 text-xs">
+                          <div className="space-y-2">
+                            <Label>List Name</Label>
+                            <Input name="name" placeholder="e.g. Wholesale Tier A" required />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Description</Label>
+                            <Input name="description" placeholder="Notes on eligibility or terms" />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button type="submit" className="h-9 font-bold uppercase text-xs">Create List</Button>
+                        </DialogFooter>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {priceLists?.map(list => (
+                    <Card key={list.id} className="bg-card border-none ring-1 ring-border shadow-md group hover:ring-primary/30 transition-all overflow-hidden">
+                      <CardHeader className="pb-2 bg-secondary/10 border-b">
+                        <div className="flex justify-between items-start">
+                          <div className="space-y-1">
+                            <CardTitle className="text-sm font-bold">{list.name}</CardTitle>
+                            <p className="text-[10px] text-muted-foreground">{list.description}</p>
+                          </div>
+                          <Badge variant="secondary" className="text-[8px] h-4 font-bold bg-emerald-500/10 text-emerald-500">ACTIVE</Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-4 flex flex-col gap-4">
+                        <div className="flex items-center justify-between text-[10px] uppercase font-bold text-muted-foreground">
+                          <span>Items Overridden</span>
+                          <span className="text-primary">0 SKUs</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 mt-auto">
+                          <Button variant="outline" size="sm" className="h-8 text-[10px] font-bold uppercase">
+                            <Edit2 className="size-3 mr-1" /> Configure
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-8 text-[10px] font-bold uppercase text-destructive hover:bg-destructive/10">
+                            <Trash2 className="size-3 mr-1" /> Remove
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  {(!priceLists || priceLists.length === 0) && (
+                    <div className="col-span-full py-20 text-center border-2 border-dashed rounded-xl bg-secondary/5 opacity-50">
+                      <Banknote className="size-10 mx-auto mb-3 text-muted-foreground" />
+                      <p className="text-sm font-medium">No price lists defined yet.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         )}

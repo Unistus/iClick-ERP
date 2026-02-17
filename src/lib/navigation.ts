@@ -39,7 +39,12 @@ import {
   Gavel,
   Landmark,
   ArrowRightLeft,
-  ClipboardCheck
+  ClipboardCheck,
+  Scale,
+  PackageSearch,
+  Timer,
+  Factory,
+  Database
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -80,10 +85,13 @@ export const navConfig: NavItem[] = [
     pattern: /^\/inventory/,
     id: "inventory",
     submenus: [
-      { title: "Products", icon: Box, url: "/inventory", id: "products" },
+      { title: "Products & Services", icon: Box, url: "/inventory", id: "products" },
+      { title: "Warehouses", icon: Database, url: "/inventory/warehouses", id: "warehouses" },
       { title: "Stock Transfers", icon: Truck, url: "/inventory/transfers", id: "transfers" },
       { title: "Adjustments", icon: Layers, url: "/inventory/adjustments", id: "adjustments" },
-      { title: "Categories", icon: Hash, url: "/inventory/categories", id: "categories" },
+      { title: "Expiry Control", icon: Timer, url: "/inventory/expiry", id: "expiry" },
+      { title: "Valuation", icon: Scale, url: "/inventory/valuation", id: "valuation" },
+      { title: "Inventory Setup", icon: Settings, url: "/inventory/setup", id: "setup" },
     ]
   },
   { 

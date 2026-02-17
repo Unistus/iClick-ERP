@@ -69,53 +69,59 @@
         }
       }
     },
-    "ExpenseRequisition": {
-      "title": "ExpenseRequisition",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "requestedBy": { "type": "string" },
-        "amount": { "type": "number" },
-        "status": { "type": "string", "enum": ["Pending", "Approved", "Paid", "Rejected"] },
-        "expenseAccountId": { "type": "string" },
-        "description": { "type": "string" }
-      }
-    },
-    "TaxReturn": {
-      "title": "TaxReturn",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "periodId": { "type": "string" },
-        "periodName": { "type": "string" },
-        "grossSales": { "type": "number" },
-        "outputVat": { "type": "number" },
-        "inputVat": { "type": "number" },
-        "netTaxPayable": { "type": "number" },
-        "status": { "type": "string" }
-      }
-    },
-    "FiscalPeriod": {
-      "title": "FiscalPeriod",
+    "Product": {
+      "title": "Product",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "startDate": { "type": "string" },
-        "endDate": { "type": "string" },
-        "status": { "type": "string", "enum": ["Open", "Closed"] }
+        "sku": { "type": "string" },
+        "type": { "type": "string", "enum": ["Stock", "Service", "Bundle"] },
+        "categoryId": { "type": "string" },
+        "uomId": { "type": "string" },
+        "basePrice": { "type": "number" },
+        "costPrice": { "type": "number" },
+        "reorderLevel": { "type": "number" },
+        "trackExpiry": { "type": "boolean" },
+        "trackSerials": { "type": "boolean" },
+        "totalStock": { "type": "number" }
       }
     },
-    "FixedAsset": {
-      "title": "FixedAsset",
+    "Warehouse": {
+      "title": "Warehouse",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
         "code": { "type": "string" },
-        "purchasePrice": { "type": "number" },
-        "currentValue": { "type": "number" },
-        "status": { "type": "string" }
+        "location": { "type": "string" },
+        "isDefault": { "type": "boolean" }
+      }
+    },
+    "StockMovement": {
+      "title": "StockMovement",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "productId": { "type": "string" },
+        "warehouseId": { "type": "string" },
+        "type": { "type": "string", "enum": ["In", "Out", "Transfer", "Adjustment", "Damage"] },
+        "quantity": { "type": "number" },
+        "reference": { "type": "string" },
+        "batchId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    "InventoryBatch": {
+      "title": "InventoryBatch",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "productId": { "type": "string" },
+        "batchNumber": { "type": "string" },
+        "expiryDate": { "type": "string", "format": "date" },
+        "warehouseId": { "type": "string" },
+        "quantity": { "type": "number" }
       }
     }
   },
@@ -133,27 +139,35 @@
         }
       },
       {
-        "path": "/institutions/{institutionId}/fiscal_periods/{periodId}",
+        "path": "/institutions/{institutionId}/inventory/products/{productId}",
         "definition": {
-          "entityName": "FiscalPeriod",
-          "schema": { "$ref": "#/backend/entities/FiscalPeriod" },
-          "description": "Accounting cycles."
+          "entityName": "Product",
+          "schema": { "$ref": "#/backend/entities/Product" },
+          "description": "Stock items and services."
         }
       },
       {
-        "path": "/institutions/{institutionId}/tax_returns/{returnId}",
+        "path": "/institutions/{institutionId}/inventory/warehouses/{warehouseId}",
         "definition": {
-          "entityName": "TaxReturn",
-          "schema": { "$ref": "#/backend/entities/TaxReturn" },
-          "description": "Historical tax filings."
+          "entityName": "Warehouse",
+          "schema": { "$ref": "#/backend/entities/Warehouse" },
+          "description": "Storage locations."
         }
       },
       {
-        "path": "/institutions/{institutionId}/journal_entries/{entryId}",
+        "path": "/institutions/{institutionId}/inventory/movements/{movementId}",
         "definition": {
-          "entityName": "JournalEntry",
-          "schema": { "$ref": "#/backend/entities/JournalEntry" },
-          "description": "Double-entry logs."
+          "entityName": "StockMovement",
+          "schema": { "$ref": "#/backend/entities/StockMovement" },
+          "description": "Ledger of all stock changes."
+        }
+      },
+      {
+        "path": "/institutions/{institutionId}/inventory/batches/{batchId}",
+        "definition": {
+          "entityName": "InventoryBatch",
+          "schema": { "$ref": "#/backend/entities/InventoryBatch" },
+          "description": "Batch and expiry tracking."
         }
       }
     ]

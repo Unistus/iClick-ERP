@@ -57,7 +57,11 @@ import {
   Quote,
   ClipboardCheck as OrderIcon,
   ArrowLeftRight,
-  UserCheck
+  UserCheck,
+  Users2,
+  PackageCheck,
+  Hourglass,
+  BadgeCent
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -114,6 +118,23 @@ export const navConfig: NavItem[] = [
       { title: "Sales Reports", icon: ClipboardList, url: "/sales/reports", id: "reports" },
       { title: "Commission", icon: UserCheck, url: "/sales/commissions", id: "commissions" },
       { title: "Sales Setup", icon: Settings, url: "/sales/setup", id: "setup" },
+    ]
+  },
+  {
+    title: "Purchases",
+    icon: ShoppingCart,
+    url: "/purchases",
+    pattern: /^\/purchases/,
+    id: "purchases",
+    submenus: [
+      { title: "Suppliers", icon: Users2, url: "/purchases/suppliers", id: "suppliers" },
+      { title: "Purchase Orders", icon: ClipboardCheck, url: "/purchases/orders", id: "orders" },
+      { title: "GRN Hub", icon: PackageCheck, url: "/purchases/grn", id: "grn" },
+      { title: "Vendor Invoices", icon: FileText, url: "/purchases/invoices", id: "invoices" },
+      { title: "Purchase Returns", icon: ArrowLeftRight, url: "/purchases/returns", id: "returns" },
+      { title: "Supplier Aging", icon: Hourglass, url: "/purchases/aging", id: "aging" },
+      { title: "Procurement Setup", icon: Settings, url: "/purchases/setup", id: "setup" },
+      { title: "Purchases Reports", icon: ClipboardList, url: "/purchases/reports", id: "reports" },
     ]
   },
   { 

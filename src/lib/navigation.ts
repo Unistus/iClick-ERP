@@ -96,7 +96,6 @@ export const navConfig: NavItem[] = [
       { title: "General Ledger", icon: BookOpen, url: "/accounting", id: "ledger" },
       { title: "Chart of Accounts", icon: Layers, url: "/accounting/coa", id: "coa" },
       { title: "Journal Entries", icon: History, url: "/accounting/journal", id: "journal" },
-      { title: "Financial Reports", icon: ClipboardCheck, url: "/accounting/reports", id: "reports" },
       { title: "Accounts Receivable", icon: Receipt, url: "/accounting/ar", id: "ar" },
       { title: "Accounts Payable", icon: Gavel, url: "/accounting/ap", id: "ap" },
       { title: "Cash & Bank", icon: Landmark, url: "/accounting/banking", id: "bank" },
@@ -105,6 +104,7 @@ export const navConfig: NavItem[] = [
       { title: "Budgets", icon: PieChart, url: "/accounting/budgets", id: "budgets" },
       { title: "Tax Returns", icon: FileText, url: "/accounting/tax", id: "tax_returns" },
       { title: "Financial Setup", icon: Settings, url: "/accounting/setup", id: "setup" },
+      { title: "Financial Reports", icon: ClipboardCheck, url: "/accounting/reports", id: "reports" },
     ]
   },
   { 

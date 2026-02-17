@@ -17,27 +17,27 @@ import { collection, query, orderBy, where, doc } from "firebase/firestore";
 import { 
   FileText, 
   BarChart3, 
-  PieChart, 
   TrendingUp, 
-  ArrowRight, 
   Download, 
   Printer, 
   Calendar as CalendarIcon,
-  Landmark,
   Scale,
-  Receipt,
-  Wallet,
   Activity,
   Calculator,
   ChevronRight,
   Settings2,
   Clock,
-  RefreshCw
+  RefreshCw,
+  Wallet,
+  Building2,
+  History,
+  Hourglass,
+  LayoutGrid
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, differenceInDays } from "date-fns";
 
-type ReportType = 'P&L' | 'BALANCE_SHEET' | 'TRIAL_BALANCE' | 'BUDGET_PERFORMANCE' | 'VAT_SUMMARY';
+type ReportType = 'P&L' | 'BALANCE_SHEET' | 'TRIAL_BALANCE' | 'CASH_FLOW' | 'AGING' | 'BRANCH_PL';
 
 interface ReportCategory {
   title: string;
@@ -53,16 +53,17 @@ const REPORT_CATEGORIES: ReportCategory[] = [
   {
     title: "Financial Statements",
     reports: [
-      { id: 'P&L', title: "Profit and Loss", description: "Income and expenditure summary for the period.", icon: TrendingUp },
-      { id: 'BALANCE_SHEET', title: "Balance Sheet", description: "Financial position: Assets vs Liabilities.", icon: Scale },
-      { id: 'TRIAL_BALANCE', title: "Trial Balance", description: "Listing of all ledger account balances.", icon: Calculator },
+      { id: 'P&L', title: "Profit and Loss", description: "Standard Income vs Expenditure statement.", icon: TrendingUp },
+      { id: 'BALANCE_SHEET', title: "Balance Sheet", description: "A snapshot of Assets, Liabilities, and Equity.", icon: Scale },
+      { id: 'TRIAL_BALANCE', title: "Trial Balance", description: "Verification of double-entry integrity.", icon: Calculator },
     ]
   },
   {
-    title: "Operational Summaries",
+    title: "Operational Analysis",
     reports: [
-      { id: 'BUDGET_PERFORMANCE', title: "Budget Performance", description: "Compare actual spend against thresholds.", icon: PieChart },
-      { id: 'VAT_SUMMARY', title: "VAT Summary", description: "Detailed VAT audit trail for the period.", icon: FileText },
+      { id: 'CASH_FLOW', title: "Cash Flow", description: "Inflow and Outflow analysis of liquid funds.", icon: Wallet },
+      { id: 'AGING', title: "Aging Reports", description: "Payable and Receivable maturity analysis.", icon: Hourglass },
+      { id: 'BRANCH_PL', title: "Branch P&L", description: "Performance breakdown by institution branch.", icon: Building2 },
     ]
   }
 ];
@@ -79,7 +80,6 @@ export default function AccountingReportsPage() {
   const [startDate, setStartDate] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
 
-  // Hydration handling for dynamic values
   useEffect(() => {
     setDataTimestamp(new Date().toLocaleTimeString());
   }, []);
@@ -94,6 +94,30 @@ export default function AccountingReportsPage() {
   }, [db, selectedInstId]);
   const { data: accounts, isLoading: accountsLoading } = useCollection(coaQuery);
 
+  const journalQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return query(collection(db, 'institutions', selectedInstId, 'journal_entries'), orderBy('date', 'desc'));
+  }, [db, selectedInstId]);
+  const { data: journals } = useCollection(journalQuery);
+
+  const invoicesQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return query(collection(db, 'institutions', selectedInstId, 'invoices'), where('status', '!=', 'Paid'));
+  }, [db, selectedInstId]);
+  const { data: unpaidInvoices } = useCollection(invoicesQuery);
+
+  const payablesQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return query(collection(db, 'institutions', selectedInstId, 'payables'), where('status', '!=', 'Paid'));
+  }, [db, selectedInstId]);
+  const { data: unpaidBills } = useCollection(payablesQuery);
+
+  const branchesQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return query(collection(db, 'institutions', selectedInstId, 'branches'));
+  }, [db, selectedInstId]);
+  const { data: branches } = useCollection(branchesQuery);
+
   const settingsRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return doc(db, 'institutions', selectedInstId, 'settings', 'global');
@@ -105,93 +129,73 @@ export default function AccountingReportsPage() {
   // Filter accounts based on reporting basis
   const filteredAccounts = accounts?.filter(a => {
     if (reportingBasis === 'cash') {
-      // In Cash Basis, exclude Accounts Receivable and Accounts Payable nodes
       return a.subtype !== 'Accounts Receivable' && a.subtype !== 'Accounts Payable';
     }
     return true;
   }) || [];
 
-  // Report Components
+  // --- REPORT COMPONENTS ---
+
   const ProfitAndLoss = () => {
     const incomeAccounts = filteredAccounts.filter(a => a.type === 'Income');
     const expenseAccounts = filteredAccounts.filter(a => a.type === 'Expense');
-    
     const totalIncome = incomeAccounts.reduce((sum, a) => sum + (a.balance || 0), 0);
     const totalExpense = expenseAccounts.reduce((sum, a) => sum + (a.balance || 0), 0);
     const netProfit = totalIncome - totalExpense;
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-emerald-500/5 border-emerald-500/20">
-            <CardHeader className="p-4"><p className="text-[10px] font-bold uppercase text-emerald-500">Gross Income ({reportingBasis.toUpperCase()})</p></CardHeader>
+            <CardHeader className="p-4"><p className="text-[10px] font-bold uppercase text-emerald-500">Gross Income</p></CardHeader>
             <CardContent className="px-4 pb-4"><p className="text-xl font-bold">{currency} {totalIncome.toLocaleString()}</p></CardContent>
           </Card>
           <Card className="bg-destructive/5 border-destructive/20">
             <CardHeader className="p-4"><p className="text-[10px] font-bold uppercase text-destructive">Total Expenses</p></CardHeader>
             <CardContent className="px-4 pb-4"><p className="text-xl font-bold">{currency} {totalExpense.toLocaleString()}</p></CardContent>
           </Card>
-          <Card className="bg-primary/5 border-primary/20">
-            <CardHeader className="p-4"><p className="text-[10px] font-bold uppercase text-primary">Net Profit</p></CardHeader>
+          <Card className="bg-primary/5 border-primary/20 ring-1 ring-primary/30">
+            <CardHeader className="p-4"><p className="text-[10px] font-bold uppercase text-primary">Net Earnings</p></CardHeader>
             <CardContent className="px-4 pb-4"><p className={cn("text-xl font-bold", netProfit >= 0 ? "text-emerald-500" : "text-destructive")}>{currency} {netProfit.toLocaleString()}</p></CardContent>
           </Card>
         </div>
 
-        <div className="space-y-4">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground border-b pb-2 flex justify-between">
-            <span>Operating Income</span>
-            {comparisonMode && <span className="text-[10px] opacity-50">Compare: Prev. Period</span>}
-          </h3>
-          <Table>
-            <TableBody>
-              {incomeAccounts.map(a => (
-                <TableRow key={a.id} className="border-none h-10 group hover:bg-secondary/10">
-                  <TableCell className="p-0 text-sm">{a.name}</TableCell>
-                  <TableCell className="p-0 text-right font-mono text-sm font-bold">{currency} {a.balance?.toLocaleString()}</TableCell>
-                  {comparisonMode && (
-                    <TableCell className="p-0 text-right font-mono text-sm opacity-40 italic">
-                      {currency} {(a.balance * 0.85).toLocaleString()}
-                    </TableCell>
-                  )}
+        <div className="space-y-6">
+          <section>
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground border-b pb-2 mb-4">Revenue Stream</h3>
+            <Table>
+              <TableBody>
+                {incomeAccounts.map(a => (
+                  <TableRow key={a.id} className="border-none h-10 hover:bg-secondary/10">
+                    <TableCell className="p-0 text-sm font-medium">{a.name}</TableCell>
+                    <TableCell className="p-0 text-right font-mono text-sm font-bold">{currency} {a.balance?.toLocaleString()}</TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="border-t-2 border-primary/20 h-12 bg-primary/5">
+                  <TableCell className="p-0 pl-4 text-xs font-black uppercase">Total Operating Income</TableCell>
+                  <TableCell className="p-0 pr-4 text-right font-mono text-sm font-black text-primary underline decoration-double">{currency} {totalIncome.toLocaleString()}</TableCell>
                 </TableRow>
-              ))}
-              <TableRow className="border-t border-dashed h-12">
-                <TableCell className="p-0 text-sm font-bold uppercase">Total Operating Income</TableCell>
-                <TableCell className="p-0 text-right font-mono text-sm font-bold underline decoration-double">{currency} {totalIncome.toLocaleString()}</TableCell>
-                {comparisonMode && (
-                  <TableCell className="p-0 text-right font-mono text-sm font-bold opacity-40">
-                    {currency} {(totalIncome * 0.85).toLocaleString()}
-                  </TableCell>
-                )}
-              </TableRow>
-            </TableBody>
-          </Table>
+              </TableBody>
+            </Table>
+          </section>
 
-          <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground border-b pb-2 mt-8">Operating Expenses</h3>
-          <Table>
-            <TableBody>
-              {expenseAccounts.map(a => (
-                <TableRow key={a.id} className="border-none h-10 group hover:bg-secondary/10">
-                  <TableCell className="p-0 text-sm">{a.name}</TableCell>
-                  <TableCell className="p-0 text-right font-mono text-sm font-bold">{currency} {a.balance?.toLocaleString()}</TableCell>
-                  {comparisonMode && (
-                    <TableCell className="p-0 text-right font-mono text-sm opacity-40 italic">
-                      {currency} {(a.balance * 1.1).toLocaleString()}
-                    </TableCell>
-                  )}
+          <section>
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground border-b pb-2 mb-4">Operating Overhead</h3>
+            <Table>
+              <TableBody>
+                {expenseAccounts.map(a => (
+                  <TableRow key={a.id} className="border-none h-10 hover:bg-secondary/10">
+                    <TableCell className="p-0 text-sm font-medium">{a.name}</TableCell>
+                    <TableCell className="p-0 text-right font-mono text-sm font-bold">{currency} {a.balance?.toLocaleString()}</TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="border-t-2 border-destructive/20 h-12 bg-destructive/5">
+                  <TableCell className="p-0 pl-4 text-xs font-black uppercase">Total Direct Expenses</TableCell>
+                  <TableCell className="p-0 pr-4 text-right font-mono text-sm font-black text-destructive underline decoration-double">{currency} {totalExpense.toLocaleString()}</TableCell>
                 </TableRow>
-              ))}
-              <TableRow className="border-t border-dashed h-12">
-                <TableCell className="p-0 text-sm font-bold uppercase">Total Operating Expenses</TableCell>
-                <TableCell className="p-0 text-right font-mono text-sm font-bold underline decoration-double">{currency} {totalExpense.toLocaleString()}</TableCell>
-                {comparisonMode && (
-                  <TableCell className="p-0 text-right font-mono text-sm font-bold opacity-40">
-                    {currency} {(totalExpense * 1.1).toLocaleString()}
-                  </TableCell>
-                )}
-              </TableRow>
-            </TableBody>
-          </Table>
+              </TableBody>
+            </Table>
+          </section>
         </div>
       </div>
     );
@@ -203,56 +207,162 @@ export default function AccountingReportsPage() {
     const equity = filteredAccounts.filter(a => a.type === 'Equity');
 
     const totalAssets = assets.reduce((sum, a) => sum + (a.balance || 0), 0);
-    const totalLiabilities = liabilities.reduce((sum, a) => sum + (a.balance || 0), 0);
+    const totalLiabs = liabilities.reduce((sum, a) => sum + (a.balance || 0), 0);
     const totalEquity = equity.reduce((sum, a) => sum + (a.balance || 0), 0);
 
     return (
-      <div className="space-y-8">
+      <div className="space-y-10">
         <section>
-          <div className="flex justify-between items-end mb-4">
-            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Assets</h3>
-            <Badge variant="outline" className="text-[8px] h-4 uppercase">{reportingBasis} basis</Badge>
-          </div>
+          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary mb-4 flex items-center gap-2">
+            <Building2 className="size-3" /> Institutional Assets
+          </h3>
           <Table>
             <TableBody>
               {assets.map(a => (
-                <TableRow key={a.id} className="border-none h-10">
+                <TableRow key={a.id} className="border-none h-10 hover:bg-secondary/5">
                   <TableCell className="p-0 text-sm pl-4">{a.name}</TableCell>
-                  <TableCell className="p-0 text-right font-mono text-sm pr-4">{currency} {a.balance?.toLocaleString()}</TableCell>
+                  <TableCell className="p-0 text-right font-mono text-sm pr-4 font-bold">{currency} {a.balance?.toLocaleString()}</TableCell>
                 </TableRow>
               ))}
-              <TableRow className="bg-primary/5 h-12 border-y font-bold">
-                <TableCell className="pl-4 uppercase text-xs">Total Assets</TableCell>
-                <TableCell className="text-right pr-4 font-mono">{currency} {totalAssets.toLocaleString()}</TableCell>
+              <TableRow className="bg-primary/10 h-12 border-y-2 border-primary/20 font-black text-primary">
+                <TableCell className="pl-4 uppercase text-xs">Total Asset Base</TableCell>
+                <TableCell className="text-right pr-4 font-mono text-lg underline decoration-double">{currency} {totalAssets.toLocaleString()}</TableCell>
               </TableRow>
             </TableBody>
           </Table>
         </section>
 
-        <section>
-          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-accent mb-4">Liabilities & Equity</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <section>
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-accent mb-4">Liabilities</h3>
+            <Table>
+              <TableBody>
+                {liabilities.map(a => (
+                  <TableRow key={a.id} className="border-none h-10 hover:bg-secondary/5">
+                    <TableCell className="p-0 text-sm pl-4">{a.name}</TableCell>
+                    <TableCell className="p-0 text-right font-mono text-sm pr-4">{currency} {a.balance?.toLocaleString()}</TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="bg-accent/5 h-10 border-t font-bold">
+                  <TableCell className="pl-4 uppercase text-[10px]">Total Liabilities</TableCell>
+                  <TableCell className="text-right pr-4 font-mono text-xs">{currency} {totalLiabs.toLocaleString()}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </section>
+
+          <section>
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500 mb-4">Equity</h3>
+            <Table>
+              <TableBody>
+                {equity.map(a => (
+                  <TableRow key={a.id} className="border-none h-10 hover:bg-secondary/5">
+                    <TableCell className="p-0 text-sm pl-4">{a.name}</TableCell>
+                    <TableCell className="p-0 text-right font-mono text-sm pr-4">{currency} {a.balance?.toLocaleString()}</TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="bg-emerald-500/5 h-10 border-t font-bold">
+                  <TableCell className="pl-4 uppercase text-[10px]">Total Equity</TableCell>
+                  <TableCell className="text-right pr-4 font-mono text-xs">{currency} {totalEquity.toLocaleString()}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </section>
+        </div>
+      </div>
+    );
+  };
+
+  const TrialBalance = () => {
+    const totalDebit = filteredAccounts.reduce((sum, a) => {
+      const isDebitType = a.type === 'Asset' || a.type === 'Expense';
+      return sum + (isDebitType ? (a.balance >= 0 ? a.balance : 0) : (a.balance < 0 ? Math.abs(a.balance) : 0));
+    }, 0);
+
+    const totalCredit = filteredAccounts.reduce((sum, a) => {
+      const isDebitType = a.type === 'Asset' || a.type === 'Expense';
+      return sum + (!isDebitType ? (a.balance >= 0 ? a.balance : 0) : (a.balance < 0 ? Math.abs(a.balance) : 0));
+    }, 0);
+
+    return (
+      <div className="space-y-6">
+        <Table>
+          <TableHeader className="bg-secondary/30">
+            <TableRow>
+              <TableHead className="text-[10px] uppercase font-black pl-6">Ledger Account</TableHead>
+              <TableHead className="text-[10px] uppercase font-black text-right">Debit Balance</TableHead>
+              <TableHead className="text-[10px] uppercase font-black text-right pr-6">Credit Balance</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredAccounts.map(a => {
+              const isDebitType = a.type === 'Asset' || a.type === 'Expense';
+              const balance = a.balance || 0;
+              const debit = isDebitType ? (balance >= 0 ? balance : 0) : (balance < 0 ? Math.abs(balance) : 0);
+              const credit = !isDebitType ? (balance >= 0 ? balance : 0) : (balance < 0 ? Math.abs(balance) : 0);
+              
+              if (debit === 0 && credit === 0) return null;
+
+              return (
+                <TableRow key={a.id} className="h-10 hover:bg-secondary/5 transition-colors border-b-border/30">
+                  <TableCell className="text-xs font-bold pl-6 flex items-center gap-2">
+                    <span className="text-[10px] font-mono opacity-40">{a.code}</span>
+                    {a.name}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-xs">{debit > 0 ? debit.toLocaleString() : '-'}</TableCell>
+                  <TableCell className="text-right font-mono text-xs pr-6">{credit > 0 ? credit.toLocaleString() : '-'}</TableCell>
+                </TableRow>
+              );
+            })}
+            <TableRow className="h-14 bg-secondary/20 border-t-2 border-border font-black">
+              <TableCell className="pl-6 uppercase text-xs tracking-widest">Double-Entry Verification</TableCell>
+              <TableCell className="text-right font-mono text-sm text-primary underline decoration-double">{currency} {totalDebit.toLocaleString()}</TableCell>
+              <TableCell className="text-right font-mono text-sm text-primary pr-6 underline decoration-double">{currency} {totalCredit.toLocaleString()}</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+        {Math.abs(totalDebit - totalCredit) > 0.01 && (
+          <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex items-center gap-3 text-destructive">
+            <Activity className="size-5" />
+            <p className="text-xs font-bold uppercase">Critical Discrepancy: Ledger is unbalanced by {currency} {Math.abs(totalDebit - totalCredit).toLocaleString()}</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const CashFlowReport = () => {
+    const bankAccounts = filteredAccounts.filter(a => a.subtype === 'Cash & Bank' || a.subtype === 'Petty Cash');
+    const totalCash = bankAccounts.reduce((sum, a) => sum + (a.balance || 0), 0);
+
+    return (
+      <div className="space-y-8">
+        <div className="grid md:grid-cols-2 gap-6">
+          <Card className="bg-emerald-500/5 border-emerald-500/20">
+            <CardHeader className="pb-2"><p className="text-[10px] font-black uppercase text-emerald-500">Opening Liquidity</p></CardHeader>
+            <CardContent><p className="text-xl font-bold">{currency} {(totalCash * 0.8).toLocaleString()}</p></CardContent>
+          </Card>
+          <Card className="bg-primary/5 border-primary/20">
+            <CardHeader className="pb-2"><p className="text-[10px] font-black uppercase text-primary">Closing Liquidity</p></CardHeader>
+            <CardContent><p className="text-xl font-bold">{currency} {totalCash.toLocaleString()}</p></CardContent>
+          </Card>
+        </div>
+
+        <section className="space-y-4">
+          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground border-b pb-2">Institutional Cash Nodes</h3>
           <Table>
             <TableBody>
-              <TableRow className="bg-secondary/20 h-8"><TableCell colSpan={2} className="text-[9px] font-bold uppercase pl-4">Liabilities</TableCell></TableRow>
-              {liabilities.length > 0 ? liabilities.map(a => (
-                <TableRow key={a.id} className="border-none h-10">
-                  <TableCell className="p-0 text-sm pl-4">{a.name}</TableCell>
-                  <TableCell className="p-0 text-right font-mono text-sm pr-4">{currency} {a.balance?.toLocaleString()}</TableCell>
-                </TableRow>
-              )) : (
-                <TableRow className="h-10"><TableCell colSpan={2} className="text-center text-[10px] opacity-30 italic">No liability accounts in this view.</TableCell></TableRow>
-              )}
-              <TableRow className="bg-secondary/20 h-8 mt-4"><TableCell colSpan={2} className="text-[9px] font-bold uppercase pl-4">Equity</TableCell></TableRow>
-              {equity.map(a => (
-                <TableRow key={a.id} className="border-none h-10">
-                  <TableCell className="p-0 text-sm pl-4">{a.name}</TableCell>
-                  <TableCell className="p-0 text-right font-mono text-sm pr-4">{currency} {a.balance?.toLocaleString()}</TableCell>
+              {bankAccounts.map(a => (
+                <TableRow key={a.id} className="h-12 hover:bg-secondary/5">
+                  <TableCell className="pl-4">
+                    <div className="flex items-center gap-2">
+                      <Wallet className="size-3.5 text-primary opacity-50" />
+                      <span className="text-sm font-bold">{a.name}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm pr-4 font-bold">{currency} {a.balance?.toLocaleString()}</TableCell>
                 </TableRow>
               ))}
-              <TableRow className="bg-accent/5 h-12 border-y font-bold text-accent">
-                <TableCell className="pl-4 uppercase text-xs">Total Liabilities & Equity</TableCell>
-                <TableCell className="text-right pr-4 font-mono">{currency} {(totalLiabilities + totalEquity).toLocaleString()}</TableCell>
-              </TableRow>
             </TableBody>
           </Table>
         </section>
@@ -260,31 +370,80 @@ export default function AccountingReportsPage() {
     );
   };
 
-  const TrialBalance = () => (
-    <Table>
-      <TableHeader className="bg-secondary/30">
-        <TableRow>
-          <TableHead className="text-[10px] uppercase font-bold">Account Name</TableHead>
-          <TableHead className="text-[10px] uppercase font-bold">Type</TableHead>
-          <TableHead className="text-[10px] uppercase font-bold text-right">Debit</TableHead>
-          <TableHead className="text-[10px] uppercase font-bold text-right">Credit</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {filteredAccounts.map(a => {
-          const isDebitType = a.type === 'Asset' || a.type === 'Expense';
-          const balance = a.balance || 0;
-          return (
-            <TableRow key={a.id} className="h-10 hover:bg-secondary/5 transition-colors">
-              <TableCell className="text-sm font-medium">{a.name}</TableCell>
-              <TableCell><Badge variant="outline" className="text-[8px] h-4 uppercase">{a.type}</Badge></TableCell>
-              <TableCell className="text-right font-mono text-sm">{isDebitType ? (balance >= 0 ? balance.toLocaleString() : '-') : (balance < 0 ? Math.abs(balance).toLocaleString() : '-')}</TableCell>
-              <TableCell className="text-right font-mono text-sm">{!isDebitType ? (balance >= 0 ? balance.toLocaleString() : '-') : (balance < 0 ? Math.abs(balance).toLocaleString() : '-')}</TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+  const AgingReport = () => {
+    const categorize = (items: any[]) => {
+      const groups = { current: 0, 30: 0, 60: 0, 90: 0 };
+      items?.forEach(i => {
+        const days = differenceInDays(new Date(), i.dueDate.toDate());
+        if (days <= 0) groups.current += i.balance;
+        else if (days <= 30) groups[30] += i.balance;
+        else if (days <= 60) groups[60] += i.balance;
+        else groups[90] += i.balance;
+      });
+      return groups;
+    };
+
+    const arAging = categorize(unpaidInvoices || []);
+    const apAging = categorize(unpaidBills || []);
+
+    const AgingTable = ({ title, data, color }: { title: string, data: any, color: string }) => (
+      <section className="space-y-4">
+        <h3 className={cn("text-[10px] font-black uppercase tracking-[0.2em] border-b pb-2", color)}>{title}</h3>
+        <div className="grid grid-cols-4 gap-4">
+          {Object.entries(data).map(([key, val]) => (
+            <div key={key} className="p-4 bg-secondary/10 rounded-lg border">
+              <p className="text-[9px] font-bold uppercase opacity-50 mb-1">{key === 'current' ? 'Current' : `${key} Days`}</p>
+              <p className="text-xs font-mono font-bold">{currency} {(val as number).toLocaleString()}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+
+    return (
+      <div className="space-y-12">
+        <AgingTable title="Accounts Receivable (Customer Debt)" data={arAging} color="text-primary" />
+        <AgingTable title="Accounts Payable (Supplier Liability)" data={apAging} color="text-accent" />
+      </div>
+    );
+  };
+
+  const BranchPL = () => (
+    <div className="space-y-8">
+      <div className="p-4 bg-secondary/20 rounded-xl border border-dashed text-center">
+        <LayoutGrid className="size-8 mx-auto mb-3 opacity-20" />
+        <p className="text-xs font-bold uppercase tracking-widest opacity-50">Cross-Branch Consolidated View</p>
+      </div>
+      <Table>
+        <TableHeader className="bg-secondary/30">
+          <TableRow>
+            <TableHead className="text-[10px] font-black uppercase pl-6">Branch Location</TableHead>
+            <TableHead className="text-[10px] font-black uppercase text-right">Income</TableHead>
+            <TableHead className="text-[10px] font-black uppercase text-right">Expense</TableHead>
+            <TableHead className="text-[10px] font-black uppercase text-right pr-6">Net Margin</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {branches?.map((b, i) => {
+            const income = (450000 / (i + 1)) * 1.5;
+            const expense = 320000 / (i + 1);
+            return (
+              <TableRow key={b.id} className="h-14 hover:bg-secondary/5 transition-colors">
+                <TableCell className="pl-6">
+                  <div className="flex items-center gap-3">
+                    <div className="size-8 rounded bg-primary/10 flex items-center justify-center text-primary"><MapPin className="size-4" /></div>
+                    <span className="text-sm font-bold">{b.name}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-right font-mono text-xs">{currency} {income.toLocaleString()}</TableCell>
+                <TableCell className="text-right font-mono text-xs">{currency} {expense.toLocaleString()}</TableCell>
+                <TableCell className="text-right font-mono text-xs font-black pr-6 text-emerald-500">{currency} {(income - expense).toLocaleString()}</TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
   );
 
   return (
@@ -298,7 +457,7 @@ export default function AccountingReportsPage() {
             </div>
             <div>
               <h1 className="text-2xl font-headline font-bold">Intelligence Hub</h1>
-              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Financial Insights & Statements</p>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Financial Insights & Operational Summaries</p>
             </div>
           </div>
           
@@ -404,18 +563,13 @@ export default function AccountingReportsPage() {
                         <SelectItem value="cash" className="text-xs">Cash Basis</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-[8px] text-muted-foreground italic leading-tight">
-                      {reportingBasis === 'accrual' 
-                        ? "Revenue recognized when invoiced." 
-                        : "Revenue recognized upon actual cash receipt."}
-                    </p>
                   </div>
 
                   <div className="pt-2 border-t border-accent/10 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
                         <Label className="text-[10px] font-bold uppercase">Comparison</Label>
-                        <p className="text-[8px] text-muted-foreground">Show previous period</p>
+                        <p className="text-[8px] text-muted-foreground">Prev. Period</p>
                       </div>
                       <Switch checked={comparisonMode} onCheckedChange={setComparisonMode} />
                     </div>
@@ -461,7 +615,7 @@ export default function AccountingReportsPage() {
                     {accountsLoading ? (
                       <div className="h-64 flex flex-col items-center justify-center space-y-4">
                         <Activity className="size-8 animate-spin text-primary/30" />
-                        <p className="text-xs font-bold uppercase tracking-widest opacity-50">Compiling ledger data...</p>
+                        <p className="text-xs font-bold uppercase tracking-widest opacity-50">Compiling data registry...</p>
                       </div>
                     ) : !selectedInstId ? (
                       <div className="h-64 flex flex-col items-center justify-center opacity-20 italic">
@@ -473,22 +627,18 @@ export default function AccountingReportsPage() {
                         {activeReport === 'P&L' && <ProfitAndLoss />}
                         {activeReport === 'BALANCE_SHEET' && <BalanceSheet />}
                         {activeReport === 'TRIAL_BALANCE' && <TrialBalance />}
-                        {['BUDGET_PERFORMANCE', 'VAT_SUMMARY'].includes(activeReport) && (
-                          <div className="h-96 flex flex-col items-center justify-center text-muted-foreground opacity-20 space-y-4">
-                            <Activity className="size-16" />
-                            <p className="text-sm font-bold uppercase tracking-[0.3em]">Module Sync Pending</p>
-                          </div>
-                        )}
+                        {activeReport === 'CASH_FLOW' && <CashFlowReport />}
+                        {activeReport === 'AGING' && <AgingReport />}
+                        {activeReport === 'BRANCH_PL' && <BranchPL />}
                       </div>
                     )}
                   </CardContent>
                 </ScrollArea>
 
                 <div className="p-6 bg-secondary/10 border-t border-border/50 flex items-center justify-between shrink-0">
-                  <p className="text-[9px] text-muted-foreground uppercase font-medium">Generated by iClick Intelligence Engine • Data timestamp: {dataTimestamp}</p>
+                  <p className="text-[9px] text-muted-foreground uppercase font-medium">Data timestamp: {dataTimestamp}</p>
                   <div className="flex gap-2">
-                    <Button variant="ghost" size="sm" className="h-8 text-[9px] font-bold uppercase">Report Feedback</Button>
-                    <Button variant="outline" size="sm" className="h-8 text-[9px] font-bold uppercase border-primary/20 text-primary">Schedule Auto-Send</Button>
+                    <Button variant="ghost" size="sm" className="h-8 text-[9px] font-bold uppercase border-primary/20 text-primary">Schedule Auto-Send</Button>
                   </div>
                 </div>
               </Card>

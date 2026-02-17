@@ -1,4 +1,3 @@
-
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -44,7 +43,9 @@ import {
   PackageSearch,
   Timer,
   Factory,
-  Database
+  Database,
+  BrainCircuit,
+  Sparkles
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -70,6 +71,13 @@ export const navConfig: NavItem[] = [
     url: "/", 
     pattern: /^\/($|dashboard)/,
     id: "dashboard"
+  },
+  {
+    title: "AI Strategist",
+    icon: BrainCircuit,
+    url: "/ai-insights",
+    pattern: /^\/ai-insights/,
+    id: "ai_strategist"
   },
   { 
     title: "iClick POS", 

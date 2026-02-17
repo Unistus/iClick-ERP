@@ -1,9 +1,8 @@
-
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { 
   TrendingUp, 
   DollarSign, 
@@ -36,11 +35,14 @@ import {
   MapPin,
   ArrowRight,
   ShieldCheck,
-  LayoutDashboard
+  LayoutDashboard,
+  BrainCircuit,
+  Sparkles,
+  ChevronRight
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { useFirestore, useDoc, useMemoFirebase, useUser } from "@/firebase"
-import { doc } from "firebase/firestore"
+import { useFirestore, useDoc, useMemoFirebase, useUser, useCollection } from "@/firebase"
+import { doc, collection, query, limit, orderBy } from "firebase/firestore"
 import { 
   AreaChart, 
   Area, 
@@ -60,6 +62,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import Link from 'next/link';
 
 // --- Mock Data ---
 const salesData = [
@@ -132,15 +135,45 @@ export default function HomePage() {
             <h1 className="text-2xl font-headline font-bold">Command Center</h1>
             <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold mt-1">Multi-Tenant Intelligence Hub</p>
           </div>
-          <div className="flex items-center gap-2 bg-secondary/20 p-1 rounded-lg border border-border/50">
-            <Badge variant="outline" className="h-7 gap-1.5 px-3 border-none bg-background text-[10px] font-bold">
-              <Calendar className="size-3 text-primary" /> Last 30 Days
-            </Badge>
-            <Badge variant="ghost" className="h-7 gap-1.5 px-3 text-[10px] font-bold opacity-50 hover:opacity-100">
-              Q3 2024
-            </Badge>
+          <div className="flex items-center gap-2">
+            <Link href="/ai-insights">
+              <Button size="sm" className="gap-2 bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 h-9 font-bold text-[10px] uppercase">
+                <BrainCircuit className="size-4" /> AI Strategist
+              </Button>
+            </Link>
+            <div className="flex items-center gap-2 bg-secondary/20 p-1 rounded-lg border border-border/50">
+              <Badge variant="outline" className="h-7 gap-1.5 px-3 border-none bg-background text-[10px] font-bold">
+                <Calendar className="size-3 text-primary" /> Last 30 Days
+              </Badge>
+            </div>
           </div>
         </div>
+
+        {/* AI Insight Highlight Card */}
+        <Card className="border-none bg-gradient-to-r from-primary/10 via-background to-accent/5 ring-1 ring-primary/20 shadow-xl overflow-hidden group">
+          <CardContent className="p-0 flex flex-col md:flex-row items-center">
+            <div className="p-6 flex-1 space-y-2">
+              <div className="flex items-center gap-2 text-primary font-black uppercase text-[10px] tracking-[0.2em]">
+                <Sparkles className="size-3 animate-pulse" /> Strategist Insight
+              </div>
+              <h2 className="text-lg font-bold">Inventory levels are 12% higher than seasonal average.</h2>
+              <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
+                System detected unallocated capital in medical consumables. Reducing next PO by 15% would free up <span className="font-bold text-emerald-500">KES 120k</span> for payroll overhead.
+              </p>
+              <div className="pt-2">
+                <Link href="/ai-insights">
+                  <Button variant="link" size="sm" className="text-primary p-0 h-auto font-bold text-[10px] uppercase gap-1 hover:gap-2 transition-all">
+                    View Full Strategy <ChevronRight className="size-3" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+            <div className="p-6 bg-primary/5 md:bg-transparent flex flex-col items-center justify-center shrink-0 border-l border-primary/10">
+              <BrainCircuit className="size-12 text-primary/30 group-hover:scale-110 transition-transform duration-500" />
+              <p className="text-[8px] font-black uppercase mt-2 opacity-40">Predictive Engine v2.0</p>
+            </div>
+          </CardContent>
+        </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="bg-secondary/20 h-auto p-1 mb-6 flex-wrap justify-start gap-1">
@@ -240,197 +273,6 @@ export default function HomePage() {
               </Card>
             </div>
           </TabsContent>
-
-          {/* --- SALES TAB --- */}
-          <TabsContent value="sales" className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card className="bg-card border-none ring-1 ring-border/50">
-                <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase text-muted-foreground">M-Pesa STK</span>
-                  <Smartphone className="size-3.5 text-emerald-500" />
-                </CardHeader>
-                <CardContent><div className="text-xl font-bold">842</div><p className="text-[9px] text-emerald-500 font-bold mt-1">+12.4% SUCCESS</p></CardContent>
-              </Card>
-              <Card className="bg-card border-none ring-1 ring-border/50">
-                <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase text-muted-foreground">Card Swipes</span>
-                  <CreditCard className="size-3.5 text-blue-500" />
-                </CardHeader>
-                <CardContent><div className="text-xl font-bold">156</div><p className="text-[9px] text-muted-foreground font-bold mt-1">VISA/MASTERCARD</p></CardContent>
-              </Card>
-              <Card className="bg-card border-none ring-1 ring-border/50">
-                <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase text-muted-foreground">Cash Sum</span>
-                  <Banknote className="size-3.5 text-amber-500" />
-                </CardHeader>
-                <CardContent><div className="text-xl font-bold">124</div><p className="text-[9px] text-amber-500 font-bold mt-1">DEPOSITED</p></CardContent>
-              </Card>
-            </div>
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Card className="bg-card border-none ring-1 ring-border/50 shadow-xl">
-                <CardHeader><CardTitle className="text-xs font-bold uppercase">Hourly Sales Traffic</CardTitle></CardHeader>
-                <CardContent>
-                  <div className="h-[250px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={salesByHour}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                        <XAxis dataKey="hour" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
-                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
-                        <Tooltip />
-                        <Bar dataKey="sales" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-card border-none ring-1 ring-border/50 shadow-xl">
-                <CardHeader><CardTitle className="text-xs font-bold uppercase">Payment Mix</CardTitle></CardHeader>
-                <CardContent>
-                  <div className="h-[250px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={paymentMix} innerRadius={60} outerRadius={80} dataKey="value">
-                          {paymentMix.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* --- INVENTORY TAB --- */}
-          <TabsContent value="inventory" className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-4">
-              {[
-                { label: "Active SKUs", value: "14,204", icon: Package, color: "text-primary" },
-                { label: "Out of Stock", value: "42", icon: AlertTriangle, color: "text-destructive" },
-                { label: "Low Re-order", value: "156", icon: Clock, color: "text-amber-500" },
-                { label: "Stock Health", value: "98.4%", icon: ShieldCheck, color: "text-emerald-500" },
-              ].map(i => (
-                <Card key={i.label} className="bg-card border-none ring-1 ring-border/50">
-                  <CardContent className="pt-4 flex items-center gap-3">
-                    <div className={`p-2 rounded bg-secondary ${i.color}`}><i.icon className="size-4" /></div>
-                    <div><p className="text-[9px] font-bold uppercase text-muted-foreground">{i.label}</p><p className="text-lg font-bold">{i.value}</p></div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Card className="bg-card border-none ring-1 ring-border shadow-xl">
-                <CardHeader className="border-b border-border/10"><CardTitle className="text-[10px] font-bold uppercase">Fast Moving Items</CardTitle></CardHeader>
-                <CardContent className="pt-6 space-y-6">
-                  {[{ n: "Panadol 500mg", t: 85, v: "420k" }, { n: "Masks", t: 72, v: "180k" }, { n: "Sanitizer", t: 64, v: "92k" }].map(item => (
-                    <div key={item.n} className="space-y-2">
-                      <div className="flex justify-between text-[11px] font-bold"><span>{item.n}</span><span className="text-primary">KES {item.v}</span></div>
-                      <Progress value={item.t} className="h-1.5 bg-secondary" />
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-              <Card className="bg-card border-none ring-1 ring-border shadow-xl">
-                <CardHeader className="border-b border-border/10 text-destructive"><CardTitle className="text-[10px] font-bold uppercase">Dead Stock Risk</CardTitle></CardHeader>
-                <CardContent className="p-0">
-                  <div className="divide-y divide-border/10">
-                    {[{ n: "Vintage Stethoscope", d: "184d", l: "12k" }, { n: "Ortho-Brace", d: "92d", l: "45k" }].map(i => (
-                      <div key={i.n} className="p-4 flex justify-between items-center text-[11px]">
-                        <div><p className="font-bold">{i.n}</p><p className="text-[9px] text-muted-foreground uppercase">No activity: {i.d}</p></div>
-                        <div className="text-right"><p className="font-bold text-destructive">KES {i.l}</p></div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* --- CASH FLOW TAB --- */}
-          <TabsContent value="cashflow" className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card className="bg-card border-none ring-1 ring-border overflow-hidden">
-                <CardHeader className="py-3 px-4 bg-emerald-500/5 flex justify-between items-center"><span className="text-[10px] font-bold text-emerald-500 uppercase">Net Position</span><Wallet className="size-3.5 text-emerald-500" /></CardHeader>
-                <CardContent className="pt-4"><div className="text-2xl font-bold">KES 2.4M</div><div className="text-emerald-500 font-bold text-[10px] mt-1">+18.4% SURPLUS</div></CardContent>
-              </Card>
-              <Card className="bg-card border-none ring-1 ring-border overflow-hidden">
-                <CardHeader className="py-3 px-4 bg-primary/5 flex justify-between items-center"><span className="text-[10px] font-bold text-primary uppercase">Receivables</span><PiggyBank className="size-3.5 text-primary" /></CardHeader>
-                <CardContent className="pt-4"><div className="text-2xl font-bold">KES 842k</div><div className="text-muted-foreground font-bold text-[10px] mt-1 uppercase">12 Overdue Invoices</div></CardContent>
-              </Card>
-              <Card className="bg-card border-none ring-1 ring-border overflow-hidden">
-                <CardHeader className="py-3 px-4 bg-destructive/5 flex justify-between items-center"><span className="text-[10px] font-bold text-destructive uppercase">Payables</span><Banknote className="size-3.5 text-destructive" /></CardHeader>
-                <CardContent className="pt-4"><div className="text-2xl font-bold">KES 1.1M</div><div className="text-destructive font-bold text-[10px] mt-1 uppercase">Payroll & Vendors</div></CardContent>
-              </Card>
-            </div>
-            <Card className="bg-card border-none ring-1 ring-border shadow-xl">
-              <CardHeader className="border-b border-border/10 flex flex-row items-center justify-between">
-                <CardTitle className="text-[10px] font-bold uppercase">Recent Movement Stream</CardTitle>
-                <button className="text-[9px] font-bold uppercase bg-primary text-white px-3 h-7 rounded"><RefreshCcw className="size-3 inline mr-1" /> Reconcile</button>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y divide-border/10">
-                  {[{ a: "POS Sales", d: "Today 14:20", t: "In", v: "45,000" }, { a: "MedCo Supplier", d: "Yesterday", t: "Out", v: "12,000" }].map((tx, i) => (
-                    <div key={i} className="p-4 flex items-center justify-between text-[11px]">
-                      <div className="flex items-center gap-3">
-                        <div className={`size-8 rounded flex items-center justify-center ${tx.t === 'In' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-destructive/10 text-destructive'}`}>{tx.t === 'In' ? <ArrowUpRight className="size-4" /> : <ArrowDownLeft className="size-4" />}</div>
-                        <div><p className="font-bold">{tx.a}</p><p className="text-[9px] text-muted-foreground uppercase">{tx.d}</p></div>
-                      </div>
-                      <p className={`font-mono font-bold ${tx.t === 'In' ? 'text-emerald-500' : 'text-destructive'}`}>{tx.t === 'In' ? '+' : '-'} KES {tx.v}</p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* --- ALERTS TAB --- */}
-          <TabsContent value="alerts" className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-12">
-              <div className="lg:col-span-8 space-y-4">
-                {activeAlerts.map(alert => (
-                  <Card key={alert.id} className="bg-card border-none ring-1 ring-border/50 hover:ring-primary/30 transition-all overflow-hidden">
-                    <CardContent className="p-0 flex">
-                      <div className={`w-1.5 ${alert.color.replace('text', 'bg')}`} />
-                      <div className="p-4 flex-1 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                          <div className={`p-2 rounded bg-secondary ${alert.color}`}><alert.icon className="size-5" /></div>
-                          <div>
-                            <div className="flex items-center gap-2"><span className={`text-[10px] font-bold uppercase ${alert.color}`}>{alert.type}</span><span className="text-muted-foreground opacity-30">•</span><span className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">{alert.module}</span></div>
-                            <p className="text-sm font-bold mt-0.5">{alert.msg}</p>
-                            <div className="text-[9px] text-muted-foreground flex items-center gap-1.5 mt-1"><Clock className="size-2.5" /> {alert.time}</div>
-                          </div>
-                        </div>
-                        <Button size="sm" variant="outline" className="h-8 text-[10px] font-bold">RESOLVE</Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-              <div className="lg:col-span-4 space-y-4">
-                <Card className="bg-card border-none ring-1 ring-border">
-                  <CardHeader><CardTitle className="text-[10px] font-bold uppercase">Resolution Metrics</CardTitle></CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-1"><div className="flex justify-between text-[10px] font-bold"><span>Today's Response</span><span>92%</span></div><Progress value={92} className="h-1" /></div>
-                    <p className="text-[10px] text-muted-foreground italic">Avg resolution time: 14 mins</p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </TabsContent>
-
-          {/* --- PLACEHOLDER TABS --- */}
-          {["tax", "branches", "staff"].map(tab => (
-            <TabsContent key={tab} value={tab}>
-              <Card className="border-none ring-1 ring-border/50 bg-card/50">
-                <CardContent className="py-24 text-center space-y-3">
-                  <Activity className="size-12 mx-auto text-muted-foreground opacity-20" />
-                  <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest">Analytics node initializing...</p>
-                  <p className="text-[10px] text-muted-foreground/50">Fetching granular metrics for {tab.toUpperCase()} context.</p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          ))}
         </Tabs>
       </div>
     </DashboardLayout>

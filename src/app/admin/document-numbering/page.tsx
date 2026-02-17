@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -22,6 +23,7 @@ const SEQUENCE_DEFINITIONS = [
   { id: "product_sku", title: "Product SKU", prefix: "SKU-", nextNumber: 1000, padding: 5 },
   { id: "product_id", title: "Physical Product ID", prefix: "PROD-", nextNumber: 100, padding: 4 },
   { id: "service_id", title: "Service Asset ID", prefix: "SERV-", nextNumber: 100, padding: 4 },
+  { id: "batch_lot_number", title: "Batch / Lot Number", prefix: "LOT-", nextNumber: 1, padding: 6 },
   { id: "grn", title: "Goods Received Note", prefix: "GRN-", nextNumber: 100, padding: 4 },
   { id: "stock_transfer", title: "Stock Transfer", prefix: "TR-", nextNumber: 100, padding: 4 },
   { id: "stock_adjustment", title: "Stock Adjustment", prefix: "ADJ-", nextNumber: 100, padding: 4 },
@@ -81,6 +83,7 @@ export default function DocumentNumbering() {
     } catch (e) {
       toast({ variant: "destructive", title: "Initialization Failed" });
     } finally {
+      setIsLoading(false); // Force reload effect would be better but this is MVP
       setInitializing(false)
     }
   }

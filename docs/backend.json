@@ -80,6 +80,7 @@
         "basePrice": { "type": "number" },
         "costPrice": { "type": "number" },
         "reorderLevel": { "type": "number" },
+        "shelfLifeDays": { "type": "number", "description": "Standard shelf life in days for predictive batch expiry." },
         "trackExpiry": { "type": "boolean" },
         "trackSerials": { "type": "boolean" },
         "totalStock": { "type": "number" }
@@ -151,6 +152,23 @@
           "entityName": "Warehouse",
           "schema": { "$ref": "#/backend/entities/Warehouse" },
           "description": "Storage locations."
+        }
+      },
+      {
+        "path": "/institutions/{institutionId}/batches/{batchId}",
+        "definition": {
+          "entityName": "Batch",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "productId": { "type": "string" },
+              "warehouseId": { "type": "string" },
+              "batchNumber": { "type": "string" },
+              "expiryDate": { "type": "string", "format": "date-time" },
+              "quantity": { "type": "number" }
+            }
+          },
+          "description": "Individual stock batches with expiry tracking."
         }
       },
       {

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -23,7 +24,8 @@ import {
   Trash2,
   Edit2,
   Hash,
-  Sparkles
+  Sparkles,
+  Calendar
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -100,6 +102,7 @@ export default function ProductsPage() {
       basePrice: parseFloat(formData.get('basePrice') as string),
       costPrice: parseFloat(formData.get('costPrice') as string),
       reorderLevel: parseFloat(formData.get('reorderLevel') as string) || 0,
+      shelfLifeDays: parseInt(formData.get('shelfLife') as string) || 0,
       trackExpiry: formData.get('trackExpiry') === 'on',
       updatedAt: serverTimestamp(),
     };
@@ -304,6 +307,16 @@ export default function ProductsPage() {
                       <Label>Unit Cost</Label>
                       <Input name="costPrice" type="number" step="0.01" defaultValue={editingProduct?.costPrice} required />
                     </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1.5"><Calendar className="size-3" /> Standard Shelf Life (Days)</Label>
+                    <Input name="shelfLife" type="number" defaultValue={editingProduct?.shelfLifeDays || 0} placeholder="e.g. 365" />
+                  </div>
+                  <div className="flex items-center justify-between p-3 border rounded bg-secondary/10 mt-4">
+                    <Label className="text-[10px] uppercase font-bold">Track Expiry?</Label>
+                    <input type="checkbox" name="trackExpiry" defaultChecked={editingProduct?.trackExpiry} className="size-4" />
                   </div>
                 </div>
                 <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg flex items-start gap-3">

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -31,13 +32,15 @@ import {
   BrainCircuit,
   Loader2,
   XCircle,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Sparkles
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { registerInventoryBatch } from "@/lib/inventory/inventory.service";
 import { aiInventoryLiquidation, type AiInventoryLiquidationOutput } from "@/ai/flows/ai-inventory-liquidation-flow";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
+import { getNextSequence } from "@/lib/sequence-service";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -54,6 +57,10 @@ export default function ExpiryControlPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [filter, setFilter] = useState<'All' | 'Expired' | 'Critical' | 'Warning'>('All');
+
+  // New Batch Form State for Predictive Expiry
+  const [targetProductId, setTargetProductId] = useState<string>("");
+  const [predictedExpiry, setPredictedExpiry] = useState<string>("");
 
   // AI Suggestion State
   const [aiResult, setAiResult] = useState<AiInventoryLiquidationOutput | null>(null);
@@ -103,6 +110,17 @@ export default function ExpiryControlPage() {
     return true;
   }) || [];
 
+  const handleProductChange = (productId: string) => {
+    setTargetProductId(productId);
+    const product = products?.find(p => p.id === productId);
+    if (product?.shelfLifeDays) {
+      const expiry = addDays(new Date(), product.shelfLifeDays);
+      setPredictedExpiry(format(expiry, 'yyyy-MM-dd'));
+    } else {
+      setPredictedExpiry("");
+    }
+  };
+
   const handleTriggerAi = async (batch: any) => {
     setSelectedBatchForAi(batch);
     const prod = products?.find(p => p.id === batch.productId);
@@ -126,16 +144,27 @@ export default function ExpiryControlPage() {
     }
   };
 
-  const handleRegisterBatch = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleRegisterBatch = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || isProcessing) return;
     setIsProcessing(true);
 
     const formData = new FormData(e.currentTarget);
+    let batchNumber = formData.get('batchNumber') as string;
+
+    // AUTOMATION KING: Auto-numbering for batches
+    if (!batchNumber) {
+      try {
+        batchNumber = await getNextSequence(db, selectedInstId, 'batch_lot_number');
+      } catch (err) {
+        batchNumber = `LOT-${Date.now()}`;
+      }
+    }
+
     const data = {
-      productId: formData.get('productId') as string,
+      productId: targetProductId,
       warehouseId: formData.get('warehouseId') as string,
-      batchNumber: formData.get('batchNumber') as string,
+      batchNumber: batchNumber,
       expiryDate: new Date(formData.get('expiryDate') as string),
       quantity: parseFloat(formData.get('quantity') as string),
     };
@@ -144,10 +173,14 @@ export default function ExpiryControlPage() {
 
     registerInventoryBatch(db, selectedInstId, data).then(() => {
       logSystemEvent(db, selectedInstId, user, 'INVENTORY', 'New Batch', `Batch ${data.batchNumber} registered.`);
-      toast({ title: "Batch Logged" });
+      toast({ title: "Batch Logged", description: `Assigned LOT: ${data.batchNumber}` });
     }).catch(err => {
       toast({ variant: "destructive", title: "Registration Failed", description: err.message });
-    }).finally(() => setIsProcessing(false));
+    }).finally(() => {
+      setIsProcessing(false);
+      setTargetProductId("");
+      setPredictedExpiry("");
+    });
   };
 
   return (
@@ -386,11 +419,14 @@ export default function ExpiryControlPage() {
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogContent className="max-w-md">
             <form onSubmit={handleRegisterBatch}>
-              <DialogHeader><DialogTitle>Log Batch Arrival</DialogTitle></DialogHeader>
+              <DialogHeader>
+                <DialogTitle>Log Batch Arrival</DialogTitle>
+                <DialogDescription className="text-xs uppercase font-bold tracking-tight">Institutional Stock Receipt</DialogDescription>
+              </DialogHeader>
               <div className="grid gap-4 py-4 text-xs">
                 <div className="space-y-2">
                   <Label>Target Product</Label>
-                  <Select name="productId" required>
+                  <Select name="productId" onValueChange={handleProductChange} required>
                     <SelectTrigger className="h-10"><SelectValue placeholder="Select Item" /></SelectTrigger>
                     <SelectContent>
                       {products?.filter(p => p.type === 'Stock').map(p => (
@@ -401,18 +437,18 @@ export default function ExpiryControlPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Batch / LOT #</Label>
-                    <Input name="batchNumber" required />
+                    <Label className="flex items-center gap-1.5"><Hash className="size-3 text-primary" /> Batch / LOT #</Label>
+                    <Input name="batchNumber" placeholder="Auto-generated" className="font-mono bg-secondary/10" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Expiry Date</Label>
-                    <Input name="expiryDate" type="date" required />
+                    <Label className="flex items-center gap-1.5"><Calendar className="size-3 text-accent" /> Expiry Date</Label>
+                    <Input name="expiryDate" type="date" defaultValue={predictedExpiry} required className="font-mono" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Quantity</Label>
-                    <Input name="quantity" type="number" step="0.01" required />
+                    <Label>Quantity Received</Label>
+                    <Input name="quantity" type="number" step="0.01" required className="h-10 font-bold" />
                   </div>
                   <div className="space-y-2">
                     <Label>Warehouse</Label>
@@ -424,9 +460,17 @@ export default function ExpiryControlPage() {
                     </Select>
                   </div>
                 </div>
+                <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg flex gap-3 items-start">
+                  <Sparkles className="size-4 text-primary shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    <strong>Predictive Hub:</strong> Selecting a product will automatically set the expiry date based on its standard shelf life. Leaving LOT number blank will use the sequence from <strong>Admin Hub</strong>.
+                  </p>
+                </div>
               </div>
               <DialogFooter>
-                <Button type="submit" className="h-10 font-bold uppercase text-xs">Commit Batch</Button>
+                <Button type="submit" disabled={isProcessing} className="h-10 font-bold uppercase text-xs px-8">
+                  {isProcessing ? <Loader2 className="size-3 animate-spin mr-2" /> : <Plus className="size-3 mr-2" />} Commit Batch
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>

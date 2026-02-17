@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -124,6 +123,7 @@ export default function BudgetOverviewPage() {
                   <div className="text-lg font-bold font-headline">{overallUtilization.toFixed(1)}%</div>
                   <Progress value={Math.min(overallUtilization, 100)} className="h-1 mt-2" />
                 </CardContent>
+              </Card>
 
               <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm relative overflow-hidden">
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-primary tracking-widest">Active Nodes</span></CardHeader>

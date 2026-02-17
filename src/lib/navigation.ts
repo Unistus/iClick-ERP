@@ -46,7 +46,12 @@ import {
   Database,
   BrainCircuit,
   Sparkles,
-  SearchCode
+  Search,
+  Skull,
+  AlertTriangle,
+  Boxes,
+  Tags,
+  Barcode
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -94,13 +99,19 @@ export const navConfig: NavItem[] = [
     pattern: /^\/inventory/,
     id: "inventory",
     submenus: [
-      { title: "Products & Services", icon: Box, url: "/inventory/products", id: "products" },
-      { title: "Stock Levels", icon: SearchCode, url: "/inventory/stock-levels", id: "stock_levels" },
+      { title: "Stock Items", icon: Box, url: "/inventory/products", id: "products" },
+      { title: "Services", icon: Briefcase, url: "/inventory/services", id: "services" },
+      { title: "Bundles / Combos", icon: Boxes, url: "/inventory/bundles", id: "bundles" },
+      { title: "Variants", icon: Tags, url: "/inventory/variants", id: "variants" },
+      { title: "Stock Levels", icon: Search, url: "/inventory/stock-levels", id: "stock_levels" },
       { title: "Warehouses", icon: Database, url: "/inventory/warehouses", id: "warehouses" },
       { title: "Stock Transfers", icon: Truck, url: "/inventory/transfers", id: "transfers" },
-      { title: "Adjustments", icon: Layers, url: "/inventory/adjustments", id: "adjustments" },
+      { title: "Stock Adjustments", icon: Layers, url: "/inventory/adjustments", id: "adjustments" },
       { title: "Expiry Control", icon: Timer, url: "/inventory/expiry", id: "expiry" },
-      { title: "Valuation", icon: Scale, url: "/inventory/valuation", id: "valuation" },
+      { title: "Batch & Serial", icon: Barcode, url: "/inventory/batches", id: "batches" },
+      { title: "Reorder Levels", icon: AlertTriangle, url: "/inventory/reorder", id: "reorder" },
+      { title: "Damage & Loss", icon: Skull, url: "/inventory/damages", id: "damages" },
+      { title: "Stock Valuation", icon: Scale, url: "/inventory/valuation", id: "valuation" },
       { title: "Inventory Setup", icon: Settings, url: "/inventory/setup", id: "setup" },
     ]
   },

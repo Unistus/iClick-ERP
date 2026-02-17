@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -27,7 +26,8 @@ import {
   Plus,
   Trash2,
   ListTree,
-  Activity
+  Activity,
+  History
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
@@ -137,7 +137,7 @@ export default function InventorySetupPage() {
     };
     addDocumentNonBlocking(collection(db, 'institutions', selectedInstId, 'adjustment_reasons'), data);
     e.currentTarget.reset();
-    toast({ title: "Adjustment Reason Added" });
+    toast({ title: "Correction Reason Added" });
   };
 
   const AccountSelect = ({ name, label, description, typeFilter }: { name: string, label: string, description: string, typeFilter?: string[] }) => (
@@ -170,8 +170,8 @@ export default function InventorySetupPage() {
               <Package className="size-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-headline font-bold">Inventory Workflow</h1>
-              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Automation & Catalog Dictionaries</p>
+              <h1 className="text-2xl font-headline font-bold">Inventory Policy</h1>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Automation & Ledger Mappings</p>
             </div>
           </div>
           
@@ -190,14 +190,14 @@ export default function InventorySetupPage() {
         {!selectedInstId ? (
           <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed rounded-2xl bg-secondary/5">
             <Settings className="size-12 text-muted-foreground opacity-20 mb-3" />
-            <p className="text-sm font-medium text-muted-foreground">Select an institution to configure its inventory logic.</p>
+            <p className="text-sm font-medium text-muted-foreground">Select an institution to configure supply chain logic.</p>
           </div>
         ) : (
           <Tabs defaultValue="automation" className="w-full">
             <TabsList className="bg-secondary/20 h-auto p-1 mb-6 flex-wrap justify-start gap-1">
-              <TabsTrigger value="automation" className="text-xs gap-2"><Factory className="size-3.5" /> Automation & Ledger</TabsTrigger>
-              <TabsTrigger value="catalog" className="text-xs gap-2"><ListTree className="size-3.5" /> Catalog Settings</TabsTrigger>
-              <TabsTrigger value="pricing" className="text-xs gap-2"><Banknote className="size-3.5" /> Price Lists</TabsTrigger>
+              <TabsTrigger value="automation" className="text-xs gap-2"><Factory className="size-3.5" /> Financial Integration</TabsTrigger>
+              <TabsTrigger value="dictionaries" className="text-xs gap-2"><ListTree className="size-3.5" /> Structural Dictionaries</TabsTrigger>
+              <TabsTrigger value="reasons" className="text-xs gap-2"><History className="size-3.5" /> Correction Reasons</TabsTrigger>
             </TabsList>
 
             <TabsContent value="automation">
@@ -207,7 +207,7 @@ export default function InventorySetupPage() {
                     <Card className="border-none ring-1 ring-border shadow-2xl bg-card">
                       <CardHeader className="border-b border-border/50">
                         <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                          <Scale className="size-4 text-primary" /> Logic & Valuation
+                          <Scale className="size-4 text-primary" /> Logic & Standards
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="p-6 grid gap-8 md:grid-cols-2">
@@ -216,19 +216,19 @@ export default function InventorySetupPage() {
                           <Select name="valuationMethod" defaultValue={setup?.valuationMethod || "WeightedAverage"}>
                             <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="FIFO" className="text-xs">FIFO</SelectItem>
-                              <SelectItem value="LIFO" className="text-xs">LIFO</SelectItem>
+                              <SelectItem value="FIFO" className="text-xs">FIFO (First-In, First-Out)</SelectItem>
+                              <SelectItem value="LIFO" className="text-xs">LIFO (Last-In, First-Out)</SelectItem>
                               <SelectItem value="WeightedAverage" className="text-xs">Weighted Average</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                         <div className="space-y-4">
-                          <Label className="text-[10px] font-black uppercase tracking-widest">Stock Deduction</Label>
+                          <Label className="text-[10px] font-black uppercase tracking-widest">Stock Deduction Point</Label>
                           <Select name="deductionTrigger" defaultValue={setup?.deductionTrigger || "SaleCompletion"}>
                             <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="SaleCompletion" className="text-xs">Real-time on Sale</SelectItem>
-                              <SelectItem value="KitchenDispatch" className="text-xs">On Dispatch (Kitchen Mode)</SelectItem>
+                              <SelectItem value="KitchenDispatch" className="text-xs">On Kitchen/Bar Dispatch</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -238,26 +238,26 @@ export default function InventorySetupPage() {
                     <Card className="border-none ring-1 ring-border shadow-2xl bg-card">
                       <CardHeader className="border-b border-border/50">
                         <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                          <Scale className="size-4 text-accent" /> Financial Mapping
+                          <Banknote className="size-4 text-accent" /> Ledger Mapping
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="p-6 grid gap-8 md:grid-cols-2">
-                        <AccountSelect name="inventoryAssetAccountId" label="Inventory Asset" description="Stock balance sheet node." typeFilter={['Asset']} />
-                        <AccountSelect name="cogsAccountId" label="COGS" description="Cost of Goods Sold expense." typeFilter={['Expense']} />
-                        <AccountSelect name="inventoryShrinkageAccountId" label="Shrinkage" description="Losses and damages." typeFilter={['Expense']} />
-                        <AccountSelect name="inventoryAdjustmentAccountId" label="Adjustment Node" description="Audit reconciliation." />
+                        <AccountSelect name="inventoryAssetAccountId" label="Inventory Asset" description="Primary stock asset node." typeFilter={['Asset']} />
+                        <AccountSelect name="cogsAccountId" label="COGS Account" description="Cost of Goods Sold expense node." typeFilter={['Expense']} />
+                        <AccountSelect name="inventoryAdjustmentAccountId" label="Adjustment Node" description="Counter-entry for audit variances." />
+                        <AccountSelect name="inventoryShrinkageAccountId" label="Shrinkage Node" description="Expense node for damages/theft." typeFilter={['Expense']} />
                       </CardContent>
                     </Card>
                   </div>
                   <div className="lg:col-span-4">
                     <Card className="border-none ring-1 ring-border shadow bg-secondary/5 h-full">
-                      <CardHeader><CardTitle className="text-xs font-black uppercase tracking-widest">Automation Engine</CardTitle></CardHeader>
+                      <CardHeader><CardTitle className="text-xs font-black uppercase tracking-widest">Engine Policy</CardTitle></CardHeader>
                       <CardContent className="space-y-4">
                         <p className="text-[11px] leading-relaxed opacity-70">
-                          Committing these settings will synchronize your inventory movements with the General Ledger. All stock-outs and adjustments will auto-generate double-entry journals.
+                          These parameters govern how the iClick Inventory engine interacts with the General Ledger. Changes will apply to all subsequent stock movements.
                         </p>
-                        <Button type="submit" disabled={isSaving} className="w-full h-10 font-bold uppercase text-[10px] gap-2">
-                          {isSaving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />} Commit Automation
+                        <Button type="submit" disabled={isSaving} className="w-full h-10 font-bold uppercase text-[10px] gap-2 px-10 shadow-lg shadow-primary/20">
+                          {isSaving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />} Commit Policy
                         </Button>
                       </CardContent>
                     </Card>
@@ -266,15 +266,13 @@ export default function InventorySetupPage() {
               </form>
             </TabsContent>
 
-            <TabsContent value="catalog">
-              <div className="grid gap-6 lg:grid-cols-3">
+            <TabsContent value="dictionaries">
+              <div className="grid gap-6 lg:grid-cols-2">
                 <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
                   <CardHeader className="bg-secondary/10 border-b">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                        <Tag className="size-4 text-primary" /> Categories
-                      </CardTitle>
-                    </div>
+                    <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                      <Tag className="size-4 text-primary" /> Global Categories
+                    </CardTitle>
                   </CardHeader>
                   <CardContent className="p-0">
                     <div className="p-4 border-b bg-secondary/5">
@@ -283,7 +281,7 @@ export default function InventorySetupPage() {
                         <Button type="submit" size="sm" className="h-9 px-4 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
                       </form>
                     </div>
-                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                    <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
                       <Table>
                         <TableBody>
                           {categories?.map(cat => (
@@ -316,7 +314,7 @@ export default function InventorySetupPage() {
                         <Button type="submit" size="sm" className="h-9 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
                       </form>
                     </div>
-                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                    <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
                       <Table>
                         <TableBody>
                           {uoms?.map(uom => (
@@ -335,87 +333,48 @@ export default function InventorySetupPage() {
                     </div>
                   </CardContent>
                 </Card>
-
-                <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
-                  <CardHeader className="bg-secondary/10 border-b">
-                    <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                      <Activity className="size-4 text-emerald-500" /> Adjustment Reasons
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="p-4 border-b bg-secondary/5">
-                      <form onSubmit={handleAddReason} className="flex gap-2">
-                        <Input name="name" placeholder="Reason (e.g. Theft)" required className="h-9 text-xs" />
-                        <Button type="submit" size="sm" className="h-9 px-4 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
-                      </form>
-                    </div>
-                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
-                      <Table>
-                        <TableBody>
-                          {reasons?.map(reason => (
-                            <TableRow key={reason.id} className="h-10 hover:bg-secondary/5 group">
-                              <TableCell className="text-xs font-bold pl-6">{reason.name}</TableCell>
-                              <TableCell className="text-right pr-6">
-                                <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'adjustment_reasons', reason.id))}>
-                                  <Trash2 className="size-3.5" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
               </div>
             </TabsContent>
 
-            <TabsContent value="pricing">
-              <div className="grid gap-6 lg:grid-cols-12">
-                <div className="lg:col-span-8">
-                  <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
-                    <CardHeader className="border-b bg-secondary/5">
-                      <CardTitle className="text-sm font-bold uppercase tracking-widest">Tiered Price Lists</CardTitle>
-                      <CardDescription className="text-xs italic">Define price overrides for wholesale, insurance, or specific client groups.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <Table>
-                        <TableHeader className="bg-secondary/20">
-                          <TableRow>
-                            <TableHead className="h-10 text-[10px] font-bold uppercase pl-6">List Name</TableHead>
-                            <TableHead className="h-10 text-[10px] font-bold uppercase">Description</TableHead>
-                            <TableHead className="h-10 text-[10px] font-bold uppercase text-center">Status</TableHead>
-                            <TableHead className="h-10 text-right pr-6 text-[10px] font-bold uppercase">Actions</TableHead>
+            <TabsContent value="reasons">
+              <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
+                <CardHeader className="bg-secondary/10 border-b">
+                  <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                    <Activity className="size-4 text-emerald-500" /> Dynamic Correction Reasons
+                  </CardTitle>
+                  <CardDescription className="text-xs">Define reasons for stock adjustments and damages at this institution.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="p-4 border-b bg-secondary/5">
+                    <form onSubmit={handleAddReason} className="flex gap-2 max-w-md">
+                      <Input name="name" placeholder="e.g. Spoilage, Theft, Promo" required className="h-9 text-xs" />
+                      <Button type="submit" size="sm" className="h-9 px-6 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Register Reason</Button>
+                    </form>
+                  </div>
+                  <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                    <Table>
+                      <TableHeader className="bg-secondary/20">
+                        <TableRow>
+                          <TableHead className="h-9 text-[10px] font-bold uppercase pl-6">Standard Reason</TableHead>
+                          <TableHead className="h-9 text-right pr-6 text-[10px] font-bold uppercase">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reasons?.map(reason => (
+                          <TableRow key={reason.id} className="h-10 hover:bg-secondary/5 group">
+                            <TableCell className="text-xs font-bold pl-6">{reason.name}</TableCell>
+                            <TableCell className="text-right pr-6">
+                              <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'adjustment_reasons', reason.id))}>
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            </TableCell>
                           </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          <TableRow>
-                            <TableCell colSpan={4} className="text-center py-12 text-xs text-muted-foreground italic font-bold">No custom price lists registered.</TableCell>
-                          </TableRow>
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-                </div>
-                <div className="lg:col-span-4">
-                  <Card className="border-none ring-1 ring-border bg-card shadow shadow-primary/10">
-                    <CardHeader><CardTitle className="text-xs font-black uppercase tracking-widest">New Price Tier</CardTitle></CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-bold">List Identity</Label>
-                        <Input placeholder="e.g. Insurance Rate Card" className="h-9 text-xs" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-bold">Scope</Label>
-                        <Input placeholder="Brief description" className="h-9 text-xs" />
-                      </div>
-                      <Button className="w-full h-10 font-bold uppercase text-[10px] gap-2">
-                        <Plus className="size-3" /> Initialize List
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
         )}

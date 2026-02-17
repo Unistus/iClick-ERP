@@ -42,39 +42,17 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow update: if isInstitutionMember(institutionId);
       
-      // Core Institutional Dictionaries
-      match /coa/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /categories/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /uoms/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /adjustment_reasons/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /price_lists/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      
-      // Operational
-      match /products/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /movements/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /warehouses/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /batches/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /expenses/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /tax_returns/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /journal_entries/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /invoices/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /payables/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /assets/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /settings/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /audit_logs/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /document_sequences/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /api_keys/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /notification_templates/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /roles/{id} { 
-        allow read, write: if isInstitutionMember(institutionId); 
-        match /members/{memberId} { allow read, write: if isInstitutionMember(institutionId); }
+      // Recursive match for all institutional sub-collections
+      // This automatically covers coa, products, movements, batches, categories, etc.
+      match /{allSubcollections=**} {
+        allow read, write: if isInstitutionMember(institutionId);
       }
-      match /branches/{id} { 
-        allow read, write: if isInstitutionMember(institutionId); 
-        match /departments/{deptId} { allow read, write: if isInstitutionMember(institutionId); }
-      }
-      match /fiscal_periods/{id} { allow read, write: if isInstitutionMember(institutionId); }
-      match /approval_workflows/{id} { allow read, write: if isInstitutionMember(institutionId); }
+    }
+    
+    // Global Collections
+    match /currencies/{id} {
+      allow read: if isSignedIn();
+      allow write: if isGlobalAdmin();
     }
   }
 }

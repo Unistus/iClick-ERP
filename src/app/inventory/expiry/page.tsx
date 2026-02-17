@@ -207,6 +207,7 @@ export default function ExpiryControlPage() {
                   <p className="text-[9px] font-bold text-amber-500 uppercase mb-1 tracking-wider">Critical (&lt;30D)</p>
                   <div className="text-xl font-bold text-amber-500">{batches?.filter(b => isBefore(b.expiryDate?.toDate(), criticalThreshold) && isAfter(b.expiryDate?.toDate(), now)).length || 0}</div>
                 </CardContent>
+              </Card>
               <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm overflow-hidden">
                 <CardContent className="pt-4">
                   <p className="text-[9px] font-bold text-primary uppercase mb-1 tracking-wider">Risk Exposure</p>

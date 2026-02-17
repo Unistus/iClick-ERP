@@ -1,3 +1,4 @@
+
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -52,14 +53,18 @@ import {
   Boxes,
   Tags,
   Barcode,
-  ClipboardList
+  ClipboardList,
+  Quote,
+  ClipboardCheck as OrderIcon,
+  ArrowLeftRight,
+  UserCheck
 } from "lucide-react"
 
 export interface NavSubmenu {
   title: string
   icon: any
   url: string
-  id: string // Used for permission matching
+  id: string 
 }
 
 export interface NavItem {
@@ -67,7 +72,7 @@ export interface NavItem {
   icon: any
   url: string
   pattern: RegExp
-  id: string // Used for permission matching
+  id: string 
   submenus?: NavSubmenu[]
 }
 
@@ -92,6 +97,23 @@ export const navConfig: NavItem[] = [
     url: "/pos", 
     pattern: /^\/pos/,
     id: "pos"
+  },
+  {
+    title: "Sales Hub",
+    icon: TrendingUp,
+    url: "/sales",
+    pattern: /^\/sales/,
+    id: "sales",
+    submenus: [
+      { title: "Quotations", icon: Quote, url: "/sales/quotations", id: "quotations" },
+      { title: "Sales Orders", icon: OrderIcon, url: "/sales/orders", id: "orders" },
+      { title: "Invoice Center", icon: FileText, url: "/sales/invoices", id: "invoices" },
+      { title: "Credit Notes", icon: CreditCard, url: "/sales/credit-notes", id: "credit_notes" },
+      { title: "Sales Returns", icon: ArrowLeftRight, url: "/sales/returns", id: "returns" },
+      { title: "Delivery Notes", icon: Truck, url: "/sales/delivery", id: "delivery" },
+      { title: "Sales Reports", icon: ClipboardList, url: "/sales/reports", id: "reports" },
+      { title: "Commission", icon: UserCheck, url: "/sales/commissions", id: "commissions" },
+    ]
   },
   { 
     title: "Stock Vault", 

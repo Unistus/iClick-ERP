@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -33,7 +32,9 @@ import {
   Loader2,
   XCircle,
   ArrowRightLeft,
-  Sparkles
+  Sparkles,
+  Hash,
+  Calendar
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { registerInventoryBatch } from "@/lib/inventory/inventory.service";

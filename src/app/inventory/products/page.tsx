@@ -322,7 +322,7 @@ export default function ProductsPage() {
                 <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg flex items-start gap-3">
                   <Sparkles className="size-4 text-primary shrink-0 mt-0.5" />
                   <p className="text-[10px] text-muted-foreground leading-relaxed">
-                    <strong>Automation Hub:</strong> Leaving the ID or SKU fields blank will trigger the sequence generator. The system will use the prefix and numbering defined in your <strong>Admin > Document Numbering</strong> settings.
+                    <strong>Automation Hub:</strong> Leaving the ID or SKU fields blank will trigger the sequence generator. The system will use the prefix and numbering defined in your <strong>Admin &gt; Document Numbering</strong> settings.
                   </p>
                 </div>
               </div>

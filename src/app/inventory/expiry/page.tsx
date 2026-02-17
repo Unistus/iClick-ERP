@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -464,7 +465,7 @@ export default function ExpiryControlPage() {
                 <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg flex gap-3 items-start">
                   <Sparkles className="size-4 text-primary shrink-0 mt-0.5" />
                   <p className="text-[10px] text-muted-foreground leading-relaxed">
-                    <strong>Predictive Hub:</strong> Selecting a product will automatically set the expiry date based on its standard shelf life. Leaving LOT number blank will use the sequence from <strong>Admin Hub</strong>.
+                    <strong>Predictive Hub:</strong> Selecting a product will automatically set the expiry date based on its standard shelf life. Leaving LOT number blank will use the sequence from <strong>Admin &gt; Document Numbering</strong> settings.
                   </p>
                 </div>
               </div>

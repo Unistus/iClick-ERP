@@ -38,7 +38,6 @@ export default function InventoryDashboardPage() {
   const db = useFirestore();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
 
-  // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instColRef);
 
@@ -68,7 +67,6 @@ export default function InventoryDashboardPage() {
 
   const currency = settings?.general?.currencySymbol || "KES";
 
-  // Aggregates
   const stockItems = products?.filter(p => p.type === 'Stock') || [];
   const lowStockCount = stockItems.filter(p => p.totalStock <= (p.reorderLevel || 0)).length;
   
@@ -104,7 +102,7 @@ export default function InventoryDashboardPage() {
               </SelectContent>
             </Select>
             <Link href="/inventory/products">
-              <Button size="sm" className="gap-2 h-10 text-xs font-bold uppercase shadow-lg shadow-primary/20">
+              <Button size="sm" className="gap-2 h-10 text-xs font-bold uppercase shadow-lg shadow-primary/20" disabled={!selectedInstId}>
                 <Plus className="size-4" /> Register Item
               </Button>
             </Link>
@@ -113,12 +111,11 @@ export default function InventoryDashboardPage() {
 
         {!selectedInstId ? (
           <div className="flex flex-col items-center justify-center py-32 border-2 border-dashed rounded-3xl bg-secondary/5">
-            <Zap className="size-16 text-muted-foreground opacity-10 mb-4 animate-pulse" />
+            <RefreshCw className="size-16 text-muted-foreground opacity-10 mb-4 animate-pulse" />
             <p className="text-sm font-medium text-muted-foreground">Select an institution to initialize real-time supply chain monitoring.</p>
           </div>
         ) : (
           <div className="space-y-6 animate-in fade-in duration-700">
-            {/* Infographic Pulse Grid */}
             <div className="grid gap-4 md:grid-cols-4">
               <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden relative group hover:ring-primary/30 transition-all">
                 <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform"><Banknote className="size-24" /></div>
@@ -162,7 +159,6 @@ export default function InventoryDashboardPage() {
             </div>
 
             <div className="grid gap-6 lg:grid-cols-12">
-              {/* Movement Velocity Stream */}
               <Card className="lg:col-span-8 border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
                 <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6 flex flex-row items-center justify-between">
                   <div className="space-y-0.5">
@@ -206,7 +202,6 @@ export default function InventoryDashboardPage() {
                 </CardContent>
               </Card>
 
-              {/* Strategic Context Panel */}
               <div className="lg:col-span-4 space-y-6">
                 <Card className="border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
                   <CardHeader className="pb-3 border-b border-border/10 bg-primary/5">
@@ -234,30 +229,6 @@ export default function InventoryDashboardPage() {
                           <span className="text-[8px] font-black uppercase">Expiry Map</span>
                         </Button>
                       </Link>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
-                  <CardHeader className="pb-3 border-b border-border/10">
-                    <CardTitle className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
-                      <History className="size-3.5 text-muted-foreground" /> Audit Integrity
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-4 space-y-3">
-                    <div className="flex justify-between items-center text-[10px] uppercase font-bold">
-                      <span className="text-muted-foreground">Traceability</span>
-                      <Badge variant="secondary" className="text-[8px] h-4 bg-emerald-500/10 text-emerald-500 border-none">BATCH LEVEL</Badge>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] uppercase font-bold">
-                      <span className="text-muted-foreground">Valuation Logic</span>
-                      <span className="font-mono text-primary">{settings?.inventory?.valuationMethod || 'WeightedAvg'}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] uppercase font-bold">
-                      <span className="text-muted-foreground">Sync Status</span>
-                      <span className="flex items-center gap-1.5 text-emerald-500">
-                        <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" /> Real-time
-                      </span>
                     </div>
                   </CardContent>
                 </Card>

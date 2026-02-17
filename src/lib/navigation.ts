@@ -61,7 +61,12 @@ import {
   Users2,
   PackageCheck,
   Hourglass,
-  BadgeCent
+  BadgeCent,
+  Navigation,
+  SteeringWheel,
+  CarFront,
+  CheckCircle2,
+  Route
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -114,10 +119,25 @@ export const navConfig: NavItem[] = [
       { title: "Invoice Center", icon: FileText, url: "/sales/invoices", id: "invoices" },
       { title: "Credit Notes", icon: CreditCard, url: "/sales/credit-notes", id: "credit_notes" },
       { title: "Sales Returns", icon: ArrowLeftRight, url: "/sales/returns", id: "returns" },
-      { title: "Delivery Notes", icon: Truck, url: "/sales/delivery", id: "delivery" },
       { title: "Sales Reports", icon: ClipboardList, url: "/sales/reports", id: "reports" },
       { title: "Commission", icon: UserCheck, url: "/sales/commissions", id: "commissions" },
       { title: "Sales Setup", icon: Settings, url: "/sales/setup", id: "setup" },
+    ]
+  },
+  {
+    title: "Logistics Hub",
+    icon: Truck,
+    url: "/delivery",
+    pattern: /^\/delivery/,
+    id: "delivery",
+    submenus: [
+      { title: "Delivery Orders", icon: FileText, url: "/delivery/orders", id: "orders" },
+      { title: "Dispatch Center", icon: Zap, url: "/delivery/dispatch", id: "dispatch" },
+      { title: "Route Planning", icon: Route, url: "/delivery/routes", id: "routes" },
+      { title: "Fleet & Drivers", icon: CarFront, url: "/delivery/fleet", id: "fleet" },
+      { title: "Live Tracking", icon: Navigation, url: "/delivery/tracking", id: "tracking" },
+      { title: "Confirmation", icon: CheckCircle2, url: "/delivery/confirmation", id: "confirmation" },
+      { title: "Logistics Setup", icon: Settings, url: "/delivery/setup", id: "setup" },
     ]
   },
   {

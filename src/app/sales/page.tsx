@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -14,19 +15,16 @@ import {
   BrainCircuit,
   FileText,
   Users,
-  Wallet,
   Plus,
-  ArrowDownLeft,
   DollarSign,
   Activity,
   ChevronRight,
   Sparkles,
-  MapPin,
   Calendar
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
+import { useFirestore, useMemoFirebase, useDoc, useCollection } from "@/firebase";
 import { collection, query, orderBy, limit, doc } from "firebase/firestore";
 import Link from 'next/link';
 import { 
@@ -36,10 +34,7 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  ResponsiveContainer, 
-  PieChart,
-  Pie,
-  Cell
+  ResponsiveContainer 
 } from 'recharts';
 
 const salesData = [
@@ -51,8 +46,6 @@ const salesData = [
   { name: 'Sat', revenue: 67000, profit: 21000 },
   { name: 'Sun', revenue: 42000, profit: 9000 },
 ];
-
-const COLORS = ['#008080', '#FF4500', '#10b981', '#f59e0b'];
 
 export default function SalesOverviewPage() {
   const db = useFirestore();
@@ -112,7 +105,7 @@ export default function SalesOverviewPage() {
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Monthly Revenue</span></CardHeader>
                 <CardContent className="pb-4">
                   <div className="text-lg font-bold font-headline text-emerald-500">{currency} 4.2M</div>
-                  <div className="flex items-center gap-1.5 mt-1 text-emerald-500 font-bold text-[9px] uppercase">
+                  <div className="flex items-center gap-1.5 mt-1 text-emerald-500 font-bold text-[10px] uppercase">
                     <ArrowUpRight className="size-3" /> +12% Growth
                   </div>
                 </CardContent>
@@ -186,6 +179,7 @@ export default function SalesOverviewPage() {
                   </CardHeader>
                   <CardContent className="pt-4 space-y-4">
                     <div className="p-4 bg-secondary/20 rounded-xl border border-border/50 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-2 opacity-10 rotate-12"><Zap className="size-12 text-primary" /></div>
                       <p className="text-[11px] leading-relaxed italic font-medium relative z-10 text-muted-foreground">
                         "Your <span className="text-primary font-bold">Westlands</span> branch is seeing a 15% uptick in credit sales. Recommendation: Trigger automated reminders for invoices past 14 days to preserve liquidity."
                       </p>

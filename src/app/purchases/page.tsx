@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -11,19 +10,13 @@ import {
   FileText, 
   ArrowUpRight, 
   TrendingDown, 
-  Activity, 
-  Clock, 
   Plus,
   History,
   Zap,
-  LayoutGrid,
-  BarChart3,
-  RefreshCw,
-  Search
+  LayoutGrid
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, query, orderBy, limit, doc } from "firebase/firestore";
@@ -90,7 +83,6 @@ export default function PurchasesOverviewPage() {
           </div>
         ) : (
           <div className="space-y-6 animate-in fade-in duration-700">
-            {/* Procurement Metrics */}
             <div className="grid gap-4 md:grid-cols-4">
               <Card className="bg-card border-none ring-1 ring-border shadow-sm">
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Active POs</span></CardHeader>
@@ -128,7 +120,6 @@ export default function PurchasesOverviewPage() {
             </div>
 
             <div className="grid gap-6 lg:grid-cols-12">
-              {/* Recent Orders Stream */}
               <Card className="lg:col-span-8 border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
                 <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6 flex flex-row items-center justify-between">
                   <div className="space-y-0.5">
@@ -164,7 +155,6 @@ export default function PurchasesOverviewPage() {
                 </CardContent>
               </Card>
 
-              {/* Functional Panel */}
               <div className="lg:col-span-4 space-y-6">
                 <Card className="border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
                   <CardHeader className="pb-3 border-b border-border/10 bg-primary/5">

@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { 
@@ -12,7 +13,6 @@ import {
   ArrowDownLeft,
   Calendar,
   Building2,
-  PieChart as PieChartIcon,
   BarChart3,
   History,
   Package,
@@ -20,29 +20,21 @@ import {
   FileText,
   Users,
   Target,
-  Smartphone,
-  CreditCard,
-  Banknote,
   Wallet,
-  PiggyBank,
-  RefreshCcw,
   Search,
-  AlertTriangle,
-  Clock,
   ShieldAlert,
   GitPullRequest,
-  CheckCircle2,
   MapPin,
-  ArrowRight,
   ShieldCheck,
   LayoutDashboard,
   BrainCircuit,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Zap
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
-import { useFirestore, useDoc, useMemoFirebase, useUser, useCollection } from "@/firebase"
-import { doc, collection, query, limit, orderBy } from "firebase/firestore"
+import { useFirestore, useDoc, useMemoFirebase, useUser } from "@/firebase"
+import { doc } from "firebase/firestore"
 import { 
   AreaChart, 
   Area, 
@@ -51,20 +43,14 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer, 
-  BarChart, 
-  Bar, 
-  Cell,
   PieChart,
   Pie,
-  Legend
+  Cell
 } from 'recharts'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Progress } from "@/components/ui/progress"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import Link from 'next/link';
 
-// --- Mock Data ---
 const salesData = [
   { name: 'Mon', revenue: 45000, profit: 12000 },
   { name: 'Tue', revenue: 52000, profit: 15000 },
@@ -80,29 +66,6 @@ const branchPerf = [
   { name: 'Westlands', value: 25 },
   { name: 'Mombasa', value: 20 },
   { name: 'Kisumu', value: 10 },
-]
-
-const paymentMix = [
-  { name: 'M-Pesa', value: 65 },
-  { name: 'Card', value: 20 },
-  { name: 'Cash', value: 15 },
-]
-
-const salesByHour = [
-  { hour: '08:00', sales: 12 },
-  { hour: '10:00', sales: 45 },
-  { hour: '12:00', sales: 82 },
-  { hour: '14:00', sales: 65 },
-  { hour: '16:00', sales: 110 },
-  { hour: '18:00', sales: 145 },
-  { hour: '20:00', sales: 55 },
-]
-
-const activeAlerts = [
-  { id: 1, type: 'Critical', module: 'Inventory', msg: 'Insulin stock depleted at Westlands branch.', time: '2 mins ago', icon: Package, color: 'text-destructive' },
-  { id: 2, type: 'Approval', module: 'Accounting', msg: 'New expense requisition (KES 45,000) requires sign-off.', time: '15 mins ago', icon: GitPullRequest, color: 'text-primary' },
-  { id: 3, type: 'Security', module: 'System', msg: 'Multiple failed login attempts detected.', time: '45 mins ago', icon: ShieldAlert, color: 'text-destructive' },
-  { id: 4, type: 'Operational', module: 'POS', msg: 'M-Pesa Gateway latency exceeded threshold.', time: '1 hour ago', icon: Activity, color: 'text-amber-500' },
 ]
 
 const COLORS = ['#008080', '#FF4500', '#10b981', '#f59e0b'];
@@ -149,7 +112,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* AI Insight Highlight Card */}
         <Card className="border-none bg-gradient-to-r from-primary/10 via-background to-accent/5 ring-1 ring-primary/20 shadow-xl overflow-hidden group">
           <CardContent className="p-0 flex flex-col md:flex-row items-center">
             <div className="p-6 flex-1 space-y-2">
@@ -169,7 +131,7 @@ export default function HomePage() {
               </div>
             </div>
             <div className="p-6 bg-primary/5 md:bg-transparent flex flex-col items-center justify-center shrink-0 border-l border-primary/10">
-              <BrainCircuit className="size-12 text-primary/30 group-hover:scale-110 transition-transform duration-500" />
+              <Zap className="size-12 text-primary/30 group-hover:scale-110 transition-transform duration-500" />
               <p className="text-[8px] font-black uppercase mt-2 opacity-40">Predictive Engine v2.0</p>
             </div>
           </CardContent>
@@ -190,7 +152,6 @@ export default function HomePage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* --- OVERVIEW TAB --- */}
           <TabsContent value="overview" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               {stats.map((stat) => (

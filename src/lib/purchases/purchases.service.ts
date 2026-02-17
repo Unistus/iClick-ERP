@@ -98,3 +98,59 @@ export async function createVendorInvoice(db: Firestore, institutionId: string, 
     });
   });
 }
+
+export async function processPurchaseReturn(db: Firestore, institutionId: string, payload: {
+  supplierId: string;
+  supplierName: string;
+  warehouseId: string;
+  total: number;
+  reason: string;
+  items: { productId: string; qty: number; unitCost: number }[];
+}) {
+  const returnNumber = `PRET-${Date.now()}`;
+  const setupRef = doc(db, 'institutions', institutionId, 'settings', 'accounting');
+  
+  return runTransaction(db, async (transaction) => {
+    const setupSnap = await transaction.get(setupRef);
+    if (!setupSnap.exists()) throw new Error("Accounting setup missing");
+    const setup = setupSnap.data();
+
+    if (!setup.accountsPayableAccountId || !setup.inventoryAssetAccountId) {
+      throw new Error("Ledger mappings for AP or Inventory Asset missing in setup.");
+    }
+
+    // 1. Post to GL (Reverse Liability)
+    // DR: Accounts Payable (Liability -)
+    // CR: Inventory Asset (Asset -)
+    await postJournalEntry(db, institutionId, {
+      date: new Date(),
+      description: `Purchase Return ${returnNumber} to ${payload.supplierName}`,
+      reference: returnNumber,
+      items: [
+        { accountId: setup.accountsPayableAccountId, amount: payload.total, type: 'Debit' },
+        { accountId: setup.inventoryAssetAccountId, amount: payload.total, type: 'Credit' },
+      ]
+    });
+
+    // 2. Adjust Stock (Physically remove items)
+    for (const item of payload.items) {
+      await recordStockMovement(db, institutionId, {
+        productId: item.productId,
+        warehouseId: payload.warehouseId,
+        type: 'Out',
+        quantity: item.qty,
+        reference: `Purchase Return: ${returnNumber}`,
+        unitCost: item.unitCost
+      });
+    }
+
+    // 3. Save Return Record
+    const returnRef = doc(collection(db, 'institutions', institutionId, 'purchase_returns'));
+    transaction.set(returnRef, {
+      ...payload,
+      returnNumber,
+      status: 'Completed',
+      createdAt: serverTimestamp()
+    });
+  });
+}

@@ -22,6 +22,7 @@ import {
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, query, orderBy, where, doc } from "firebase/firestore";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from 'next/link';
 
 export default function StockLevelsPage() {

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -13,9 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, doc, serverTimestamp } from "firebase/firestore";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { Database, Plus, MapPin, Warehouse, CheckCircle2, MoreVertical } from "lucide-react";
+import { Database, Plus, MapPin, Warehouse, CheckCircle2, MoreVertical, Hash, Sparkles, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
+import { getNextSequence } from "@/lib/sequence-service";
 
 export default function WarehousesPage() {
   const db = useFirestore();
@@ -32,15 +32,26 @@ export default function WarehousesPage() {
   }, [db, selectedInstId]);
   const { data: warehouses, isLoading } = useCollection(warehouseQuery);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || isProcessing) return;
     setIsProcessing(true);
 
     const formData = new FormData(e.currentTarget);
+    let code = formData.get('code') as string;
+
+    // AUTOMATION KING: Auto-generate Warehouse Code if left empty
+    if (!code) {
+      try {
+        code = await getNextSequence(db, selectedInstId, 'warehouse_code');
+      } catch (err) {
+        code = `WH-${Date.now()}`;
+      }
+    }
+
     const data = {
       name: formData.get('name') as string,
-      code: formData.get('code') as string,
+      code: code,
       location: formData.get('location') as string,
       isDefault: formData.get('isDefault') === 'on',
       updatedAt: serverTimestamp(),
@@ -49,7 +60,7 @@ export default function WarehousesPage() {
     const colRef = collection(db, 'institutions', selectedInstId, 'warehouses');
     addDocumentNonBlocking(colRef, { ...data, createdAt: serverTimestamp() });
 
-    toast({ title: "Storage Site Registered" });
+    toast({ title: "Storage Site Registered", description: `Assigned Code: ${data.code}` });
     setIsCreateOpen(false);
     setIsProcessing(false);
   };
@@ -139,8 +150,8 @@ export default function WarehousesPage() {
                     <Input name="name" placeholder="e.g. Main Central Store" required />
                   </div>
                   <div className="space-y-2">
-                    <Label>Code</Label>
-                    <Input name="code" placeholder="WH-01" required className="font-mono" />
+                    <Label className="flex items-center gap-1.5"><Hash className="size-3 text-primary" /> Code</Label>
+                    <Input name="code" placeholder="Auto-gen" className="font-mono bg-secondary/10" />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -154,10 +165,19 @@ export default function WarehousesPage() {
                   </div>
                   <input type="checkbox" name="isDefault" className="size-4" />
                 </div>
+
+                <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg flex items-start gap-3">
+                  <Sparkles className="size-4 text-primary shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    <strong>Automation Hub:</strong> Leaving the Code field blank will trigger the sequence generator using rules from <strong>Admin &gt; Doc Numbering</strong>.
+                  </p>
+                </div>
               </div>
               <DialogFooter>
                 <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-                <Button type="submit" className="h-10 font-bold uppercase text-xs">Deploy Site</Button>
+                <Button type="submit" disabled={isProcessing} className="h-10 font-bold uppercase text-xs">
+                  {isProcessing ? <Loader2 className="size-3 animate-spin mr-2" /> : <Warehouse className="size-3 mr-2" />} Deploy Site
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>

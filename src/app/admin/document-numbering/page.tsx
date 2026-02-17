@@ -14,7 +14,6 @@ import { toast } from "@/hooks/use-toast"
 
 /**
  * Registry of document types requiring sequences.
- * Refactored to include Catalog and Service numbering.
  */
 const SEQUENCE_DEFINITIONS = [
   { id: "sales_invoice", title: "Sales Invoice", prefix: "INV-", nextNumber: 1001, padding: 4 },
@@ -23,6 +22,7 @@ const SEQUENCE_DEFINITIONS = [
   { id: "product_id", title: "Physical Product ID", prefix: "PROD-", nextNumber: 100, padding: 4 },
   { id: "service_id", title: "Service Asset ID", prefix: "SERV-", nextNumber: 100, padding: 4 },
   { id: "batch_lot_number", title: "Batch / Lot Number", prefix: "LOT-", nextNumber: 1, padding: 6 },
+  { id: "warehouse_code", title: "Warehouse Site Code", prefix: "WH-", nextNumber: 1, padding: 2 },
   { id: "grn", title: "Goods Received Note", prefix: "GRN-", nextNumber: 100, padding: 4 },
   { id: "stock_transfer", title: "Stock Transfer", prefix: "TR-", nextNumber: 100, padding: 4 },
   { id: "stock_adjustment", title: "Stock Adjustment", prefix: "ADJ-", nextNumber: 100, padding: 4 },

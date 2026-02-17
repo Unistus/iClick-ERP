@@ -9,20 +9,20 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, serverTimestamp, setDoc, query, orderBy } from "firebase/firestore";
+import { collection, doc, serverTimestamp, setDoc, query, orderBy, updateDoc } from "firebase/firestore";
 import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { 
   Settings, 
   Save, 
   Loader2, 
-  Info, 
   CalendarDays, 
-  BellRing, 
   ShieldCheck, 
   Zap,
   Plus,
   Trash2,
-  Table as TableIcon
+  Lock,
+  Unlock,
+  AlertTriangle
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
@@ -78,6 +78,18 @@ export default function BudgetSetupPage() {
       toast({ variant: "destructive", title: "Deployment Failed" });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleTogglePeriod = async (periodId: string, currentStatus: string) => {
+    if (!selectedInstId) return;
+    const newStatus = currentStatus === 'Open' ? 'Closed' : 'Open';
+    const ref = doc(db, 'institutions', selectedInstId, 'fiscal_periods', periodId);
+    try {
+      await updateDoc(ref, { status: newStatus, updatedAt: serverTimestamp() });
+      toast({ title: `Period ${newStatus}` });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Status Update Failed" });
     }
   };
 
@@ -140,7 +152,7 @@ export default function BudgetSetupPage() {
                       <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                         <CalendarDays className="size-4 text-primary" /> Fiscal Periods
                       </CardTitle>
-                      <CardDescription className="text-[10px]">Define historical and future budget cycles.</CardDescription>
+                      <CardDescription className="text-[10px]">Define and lock auditing cycles.</CardDescription>
                     </div>
                   </div>
                 </CardHeader>
@@ -159,7 +171,7 @@ export default function BudgetSetupPage() {
                         <TableHead className="h-9 text-[10px] font-black uppercase pl-6">Period Name</TableHead>
                         <TableHead className="h-9 text-[10px] font-black uppercase">Range</TableHead>
                         <TableHead className="h-9 text-[10px] font-black uppercase text-center">Status</TableHead>
-                        <TableHead className="h-9 text-right pr-6 text-[10px] font-black uppercase">Actions</TableHead>
+                        <TableHead className="h-9 text-right pr-6 text-[10px] font-black uppercase">Lifecycle</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -168,14 +180,24 @@ export default function BudgetSetupPage() {
                       ) : periods?.length === 0 ? (
                         <TableRow><TableCell colSpan={4} className="text-center py-12 text-xs text-muted-foreground uppercase font-bold">No active cycles defined.</TableCell></TableRow>
                       ) : periods?.map(p => (
-                        <TableRow key={p.id} className="h-12 hover:bg-secondary/5 border-b-border/30">
+                        <TableRow key={p.id} className="h-12 hover:bg-secondary/5 border-b-border/30 group">
                           <TableCell className="pl-6 font-bold text-xs uppercase">{p.name}</TableCell>
                           <TableCell className="text-[10px] font-mono text-muted-foreground uppercase">{p.startDate} to {p.endDate}</TableCell>
                           <TableCell className="text-center">
-                            <Badge variant="outline" className="text-[8px] h-4 bg-emerald-500/10 text-emerald-500 border-none font-black uppercase">{p.status}</Badge>
+                            <Badge variant="outline" className={cn("text-[8px] h-4 border-none font-black uppercase", p.status === 'Open' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-destructive/10 text-destructive')}>
+                              {p.status}
+                            </Badge>
                           </TableCell>
                           <TableCell className="text-right pr-6">
-                            <Button variant="ghost" size="icon" className="size-7 text-destructive opacity-30 hover:opacity-100"><Trash2 className="size-3.5" /></Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-7 px-3 text-[9px] font-black uppercase gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => handleTogglePeriod(p.id, p.status)}
+                            >
+                              {p.status === 'Open' ? <Lock className="size-3" /> : <Unlock className="size-3" />}
+                              {p.status === 'Open' ? 'Close Cycle' : 'Open Cycle'}
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -214,16 +236,9 @@ export default function BudgetSetupPage() {
                           <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Variance Tolerance (%)</Label>
                           <Input name="varianceTolerance" type="number" defaultValue={setup?.varianceTolerance || 5} className="h-9" />
                         </div>
-                        <div className="space-y-2">
-                          <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Notification Channel</Label>
-                          <Select name="alertChannel" defaultValue={setup?.alertChannel || "System"}>
-                            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="System">Internal System Only</SelectItem>
-                              <SelectItem value="Email">Email Administrator</SelectItem>
-                              <SelectItem value="Both">System & Email</SelectItem>
-                            </SelectContent>
-                          </Select>
+                        <div className="p-3 bg-amber-500/5 border border-amber-500/10 rounded-lg flex items-center gap-3">
+                          <AlertTriangle className="size-4 text-amber-600" />
+                          <p className="text-[10px] leading-tight text-muted-foreground italic">Tightening tolerance reduces fiscal risk but requires higher frequency approvals.</p>
                         </div>
                       </div>
                     </div>
@@ -245,14 +260,11 @@ export default function BudgetSetupPage() {
                 </CardHeader>
                 <CardContent className="space-y-4 relative z-10">
                   <p className="text-[11px] leading-relaxed text-muted-foreground italic font-medium">
-                    "Institutional budget logic governs the financial ceilings applied to every operational module. Strict control mode enforces absolute adherence to these limits during procurement and expense workflows."
+                    "Institutional budget logic governs the financial ceilings applied to every operational module. Strict control mode enforces absolute adherence during procurement."
                   </p>
                   <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl space-y-2">
-                    <div className="flex items-center gap-2 text-primary font-black uppercase text-[9px] tracking-widest">
-                      <Zap className="size-3" /> System Note
-                    </div>
                     <p className="text-[10px] leading-snug">
-                      Fiscal periods must be defined here to enable historical variance analysis and multi-cycle forecasting.
+                      Closing a fiscal period prevents further allocations and locks the variance data for that cycle.
                     </p>
                   </div>
                 </CardContent>

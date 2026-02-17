@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -8,34 +8,46 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, query, where, doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { 
   FilePlus2, 
   Search, 
-  Filter, 
   Target, 
   Edit2, 
   Save, 
   Loader2, 
-  ArrowRight,
-  Info,
-  CheckCircle2
+  Info, 
+  CheckCircle2, 
+  Calendar,
+  Zap,
+  RefreshCw,
+  LayoutGrid
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { Badge } from '@/components/ui/badge';
+import { saveBudgetAllocations } from '@/lib/budgeting/budget.service';
 
 export default function BudgetCreationPage() {
   const db = useFirestore();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
+  const [selectedPeriodId, setSelectedPeriodId] = useState<string>("");
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingAcc, setEditingAcc] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  const [localLimits, setLocalLimits] = useState<Record<string, number>>({});
 
   // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instColRef);
+
+  const periodsQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return query(collection(db, 'institutions', selectedInstId, 'fiscal_periods'), where('status', '==', 'Open'));
+  }, [db, selectedInstId]);
+  const { data: periods } = useCollection(periodsQuery);
 
   const budgetAccountsQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -46,32 +58,48 @@ export default function BudgetCreationPage() {
   }, [db, selectedInstId]);
   const { data: accounts, isLoading } = useCollection(budgetAccountsQuery);
 
-  const settingsRef = useMemoFirebase(() => {
-    if (!selectedInstId) return null;
-    return doc(db, 'institutions', selectedInstId, 'settings', 'global');
-  }, [db, selectedInstId]);
-  const { data: settings } = useDoc(settingsRef);
+  const periodAllocationsQuery = useMemoFirebase(() => {
+    if (!selectedInstId || !selectedPeriodId) return null;
+    return collection(db, 'institutions', selectedInstId, 'fiscal_periods', selectedPeriodId, 'allocations');
+  }, [db, selectedInstId, selectedPeriodId]);
+  const { data: allocations } = useCollection(periodAllocationsQuery);
 
-  const currency = settings?.general?.currencySymbol || "KES";
+  useEffect(() => {
+    if (allocations) {
+      const map: Record<string, number> = {};
+      allocations.forEach(a => map[a.id] = a.limit || 0);
+      setLocalLimits(map);
+    }
+  }, [allocations]);
 
   const handleUpdateLimit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!selectedInstId || !editingAcc || isProcessing) return;
+    if (!selectedInstId || !selectedPeriodId || !editingAcc || isProcessing) return;
     setIsProcessing(true);
 
     const formData = new FormData(e.currentTarget);
     const limit = parseFloat(formData.get('limit') as string) || 0;
 
     try {
-      const accRef = doc(db, 'institutions', selectedInstId, 'coa', editingAcc.id);
-      await updateDoc(accRef, {
-        monthlyLimit: limit,
-        updatedAt: serverTimestamp()
-      });
-      toast({ title: "Allocation Updated", description: `${editingAcc.name} ceiling set to ${currency} ${limit.toLocaleString()}.` });
+      await saveBudgetAllocations(db, selectedInstId, selectedPeriodId, [{ accountId: editingAcc.id, limit }]);
+      toast({ title: "Allocation Saved" });
       setIsEditOpen(false);
     } catch (err) {
       toast({ variant: "destructive", title: "Update Failed" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleBulkSave = async () => {
+    if (!selectedInstId || !selectedPeriodId || isProcessing) return;
+    setIsProcessing(true);
+    try {
+      const payload = Object.entries(localLimits).map(([accountId, limit]) => ({ accountId, limit }));
+      await saveBudgetAllocations(db, selectedInstId, selectedPeriodId, payload);
+      toast({ title: "Bulk Update Complete", description: "All period targets deployed." });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Bulk Save Failed" });
     } finally {
       setIsProcessing(false);
     }
@@ -91,22 +119,40 @@ export default function BudgetCreationPage() {
             </div>
           </div>
           
-          <Select value={selectedInstId} onValueChange={setSelectedInstId}>
-            <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold">
-              <SelectValue placeholder="Select Institution" />
-            </SelectTrigger>
-            <SelectContent>
-              {institutions?.map(i => (
-                <SelectItem key={i.id} value={i.id} className="text-xs">{i.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex flex-wrap gap-2 w-full md:w-auto">
+            <Select value={selectedInstId} onValueChange={setSelectedInstId}>
+              <SelectTrigger className="w-[200px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold">
+                <SelectValue placeholder="Select Institution" />
+              </SelectTrigger>
+              <SelectContent>
+                {institutions?.map(i => (
+                  <SelectItem key={i.id} value={i.id} className="text-xs">{i.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={selectedPeriodId} onValueChange={setSelectedPeriodId} disabled={!selectedInstId}>
+              <SelectTrigger className="w-[180px] h-9 bg-card border-none ring-1 ring-border text-xs">
+                <Calendar className="size-3 mr-2 text-primary" />
+                <SelectValue placeholder="Target Period" />
+              </SelectTrigger>
+              <SelectContent>
+                {periods?.map(p => (
+                  <SelectItem key={p.id} value={p.id} className="text-xs">{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase shadow-lg shadow-primary/20" disabled={!selectedPeriodId || isProcessing} onClick={handleBulkSave}>
+              {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />} Commit All
+            </Button>
+          </div>
         </div>
 
-        {!selectedInstId ? (
+        {!selectedPeriodId ? (
           <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed rounded-2xl bg-secondary/5">
             <Target className="size-12 text-muted-foreground opacity-20 mb-3" />
-            <p className="text-sm font-medium text-muted-foreground">Select an institution to configure budget allocations.</p>
+            <p className="text-sm font-medium text-muted-foreground">Select an institution and open fiscal period to begin allocation.</p>
           </div>
         ) : (
           <div className="space-y-6">
@@ -125,17 +171,15 @@ export default function BudgetCreationPage() {
                   <TableHeader className="bg-secondary/20">
                     <TableRow>
                       <TableHead className="h-10 text-[10px] uppercase font-black pl-6">Ledger Account</TableHead>
-                      <TableHead className="h-10 text-[10px] uppercase font-black">Type / Subtype</TableHead>
-                      <TableHead className="h-10 text-[10px] uppercase font-black text-right">Actual Balance</TableHead>
-                      <TableHead className="h-10 text-[10px] uppercase font-black text-right">Budget Limit</TableHead>
-                      <TableHead className="h-10 text-right text-[10px] uppercase font-black pr-6">Allocation</TableHead>
+                      <TableHead className="h-10 text-[10px] uppercase font-black text-center">Tracking</TableHead>
+                      <TableHead className="h-10 text-[10px] uppercase font-black text-right">Last Actual</TableHead>
+                      <TableHead className="h-10 text-[10px] uppercase font-black text-right">Period Limit</TableHead>
+                      <TableHead className="h-10 text-right text-[10px] uppercase font-black pr-6">Manage</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse font-bold uppercase">Polling Institutional Data...</TableCell></TableRow>
-                    ) : accounts?.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-20 text-xs text-muted-foreground uppercase font-bold">No accounts marked for budget tracking.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse font-bold uppercase">Syncing Registry...</TableCell></TableRow>
                     ) : accounts?.map((acc) => (
                       <TableRow key={acc.id} className="h-14 hover:bg-secondary/10 transition-colors border-b-border/30 group">
                         <TableCell className="pl-6">
@@ -144,14 +188,19 @@ export default function BudgetCreationPage() {
                             <span className="text-[9px] text-muted-foreground font-mono uppercase tracking-tighter">GL-{acc.code}</span>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-[8px] h-4 bg-background uppercase font-bold">{acc.subtype}</Badge>
+                        <TableCell className="text-center">
+                          <Badge variant="secondary" className="text-[8px] h-4 bg-emerald-500/10 text-emerald-500 font-black uppercase">ACTIVE</Badge>
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs opacity-50">
-                          {currency} {acc.balance?.toLocaleString()}
+                          {acc.balance?.toLocaleString()}
                         </TableCell>
-                        <TableCell className="text-right font-mono text-xs font-black text-primary">
-                          {currency} {acc.monthlyLimit?.toLocaleString() || '0'}
+                        <TableCell className="text-right">
+                          <Input 
+                            type="number" 
+                            className="h-8 w-32 ml-auto text-right font-mono text-xs font-black border-none bg-secondary/20"
+                            value={localLimits[acc.id] || 0}
+                            onChange={(e) => setLocalLimits(prev => ({ ...prev, [acc.id]: parseFloat(e.target.value) || 0 }))}
+                          />
                         </TableCell>
                         <TableCell className="text-right pr-6">
                           <Button 
@@ -163,7 +212,7 @@ export default function BudgetCreationPage() {
                               setIsEditOpen(true);
                             }}
                           >
-                            <Edit2 className="size-3" /> Adjust Limit
+                            <Edit2 className="size-3" /> Single Edit
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -173,13 +222,14 @@ export default function BudgetCreationPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm relative overflow-hidden p-6">
-              <div className="flex gap-4 items-start">
+            <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm p-6 relative overflow-hidden">
+              <div className="absolute -right-4 -bottom-4 opacity-5"><LayoutGrid className="size-24" /></div>
+              <div className="flex gap-4 items-start relative z-10">
                 <Info className="size-5 text-primary shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                  <p className="text-xs font-black uppercase text-primary">Allocation Logic</p>
-                  <p className="text-[11px] leading-relaxed text-muted-foreground">
-                    To add more accounts to this list, visit **Accounting &gt; Chart of Accounts** and mark the desired Expense nodes as "Budget Tracked". The system will automatically compute utilization based on every journal entry posted to that GL node.
+                  <p className="text-xs font-black uppercase text-primary">Fiscal Logic</p>
+                  <p className="text-[11px] leading-relaxed text-muted-foreground max-w-2xl">
+                    Changes made here apply only to the selected **Target Period**. You can perform a bulk save for all listed accounts using the top-right command or refine individual limits.
                   </p>
                 </div>
               </div>
@@ -191,38 +241,23 @@ export default function BudgetCreationPage() {
           <DialogContent className="max-w-md">
             <form onSubmit={handleUpdateLimit}>
               <DialogHeader>
-                <DialogTitle>Set Expenditure Ceiling</DialogTitle>
+                <DialogTitle>Set Period Ceiling</DialogTitle>
                 <CardDescription className="text-xs uppercase font-black tracking-tight">Node: {editingAcc?.name}</CardDescription>
               </DialogHeader>
               
               <div className="grid gap-4 py-6 text-xs">
-                <div className="p-4 bg-secondary/20 rounded-xl border border-border/50 flex justify-between items-center">
-                  <div>
-                    <p className="text-[9px] font-black uppercase text-muted-foreground">Actual Balance (Burned)</p>
-                    <p className="text-lg font-mono font-black text-primary">{currency} {editingAcc?.balance?.toLocaleString()}</p>
-                  </div>
-                  <Target className="size-6 text-primary opacity-20" />
-                </div>
-
                 <div className="space-y-2">
-                  <Label className="text-[10px] uppercase font-black tracking-widest opacity-60">Target Monthly Limit ({currency})</Label>
+                  <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Target Limit for {periods?.find(p => p.id === selectedPeriodId)?.name}</Label>
                   <Input 
                     name="limit" 
                     type="number" 
                     step="0.01" 
-                    defaultValue={editingAcc?.monthlyLimit} 
-                    placeholder="0.00" 
+                    defaultValue={localLimits[editingAcc?.id] || 0} 
                     required 
-                    className="h-12 text-xl font-mono font-black border-primary/20 focus-visible:ring-primary"
+                    className="h-12 text-xl font-mono font-black border-primary/20"
                   />
                 </div>
-
-                <div className="p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-lg flex gap-3 items-center">
-                  <CheckCircle2 className="size-4 text-emerald-500" />
-                  <p className="text-[10px] text-muted-foreground leading-tight italic">
-                    Finalizing this allocation will trigger threshold alerts across the Intelligence Hub once exceeded.
-                  </p>
-                </div>
+                <p className="text-[10px] italic text-muted-foreground">Note: This target will be used by the Variance Hub to track spend deviations for this specific period.</p>
               </div>
 
               <DialogFooter>

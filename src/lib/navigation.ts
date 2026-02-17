@@ -65,7 +65,11 @@ import {
   CarFront,
   CheckCircle2,
   Route,
-  Zap
+  Zap,
+  Target,
+  LineChart,
+  FilePlus2,
+  ListTree
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -177,6 +181,21 @@ export const navConfig: NavItem[] = [
       { title: "Stock Valuation", icon: Scale, url: "/inventory/valuation", id: "valuation" },
       { title: "Inventory Reports", icon: ClipboardList, url: "/inventory/reports", id: "reports" },
       { title: "Inventory Setup", icon: Settings, url: "/inventory/setup", id: "setup" },
+    ]
+  },
+  { 
+    title: "Budgeting", 
+    icon: Target, 
+    url: "/budgeting", 
+    pattern: /^\/budgeting/,
+    id: "budgeting",
+    submenus: [
+      { title: "Budget Command", icon: LayoutDashboard, url: "/budgeting", id: "overview" },
+      { title: "Budget Creation", icon: FilePlus2, url: "/budgeting/creation", id: "creation" },
+      { title: "Department Budget", icon: Building, url: "/budgeting/departments", id: "departments" },
+      { title: "Variance Analysis", icon: Scale, url: "/budgeting/variance", id: "variance" },
+      { title: "Forecasting", icon: LineChart, url: "/budgeting/forecasting", id: "forecasting" },
+      { title: "Budget Setup", icon: Settings, url: "/budgeting/setup", id: "setup" },
     ]
   },
   { 

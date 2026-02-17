@@ -35,7 +35,7 @@ import { Badge } from "@/components/ui/badge";
 
 export default function InventorySetupPage() {
   const db = useFirestore();
-  const { user } = user;
+  const { user } = useUser();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -371,7 +371,51 @@ export default function InventorySetupPage() {
             </TabsContent>
 
             <TabsContent value="pricing">
-              {/* Previous Price List logic remains functional */}
+              <div className="grid gap-6 lg:grid-cols-12">
+                <div className="lg:col-span-8">
+                  <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
+                    <CardHeader className="border-b bg-secondary/5">
+                      <CardTitle className="text-sm font-bold uppercase tracking-widest">Tiered Price Lists</CardTitle>
+                      <CardDescription className="text-xs italic">Define price overrides for wholesale, insurance, or specific client groups.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <Table>
+                        <TableHeader className="bg-secondary/20">
+                          <TableRow>
+                            <TableHead className="h-10 text-[10px] font-bold uppercase pl-6">List Name</TableHead>
+                            <TableHead className="h-10 text-[10px] font-bold uppercase">Description</TableHead>
+                            <TableHead className="h-10 text-[10px] font-bold uppercase text-center">Status</TableHead>
+                            <TableHead className="h-10 text-right pr-6 text-[10px] font-bold uppercase">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          <TableRow>
+                            <TableCell colSpan={4} className="text-center py-12 text-xs text-muted-foreground italic font-bold">No custom price lists registered.</TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </div>
+                <div className="lg:col-span-4">
+                  <Card className="border-none ring-1 ring-border bg-card shadow shadow-primary/10">
+                    <CardHeader><CardTitle className="text-xs font-black uppercase tracking-widest">New Price Tier</CardTitle></CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold">List Identity</Label>
+                        <Input placeholder="e.g. Insurance Rate Card" className="h-9 text-xs" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-bold">Scope</Label>
+                        <Input placeholder="Brief description" className="h-9 text-xs" />
+                      </div>
+                      <Button className="w-full h-10 font-bold uppercase text-[10px] gap-2">
+                        <Plus className="size-3" /> Initialize List
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         )}

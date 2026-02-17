@@ -43,11 +43,14 @@ service cloud.firestore {
     }
 
     match /institutions/{institutionId} {
+      // Any signed-in user can read an institution profile
       allow read: if isSignedIn();
+      // Any signed-in user can register an institution (multi-tenancy onboarding)
       allow create: if isSignedIn();
+      // Only members/admins can update profile
       allow update: if isInstitutionMember(institutionId);
       
-      // Recursive match for all institutional sub-collections (products, movements, batches, etc.)
+      // All institutional sub-collections (coa, products, payables, invoices, etc.)
       match /{allSubcollections=**} {
         allow read, write: if isInstitutionMember(institutionId);
       }

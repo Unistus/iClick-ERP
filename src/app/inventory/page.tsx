@@ -6,19 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   Plus, 
-  Search, 
   Package, 
   AlertTriangle, 
   RefreshCw, 
   Timer,
   Box,
-  Scale,
   TrendingUp,
   Activity,
   ArrowRightLeft,
   Warehouse,
   History,
-  ArrowUpRight,
   TrendingDown,
   BrainCircuit,
   Zap
@@ -27,8 +24,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
-import { collection, query, orderBy, limit, doc, where } from "firebase/firestore";
-import { format, isBefore, addDays } from "date-fns";
+import { collection, query, orderBy, limit, doc } from "firebase/firestore";
+import { isBefore, addDays } from "date-fns";
 import Link from 'next/link';
 
 export default function InventoryDashboardPage() {
@@ -43,7 +40,7 @@ export default function InventoryDashboardPage() {
     if (!selectedInstId) return null;
     return query(collection(db, 'institutions', selectedInstId, 'products'), orderBy('updatedAt', 'desc'), limit(10));
   }, [db, selectedInstId]);
-  const { data: products, isLoading: productsLoading } = useCollection(productsQuery);
+  const { data: products } = useCollection(productsQuery);
 
   const batchesQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -65,15 +62,14 @@ export default function InventoryDashboardPage() {
 
   const currency = settings?.general?.currencySymbol || "KES";
 
-  // Calculations
-  const totalStockItems = products?.filter(p => p.type === 'Stock').length || 0;
+  // Calculations - Dynamically updating based on real-time movements/product changes
   const lowStockCount = products?.filter(p => p.type === 'Stock' && p.totalStock <= (p.reorderLevel || 0)).length || 0;
   
   const now = new Date();
   const criticalThreshold = addDays(now, 30);
   const expiryRiskCount = batches?.filter(b => isBefore(b.expiryDate?.toDate(), criticalThreshold)).length || 0;
 
-  const totalAssetValue = products?.reduce((sum, p) => sum + ((p.totalStock || 0) * (p.costPrice || 0)), 0) || 0;
+  const totalAssetBase = products?.reduce((sum, p) => sum + ((p.totalStock || 0) * (p.costPrice || 0)), 0) || 0;
 
   return (
     <DashboardLayout>
@@ -142,7 +138,7 @@ export default function InventoryDashboardPage() {
                 </CardContent>
               </Card>
               <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm relative overflow-hidden">
-                <div className="absolute -right-4 -bottom-4 opacity-10"><RefreshCw className="size-24 animate-spin-slow" /></div>
+                <div className="absolute -right-4 -bottom-4 opacity-10"><RefreshCw className="size-24" /></div>
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-primary tracking-widest">Live Sync</span></CardHeader>
                 <CardContent className="pb-4">
                   <div className="text-2xl font-bold text-primary">Active</div>
@@ -172,11 +168,11 @@ export default function InventoryDashboardPage() {
                         <TableRow key={m.id} className="h-14 hover:bg-secondary/5 transition-colors group">
                           <TableCell className="pl-6 w-10">
                             <div className={`p-2 rounded shrink-0 ${
-                              m.type === 'In' ? 'bg-emerald-500/10 text-emerald-500' : 
-                              m.type === 'Out' ? 'bg-destructive/10 text-destructive' : 
+                              m.type === 'In' || (m.type === 'Adjustment' && m.quantity > 0) ? 'bg-emerald-500/10 text-emerald-500' : 
+                              m.type === 'Out' || m.type === 'Damage' || (m.type === 'Adjustment' && m.quantity < 0) ? 'bg-destructive/10 text-destructive' : 
                               'bg-primary/10 text-primary'
                             }`}>
-                              {m.type === 'In' ? <TrendingUp className="size-3.5" /> : m.type === 'Out' ? <TrendingDown className="size-3.5" /> : <ArrowRightLeft className="size-3.5" />}
+                              {(m.type === 'In' || (m.type === 'Adjustment' && m.quantity > 0)) ? <TrendingUp className="size-3.5" /> : (m.type === 'Out' || m.type === 'Damage' || (m.type === 'Adjustment' && m.quantity < 0)) ? <TrendingDown className="size-3.5" /> : <ArrowRightLeft className="size-3.5" />}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -188,8 +184,8 @@ export default function InventoryDashboardPage() {
                           <TableCell className="text-center">
                             <Badge variant="outline" className="text-[8px] h-4 font-bold bg-background/50 border-none ring-1 ring-border uppercase">{m.type}</Badge>
                           </TableCell>
-                          <TableCell className="text-right pr-6 font-mono font-black text-xs">
-                            {m.type === 'In' ? '+' : '-'}{m.quantity}
+                          <TableCell className={`text-right pr-6 font-mono font-black text-xs ${m.quantity > 0 ? 'text-emerald-500' : m.quantity < 0 ? 'text-destructive' : ''}`}>
+                            {m.quantity > 0 ? '+' : ''}{m.quantity}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -213,7 +209,7 @@ export default function InventoryDashboardPage() {
                         <Zap className="size-3 text-primary animate-pulse" />
                       </div>
                       <p className="text-[11px] leading-relaxed italic text-muted-foreground">
-                        "System detects high turnover in <strong>Amoxicillin</strong> at CBD branch. Recommending immediate 20% stock buffer increase."
+                        "System detects high turnover in <strong>Active SKUs</strong>. Recommending immediate 20% stock buffer increase for top items."
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -247,8 +243,8 @@ export default function InventoryDashboardPage() {
                       <Badge variant="secondary" className="text-[8px] h-4 font-bold">{settings?.inventory?.valuationMethod || 'WeightedAvg'}</Badge>
                     </div>
                     <div className="flex justify-between items-center text-[11px]">
-                      <span className="text-muted-foreground">Price Lists Deployed</span>
-                      <span className="font-bold">3 Tiers</span>
+                      <span className="text-muted-foreground">Audit Tracking</span>
+                      <Badge variant="outline" className="text-[8px] h-4 font-bold border-emerald-500/20 text-emerald-500">Bidirectional</Badge>
                     </div>
                   </CardContent>
                 </Card>

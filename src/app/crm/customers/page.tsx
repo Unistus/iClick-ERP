@@ -9,33 +9,33 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, query, orderBy, where, doc, updateDoc } from "firebase/firestore";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection, query, orderBy, doc, deleteDoc } from "firebase/firestore";
 import { registerCustomer } from "@/lib/crm/crm.service";
 import { 
   Users, 
   Plus, 
   Search, 
   Filter, 
-  CheckCircle2, 
-  XCircle, 
-  UserCircle,
-  Phone,
-  Mail,
-  CreditCard,
-  Crown,
-  Loader2,
-  MoreVertical,
-  Calendar,
-  MapPin,
-  Truck,
+  UserCircle, 
+  Phone, 
+  Mail, 
+  CreditCard, 
+  Loader2, 
+  MoreVertical, 
+  Calendar, 
+  MapPin, 
+  Truck, 
+  Building2, 
+  Contact, 
+  Hash, 
+  Globe, 
+  LayoutGrid,
+  CheckCircle2,
+  BadgeCent,
+  ShieldCheck,
   FileText,
-  Clock,
-  Building2,
-  Contact,
-  Hash,
-  Globe,
-  LayoutGrid
+  Clock
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
@@ -244,21 +244,22 @@ export default function CustomerDirectoryPage() {
         )}
 
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogContent className="max-w-3xl overflow-y-auto max-h-[90vh]">
+          <DialogContent className="max-w-4xl overflow-y-auto max-h-[90vh]">
             <form onSubmit={handleCreateCustomer}>
               <DialogHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <UserCircle className="size-5 text-primary" />
                   <DialogTitle>Register Professional Profile</DialogTitle>
                 </div>
-                <CardDescription className="text-xs uppercase font-black tracking-tight text-primary">Client Onboarding v3.0</CardDescription>
+                <CardDescription className="text-xs uppercase font-black tracking-tight text-primary">Client Onboarding v3.5</CardDescription>
               </DialogHeader>
               
               <Tabs defaultValue="basic" className="py-4">
                 <TabsList className="bg-secondary/30 h-10 p-1 mb-4">
-                  <TabsTrigger value="basic" className="text-xs gap-2 px-6">Basic & Identity</TabsTrigger>
-                  <TabsTrigger value="contact" className="text-xs gap-2 px-6">Contact Person</TabsTrigger>
-                  <TabsTrigger value="logistics" className="text-xs gap-2 px-6">Logistics Hierarchy</TabsTrigger>
+                  <TabsTrigger value="basic" className="text-xs gap-2 px-6">1. Identity</TabsTrigger>
+                  <TabsTrigger value="contact" className="text-xs gap-2 px-6">2. Contact Person</TabsTrigger>
+                  <TabsTrigger value="logistics" className="text-xs gap-2 px-6">3. Logistics</TabsTrigger>
+                  <TabsTrigger value="financial" className="text-xs gap-2 px-6">4. Tax & Financials</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="basic" className="space-y-4">
@@ -291,7 +292,7 @@ export default function CustomerDirectoryPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-1.5"><Mail className="size-3" /> Billing Email</Label>
+                        <Label className="flex items-center gap-1.5"><Mail className="size-3" /> Communication Email</Label>
                         <Input name="email" type="email" placeholder="finance@client.com" required />
                       </div>
                       <div className="space-y-2">
@@ -305,7 +306,7 @@ export default function CustomerDirectoryPage() {
                 <TabsContent value="contact" className="space-y-4">
                   <div className="grid gap-4 py-4 text-xs bg-secondary/10 p-4 rounded-xl border border-dashed">
                     <div className="space-y-2">
-                      <Label className="uppercase font-bold tracking-widest">Main Contact Person Full Name</Label>
+                      <Label className="uppercase font-bold tracking-widest">Main Decision Maker / Contact Full Name</Label>
                       <Input name="cpName" placeholder="e.g. John Doe" className="bg-background" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -352,9 +353,55 @@ export default function CustomerDirectoryPage() {
                         </Select>
                       </div>
                     </div>
-                    <div className="space-y-2 pt-2 border-t border-border/50">
-                      <Label className="flex items-center gap-1.5 text-accent font-bold"><Truck className="size-3" /> Detailed Delivery Address</Label>
-                      <Textarea name="shippingAddress" placeholder="e.g. 4th Floor, Westlands Hub, Suite 402" className="min-h-[80px]" />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1.5 text-accent font-bold"><Truck className="size-3" /> Delivery Address</Label>
+                        <Textarea name="shippingAddress" placeholder="e.g. 4th Floor, Westlands Hub, Suite 402" className="min-h-[80px]" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1.5 text-muted-foreground font-bold"><Clock className="size-3" /> Delivery Logistics Notes</Label>
+                        <Textarea name="deliveryNotes" placeholder="e.g. Ring bell at gate, specific entry instructions..." className="min-h-[80px]" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Preferred Delivery Window</Label>
+                      <Select name="preferredDeliveryTime" defaultValue="Afternoon">
+                        <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Morning">Morning (08:00 - 12:00)</SelectItem>
+                          <SelectItem value="Afternoon">Afternoon (12:00 - 17:00)</SelectItem>
+                          <SelectItem value="Evening">Evening (17:00 - 20:00)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="financial" className="space-y-4">
+                  <div className="grid gap-6 py-4 text-xs">
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-1.5 text-primary font-bold"><ShieldCheck className="size-3" /> Tax PIN (KRA PIN / TIN)</Label>
+                          <Input name="taxPin" placeholder="e.g. P051..." className="font-mono font-bold h-10" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-1.5 text-accent font-bold"><BadgeCent className="size-3" /> Credit Trust Limit</Label>
+                          <Input name="creditLimit" type="number" step="0.01" placeholder="0.00" className="h-10 font-black text-lg" />
+                          <p className="text-[9px] text-muted-foreground italic">Authorized credit ceiling for unpaid finalized invoices.</p>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-1.5 text-primary font-bold"><FileText className="size-3" /> Financial / Billing Address</Label>
+                          <Textarea name="billingAddress" placeholder="Address for official invoices and tax reports..." className="min-h-[100px]" />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-1.5 text-primary font-bold"><Calendar className="size-3" /> Date of Birth</Label>
+                          <Input name="birthday" type="date" className="h-10" />
+                          <p className="text-[9px] text-muted-foreground italic">Used for automated birthday loyalty discounts.</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </TabsContent>

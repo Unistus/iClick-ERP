@@ -23,6 +23,7 @@ import {
   CheckCircle2, 
   ShieldAlert,
   ArrowUpRight,
+  ArrowRight,
   TrendingUp,
   Landmark,
   BadgeCent,

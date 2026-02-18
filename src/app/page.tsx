@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -53,6 +52,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import Link from 'next/link';
 import { aiFinancialInsights, type AiFinancialInsightsOutput } from "@/ai/flows/ai-financial-insights-flow";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const salesData = [
   { name: 'Mon', revenue: 45000, profit: 12000 },
@@ -297,8 +297,14 @@ export default function HomePage() {
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={salesData}>
                         <defs>
-                          <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/></linearGradient>
-                          <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/><stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/></linearGradient>
+                          <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                          </linearGradient>
+                          <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/>
+                          </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                         <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
@@ -343,37 +349,4 @@ export default function HomePage() {
       </div>
     </DashboardLayout>
   )
-}
-
-function Select({ value, onValueChange, children }: { value: string, onValueChange: (v: string) => void, children: React.ReactNode }) {
-  return (
-    <div className="relative">
-      <select 
-        value={value} 
-        onChange={(e) => onValueChange(e.target.value)}
-        className="w-full h-9 bg-card border-none ring-1 ring-border text-xs font-bold rounded-md px-3 appearance-none cursor-pointer hover:bg-secondary/50 transition-colors"
-      >
-        {children}
-      </select>
-      <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-50">
-        <ChevronRight className="size-3 rotate-90" />
-      </div>
-    </div>
-  );
-}
-
-function SelectTrigger({ className, children }: { className?: string, children: React.ReactNode }) {
-  return <div className={className}>{children}</div>;
-}
-
-function SelectValue({ placeholder }: { placeholder: string }) {
-  return <span>{placeholder}</span>;
-}
-
-function SelectContent({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
-}
-
-function SelectItem({ value, className, children }: { value: string, className?: string, children: React.ReactNode }) {
-  return <option value={value} className={className}>{children}</option>;
 }

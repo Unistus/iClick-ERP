@@ -32,8 +32,36 @@ const AiFinancialInsightsOutputSchema = z.object({
 });
 export type AiFinancialInsightsOutput = z.infer<typeof AiFinancialInsightsOutputSchema>;
 
+/**
+ * Wrapper function for the financial insights flow with built-in resilience.
+ * Handles transient AI service outages by returning a helpful fallback.
+ */
 export async function aiFinancialInsights(input: AiFinancialInsightsInput): Promise<AiFinancialInsightsOutput> {
-  return aiFinancialInsightsFlow(input);
+  try {
+    return await aiFinancialInsightsFlow(input);
+  } catch (error: any) {
+    console.error("AI Insight Flow Error:", error);
+    
+    // Check if it's a transient unavailability error
+    const isUnavailable = error?.message?.includes('503') || error?.message?.includes('high demand');
+    
+    return {
+      summaryOfTrends: isUnavailable 
+        ? "AI nodes are currently under heavy load. Predictive trend synthesis is momentarily throttled."
+        : "Automated analysis encountered an unexpected interruption.",
+      reorderRecommendations: "Please verify stock levels manually via the Inventory module.",
+      answerToQuery: "The Strategist is temporarily offline but will be back shortly. Standard ledger data is still accurate.",
+      strategicActions: [
+        {
+          title: "Verify Ledger Balance",
+          description: "Perform a manual check of accounts while the AI strategist recovers.",
+          module: "Accounting",
+          priority: "Medium",
+          link: "/accounting"
+        }
+      ]
+    };
+  }
 }
 
 const prompt = ai.definePrompt({
@@ -74,6 +102,9 @@ const aiFinancialInsightsFlow = ai.defineFlow(
   },
   async (input) => {
     const { output } = await prompt(input);
-    return output!;
+    if (!output) {
+      throw new Error("AI generated an empty response payload.");
+    }
+    return output;
   }
 );

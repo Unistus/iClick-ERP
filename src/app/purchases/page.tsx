@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -22,13 +21,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, query, orderBy, limit, doc } from "firebase/firestore";
 import Link from 'next/link';
+import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 
 export default function PurchasesOverviewPage() {
   const db = useFirestore();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
 
-  const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
-  const { data: institutions } = useCollection(instColRef);
+  // 1. Data Fetching: Permitted Institutions (Access Control)
+  const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
   const poQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -61,11 +61,11 @@ export default function PurchasesOverviewPage() {
           <div className="flex gap-2 w-full md:w-auto">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
               <SelectTrigger className="w-[240px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold">
-                <SelectValue placeholder="Select Institution" />
+                <SelectValue placeholder={instLoading ? "Scanning..." : "Select Institution"} />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (
-                  <SelectItem key={i.id} value={i.id} className="text-xs">{i.name}</SelectItem>
+                  <SelectItem key={i.id} value={i.id} className="text-xs font-medium">{i.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

@@ -26,6 +26,7 @@ import { collection, query, limit, orderBy, where } from "firebase/firestore"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
+import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions"
 
 export default function AIInsightsPage() {
   const db = useFirestore()
@@ -34,9 +35,8 @@ export default function AIInsightsPage() {
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState<AiFinancialInsightsOutput | null>(null)
 
-  // Data Fetching for AI Context
-  const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db])
-  const { data: institutions } = useCollection(instColRef)
+  // 1. Data Fetching: Permitted Institutions (Access Control)
+  const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
   const salesQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null
@@ -142,7 +142,7 @@ export default function AIInsightsPage() {
 
           <Select value={selectedInstId} onValueChange={setSelectedInstId}>
             <SelectTrigger className="w-[240px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold">
-              <SelectValue placeholder="Select Institution" />
+              <SelectValue placeholder={instLoading ? "Polling Data..." : "Select Institution"} />
             </SelectTrigger>
             <SelectContent>
               {institutions?.map(i => (

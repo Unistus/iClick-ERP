@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -23,13 +22,14 @@ import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy, limit, where } from "firebase/firestore";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from 'next/link';
+import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 
 export default function LogisticsDashboard() {
   const db = useFirestore();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
 
-  const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
-  const { data: institutions } = useCollection(instColRef);
+  // 1. Data Fetching: Permitted Institutions (Access Control)
+  const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
   const deliveriesQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -66,7 +66,7 @@ export default function LogisticsDashboard() {
           <div className="flex gap-2 w-full md:w-auto">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
               <SelectTrigger className="w-[240px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold">
-                <SelectValue placeholder="Select Institution" />
+                <SelectValue placeholder={instLoading ? "Resolving Access..." : "Select Institution"} />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (

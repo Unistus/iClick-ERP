@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -54,6 +53,7 @@ import { Button } from "@/components/ui/button"
 import Link from 'next/link';
 import { aiFinancialInsights, type AiFinancialInsightsOutput } from "@/ai/flows/ai-financial-insights-flow";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 
 const salesData = [
   { name: 'Mon', revenue: 45000, profit: 12000 },
@@ -86,9 +86,8 @@ export default function HomePage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [lastAuditTime, setLastAuditTime] = useState<string>("");
 
-  // 1. Data Fetching: Institutions
-  const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
-  const { data: institutions } = useCollection(instColRef);
+  // 1. Data Fetching: Permitted Institutions (Tenancy Control)
+  const { institutions, isSuperAdmin, isLoading: instLoading } = usePermittedInstitutions();
 
   // 2. Data Fetching: Fiscal Periods
   const periodsQuery = useMemoFirebase(() => {
@@ -234,7 +233,7 @@ export default function HomePage() {
           <div className="flex flex-wrap items-center gap-2">
             <Select value={selectedInstId} onValueChange={(val) => { setSelectedInstId(val); setSelectedPeriodId(""); }}>
               <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold">
-                <SelectValue placeholder="Select Active Institution" />
+                <SelectValue placeholder={instLoading ? "Loading Access..." : "Select Institution"} />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (

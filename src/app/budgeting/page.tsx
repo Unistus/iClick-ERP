@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -29,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { calculatePeriodVariance, type BudgetAllocation } from '@/lib/budgeting/budget.service';
+import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 
 export default function BudgetOverviewPage() {
   const db = useFirestore();
@@ -37,11 +38,10 @@ export default function BudgetOverviewPage() {
   const [varianceData, setVarianceData] = useState<BudgetAllocation[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Data Fetching: Institutions
-  const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
-  const { data: institutions } = useCollection(instColRef);
+  // 1. Data Fetching: Permitted Institutions (Access Control)
+  const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
-  // Data Fetching: Open Fiscal Periods
+  // 2. Data Fetching: Open Fiscal Periods
   const periodsQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return query(
@@ -108,7 +108,7 @@ export default function BudgetOverviewPage() {
               setVarianceData([]);
             }}>
               <SelectTrigger className="w-[240px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
-                <SelectValue placeholder="Select Institution" />
+                <SelectValue placeholder={instLoading ? "Verifying Access..." : "Select Institution"} />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (

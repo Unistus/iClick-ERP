@@ -33,13 +33,14 @@ import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase
 import { collection, query, orderBy, limit, doc } from "firebase/firestore";
 import { isBefore, addDays } from "date-fns";
 import Link from 'next/link';
+import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 
 export default function InventoryDashboardPage() {
   const db = useFirestore();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
 
-  const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
-  const { data: institutions } = useCollection(instColRef);
+  // 1. Data Fetching: Permitted Institutions (Access Control)
+  const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
   const productsQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -93,7 +94,7 @@ export default function InventoryDashboardPage() {
           <div className="flex gap-2 w-full md:w-auto">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
               <SelectTrigger className="w-[240px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold">
-                <SelectValue placeholder="Select Institution" />
+                <SelectValue placeholder={instLoading ? "Authorizing..." : "Select Institution"} />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (
@@ -212,7 +213,7 @@ export default function InventoryDashboardPage() {
                   <CardContent className="pt-4 space-y-4">
                     <div className="p-4 bg-secondary/20 rounded-xl border border-border/50 relative overflow-hidden">
                       <div className="absolute top-0 right-0 p-2 opacity-10 rotate-12"><Zap className="size-12 text-primary" /></div>
-                      <p className="text-[11px] leading-relaxed italic font-medium relative z-10">
+                      <p className="text-[11px] leading-relaxed italic font-medium relative z-10 text-muted-foreground">
                         "Current turnover velocity indicates <span className="text-primary font-bold">Safety Stock</span> thresholds for Pharmacy category are optimal. Suggesting 5% buffer reduction on fast-movers to improve cash position."
                       </p>
                     </div>

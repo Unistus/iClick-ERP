@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -23,13 +22,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy, limit } from "firebase/firestore";
 import { format } from "date-fns";
+import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 
 export default function GeneralLedgerPage() {
   const db = useFirestore();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
 
-  const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
-  const { data: institutions } = useCollection(instColRef);
+  // 1. Data Fetching: Permitted Institutions (Access Control)
+  const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
   const entriesQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -55,8 +55,8 @@ export default function GeneralLedgerPage() {
           
           <div className="flex gap-2 w-full md:w-auto">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
-              <SelectTrigger className="w-[200px] h-9 bg-card border-none ring-1 ring-border text-xs">
-                <SelectValue placeholder="Select Institution" />
+              <SelectTrigger className="w-[200px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold">
+                <SelectValue placeholder={instLoading ? "Syncing Access..." : "Select Institution"} />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (

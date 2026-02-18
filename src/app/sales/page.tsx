@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -36,6 +35,8 @@ import {
   Tooltip, 
   ResponsiveContainer 
 } from 'recharts';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 
 const salesData = [
   { name: 'Mon', revenue: 45000, profit: 12000 },
@@ -51,8 +52,8 @@ export default function SalesOverviewPage() {
   const db = useFirestore();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
 
-  const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
-  const { data: institutions } = useCollection(instColRef);
+  // 1. Data Fetching: Permitted Institutions (Access Control)
+  const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
   const settingsRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -77,14 +78,16 @@ export default function SalesOverviewPage() {
           </div>
           
           <div className="flex gap-2 w-full md:w-auto">
-            <select 
-              value={selectedInstId} 
-              onChange={(e) => setSelectedInstId(e.target.value)}
-              className="w-[240px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold rounded-md px-3"
-            >
-              <option value="">Select Institution</option>
-              {institutions?.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-            </select>
+            <Select value={selectedInstId} onValueChange={setSelectedInstId}>
+              <SelectTrigger className="w-[240px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold">
+                <SelectValue placeholder={instLoading ? "Validating..." : "Select Institution"} />
+              </SelectTrigger>
+              <SelectContent>
+                {institutions?.map(i => (
+                  <SelectItem key={i.id} value={i.id} className="text-xs">{i.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Link href="/sales/invoices">
               <Button size="sm" className="gap-2 h-10 text-xs font-bold uppercase shadow-lg shadow-primary/20" disabled={!selectedInstId}>
                 <Plus className="size-4" /> Issue Invoice

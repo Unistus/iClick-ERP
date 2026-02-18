@@ -21,7 +21,6 @@ import {
   UserCircle, 
   Phone, 
   Mail, 
-  CreditCard, 
   Loader2, 
   MoreVertical, 
   Calendar, 
@@ -41,7 +40,8 @@ import {
   Coins,
   TrendingUp,
   Tag,
-  Briefcase
+  Briefcase,
+  ArrowRight
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
@@ -62,16 +62,16 @@ export default function CustomerDirectoryPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState("basic");
 
-  // Chained Select States
+  // Chained Select States for Logistics
   const [selectedCountryId, setSelectedCountryId] = useState<string>("");
   const [selectedTownId, setSelectedTownId] = useState<string>("");
 
-  // Data Fetching: Institutions
+  // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instColRef);
 
-  // Data Fetching: CRM Settings & Dictionaries
   const segmentsRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return collection(db, 'institutions', selectedInstId, 'customer_segments');
@@ -90,31 +90,33 @@ export default function CustomerDirectoryPage() {
   }, [db, selectedInstId]);
   const { data: crmSetup } = useDoc(crmSetupRef);
 
-  // Data Fetching: Customers
   const customersQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return query(collection(db, 'institutions', selectedInstId, 'customers'), orderBy('name', 'asc'));
   }, [db, selectedInstId]);
   const { data: customers, isLoading } = useCollection(customersQuery);
 
-  // Data Fetching: Geo Nodes
   const geoQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return collection(db, 'institutions', selectedInstId, 'geo_locations');
   }, [db, selectedInstId]);
   const { data: geoNodes } = useCollection(geoQuery);
 
-  // Data Fetching: Currencies
   const curRef = useMemoFirebase(() => collection(db, 'currencies'), [db]);
   const { data: currencies } = useCollection(curRef);
 
-  // Data Fetching: Staff
   const staffRef = useMemoFirebase(() => collection(db, 'users'), [db]);
   const { data: staffMembers } = useCollection(staffRef);
 
   const countries = geoNodes?.filter(n => n.level === 'Country') || [];
   const towns = geoNodes?.filter(n => n.level === 'Town' && n.parentId === selectedCountryId) || [];
   const areas = geoNodes?.filter(n => n.level === 'Area' && n.parentId === selectedTownId) || [];
+
+  const handleNext = () => {
+    if (activeTab === "basic") setActiveTab("contact");
+    else if (activeTab === "contact") setActiveTab("logistics");
+    else if (activeTab === "logistics") setActiveTab("financial");
+  };
 
   const handleCreateCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -153,8 +155,9 @@ export default function CustomerDirectoryPage() {
 
     try {
       await registerCustomer(db, selectedInstId, data);
-      toast({ title: "Customer Onboarded", description: "Profile indexed with dynamic segments." });
+      toast({ title: "Customer Profile Finalized", description: "Identity indexed for sales and logistics." });
       setIsCreateOpen(false);
+      setActiveTab("basic");
     } catch (err) {
       toast({ variant: "destructive", title: "Registration Failed" });
     } finally {
@@ -164,7 +167,7 @@ export default function CustomerDirectoryPage() {
 
   const filteredCustomers = customers?.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.email.toLowerCase().includes(searchTerm.toLowerCase())
+    c.email?.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
   return (
@@ -193,8 +196,11 @@ export default function CustomerDirectoryPage() {
               </SelectContent>
             </Select>
 
-            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase shadow-lg shadow-primary/20" disabled={!selectedInstId} onClick={() => setIsCreateOpen(true)}>
-              <Plus className="size-4" /> New Customer
+            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase shadow-lg shadow-primary/20" disabled={!selectedInstId} onClick={() => {
+              setIsCreateOpen(true);
+              setActiveTab("basic");
+            }}>
+              <Plus className="size-4" /> New Profile
             </Button>
           </div>
         </div>
@@ -289,10 +295,10 @@ export default function CustomerDirectoryPage() {
                   <UserCircle className="size-5 text-primary" />
                   <DialogTitle>Register Customer Profile</DialogTitle>
                 </div>
-                <CardDescription className="text-xs uppercase font-black tracking-tight text-primary">Strategic Account Initialization v4.0</CardDescription>
+                <CardDescription className="text-xs uppercase font-black tracking-tight text-primary">Institutional Onboarding v4.2</CardDescription>
               </DialogHeader>
               
-              <Tabs defaultValue="basic" className="py-4">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="py-4">
                 <TabsList className="bg-secondary/30 h-10 p-1 mb-4 border-b rounded-none w-full justify-start bg-transparent">
                   <TabsTrigger value="basic" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10">1. Identity</TabsTrigger>
                   <TabsTrigger value="contact" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10">2. Key Contact</TabsTrigger>
@@ -318,7 +324,7 @@ export default function CustomerDirectoryPage() {
                         <Input name="regNumber" placeholder="e.g. CPR/2023/12345" className="font-mono" />
                       </div>
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-1.5"><Calendar className="size-3" /> Registration Date</Label>
+                        <Label className="flex items-center gap-1.5"><Calendar className="size-3" /> Business Reg. Date</Label>
                         <Input name="regDate" type="date" className="h-10" />
                       </div>
                       <div className="space-y-2">
@@ -342,6 +348,11 @@ export default function CustomerDirectoryPage() {
                       </div>
                     </div>
                   </div>
+                  <div className="flex justify-end pt-4">
+                    <Button type="button" onClick={handleNext} className="gap-2 h-10 px-8 font-bold uppercase text-xs">
+                      Next Step <ArrowRight className="size-4" />
+                    </Button>
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="contact" className="space-y-4">
@@ -360,6 +371,11 @@ export default function CustomerDirectoryPage() {
                         <Input name="cpPhone" placeholder="+254..." className="bg-background" />
                       </div>
                     </div>
+                  </div>
+                  <div className="flex justify-end pt-4">
+                    <Button type="button" onClick={handleNext} className="gap-2 h-10 px-8 font-bold uppercase text-xs">
+                      Logistics Profile <ArrowRight className="size-4" />
+                    </Button>
                   </div>
                 </TabsContent>
 
@@ -415,6 +431,11 @@ export default function CustomerDirectoryPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+                  <div className="flex justify-end pt-4">
+                    <Button type="button" onClick={handleNext} className="gap-2 h-10 px-8 font-bold uppercase text-xs">
+                      Financial Controls <ArrowRight className="size-4" />
+                    </Button>
                   </div>
                 </TabsContent>
 
@@ -492,7 +513,7 @@ export default function CustomerDirectoryPage() {
                 <div className="flex-1 flex items-center gap-2 text-[10px] text-muted-foreground opacity-50 uppercase font-bold">
                   <Sparkles className="size-3" /> System indexed onboarding
                 </div>
-                <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs h-10 font-bold uppercase">Discard</Button>
+                <Button type="button" variant="ghost" onClick={() => { setIsCreateOpen(false); setActiveTab("basic"); }} className="text-xs h-10 font-bold uppercase">Discard</Button>
                 <Button type="submit" disabled={isProcessing} className="h-10 px-10 font-bold uppercase text-xs shadow-xl shadow-primary/20 gap-2">
                   {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-4" />} Finalize Customer Profile
                 </Button>

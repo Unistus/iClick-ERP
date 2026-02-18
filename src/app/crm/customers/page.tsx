@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -166,7 +165,7 @@ export default function CustomerDirectoryPage() {
   };
 
   const filteredCustomers = customers?.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     c.email?.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 

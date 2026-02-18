@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { 
@@ -77,6 +78,7 @@ export default function HomePage() {
   const db = useFirestore()
   const { user } = useUser()
   const [selectedInstId, setSelectedInstId] = useState<string>("")
+  const [selectedPeriodId, setSelectedPeriodId] = useState<string>("")
   const [activeTab, setActiveTab] = useState("overview")
   
   // AI Strategist State
@@ -84,9 +86,53 @@ export default function HomePage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [lastAuditTime, setLastAuditTime] = useState<string>("");
 
-  // Data Fetching for Dashboard & AI Context
+  // 1. Data Fetching: Institutions
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instColRef);
+
+  // 2. Data Fetching: Fiscal Periods
+  const periodsQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return query(collection(db, 'institutions', selectedInstId, 'fiscal_periods'), orderBy('startDate', 'desc'));
+  }, [db, selectedInstId]);
+  const { data: periods } = useCollection(periodsQuery);
+
+  // Auto-select current/latest period
+  useEffect(() => {
+    if (!selectedPeriodId && periods && periods.length > 0) {
+      const active = periods.find(p => p.status === 'Open') || periods[0];
+      setSelectedPeriodId(active.id);
+    }
+  }, [periods, selectedPeriodId]);
+
+  const activePeriod = useMemo(() => periods?.find(p => p.id === selectedPeriodId), [periods, selectedPeriodId]);
+
+  // 3. Data Fetching: Ledger Entries for selected period
+  const entriesQuery = useMemoFirebase(() => {
+    if (!selectedInstId || !activePeriod) return null;
+    const start = new Date(activePeriod.startDate);
+    const end = new Date(activePeriod.endDate);
+    return query(
+      collection(db, 'institutions', selectedInstId, 'journal_entries'),
+      where('date', '>=', start),
+      where('date', '<=', end)
+    );
+  }, [db, selectedInstId, activePeriod]);
+  const { data: entries } = useCollection(entriesQuery);
+
+  // 4. Data Fetching: Account Types for categorization
+  const coaQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'coa');
+  }, [db, selectedInstId]);
+  const { data: coa } = useCollection(coaQuery);
+
+  // 5. Data Fetching: Products for Stock Value
+  const productsQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'products');
+  }, [db, selectedInstId]);
+  const { data: products } = useCollection(productsQuery);
 
   const settingsRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -96,40 +142,68 @@ export default function HomePage() {
 
   const currency = settings?.general?.currencySymbol || "KES";
 
-  // Context Data for Strategist
-  const productsQuery = useMemoFirebase(() => selectedInstId ? collection(db, 'institutions', selectedInstId, 'products') : null, [db, selectedInstId]);
-  const { data: products } = useCollection(productsQuery);
+  // AGGREGATION ENGINE: Derive stats from Real-time Ledger
+  const metrics = useMemo(() => {
+    if (!entries || !coa) return { revenue: 0, expenses: 0, profit: 0, transCount: 0, avg: 0 };
 
-  const coaQuery = useMemoFirebase(() => selectedInstId ? collection(db, 'institutions', selectedInstId, 'coa') : null, [db, selectedInstId]);
-  const { data: coa } = useCollection(coaQuery);
+    let rev = 0;
+    let exp = 0;
+    let count = 0;
 
-  const salesQuery = useMemoFirebase(() => selectedInstId ? query(collection(db, 'institutions', selectedInstId, 'journal_entries'), orderBy('date', 'desc'), limit(10)) : null, [db, selectedInstId]);
-  const { data: recentSales } = useCollection(salesQuery);
+    entries.forEach(entry => {
+      let entryIsSale = false;
+      entry.items?.forEach((item: any) => {
+        const acc = coa.find(a => a.id === item.accountId);
+        if (acc?.type === 'Income' && item.type === 'Credit') {
+          rev += item.amount;
+          entryIsSale = true;
+        }
+        if (acc?.type === 'Expense' && item.type === 'Debit') {
+          exp += item.amount;
+        }
+      });
+      if (entryIsSale) count++;
+    });
 
-  const arQuery = useMemoFirebase(() => selectedInstId ? query(collection(db, 'institutions', selectedInstId, 'invoices'), where('status', '!=', 'Paid')) : null, [db, selectedInstId]);
-  const { data: openInvoices } = useCollection(arQuery);
+    return {
+      revenue: rev,
+      expenses: exp,
+      profit: rev - exp,
+      transCount: count,
+      avg: count > 0 ? rev / count : 0
+    };
+  }, [entries, coa]);
 
-  const apQuery = useMemoFirebase(() => selectedInstId ? query(collection(db, 'institutions', selectedInstId, 'payables'), where('status', '!=', 'Paid')) : null, [db, selectedInstId]);
-  const { data: openBills } = useCollection(apQuery);
+  const stockValue = useMemo(() => {
+    if (!products) return 0;
+    return products.reduce((sum, p) => sum + ((p.totalStock || 0) * (p.costPrice || 0)), 0);
+  }, [products]);
 
+  const stats = [
+    { title: "Gross Revenue", value: `${currency} ${metrics.revenue.toLocaleString()}`, change: "Period Total", trend: "up", icon: DollarSign },
+    { title: "Net Profit", value: `${currency} ${metrics.profit.toLocaleString()}`, change: "Period Margin", trend: metrics.profit >= 0 ? "up" : "down", icon: TrendingUp },
+    { title: "Stock Value", value: `${currency} ${stockValue.toLocaleString()}`, change: "Asset Base", trend: "up", icon: Package2 },
+    { title: "Avg Transaction", value: `${currency} ${metrics.avg.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, change: "Sales Logic", trend: "up", icon: Activity },
+  ];
+
+  // AI Strategist Integration
   const generateStrategistInsight = useCallback(async () => {
     if (!selectedInstId || isAnalyzing) return;
     setIsAnalyzing(true);
 
     try {
-      const salesContext = recentSales?.map(s => ({ ref: s.reference, desc: s.description, date: s.date?.toDate?.()?.toISOString() })) || [];
-      const inventoryContext = products?.map(p => ({ name: p.name, stock: p.totalStock, reorder: p.reorderLevel })) || [];
-      const accountingContext = coa?.map(a => ({ name: a.name, type: a.type, balance: a.balance })) || [];
-      const budgetContext = coa?.filter(a => a.isTrackedForBudget).map(a => ({ name: a.name, limit: a.monthlyLimit, actual: a.balance })) || [];
-      const agingContext = { ar: openInvoices?.length || 0, ap: openBills?.length || 0 };
+      const salesContext = entries?.slice(0, 10).map(s => ({ ref: s.reference, desc: s.description })) || [];
+      const inventoryContext = products?.slice(0, 20).map(p => ({ name: p.name, stock: p.totalStock })) || [];
+      const accountingContext = coa?.map(a => ({ name: a.name, balance: a.balance })) || [];
+      const agingContext = { period: activePeriod?.name || 'Current' };
 
       const res = await aiFinancialInsights({
         salesData: JSON.stringify(salesContext),
         inventoryData: JSON.stringify(inventoryContext),
         accountingData: JSON.stringify(accountingContext),
-        budgetData: JSON.stringify(budgetContext),
+        budgetData: "[]",
         agingData: JSON.stringify(agingContext),
-        userQuery: "Provide a concise, high-impact executive summary for the dashboard insight card."
+        userQuery: "Analyze the current fiscal performance and suggest one high-impact tactical action."
       });
 
       setAiInsight(res);
@@ -139,23 +213,13 @@ export default function HomePage() {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [selectedInstId, recentSales, products, coa, openInvoices, openBills]);
+  }, [selectedInstId, entries, products, coa, activePeriod, isAnalyzing]);
 
-  // Initial trigger and periodic refresh
   useEffect(() => {
-    if (selectedInstId && products && coa) {
+    if (selectedInstId && entries && coa) {
       generateStrategistInsight();
-      const interval = setInterval(generateStrategistInsight, 300000); // Refresh every 5 mins
-      return () => clearInterval(interval);
     }
-  }, [selectedInstId, !!products, !!coa, generateStrategistInsight]);
-
-  const stats = [
-    { title: "Gross Revenue", value: `${currency} 1.2M`, change: "+14.2%", trend: "up", icon: DollarSign },
-    { title: "Net Profit", value: `${currency} 482k`, change: "+8.1%", trend: "up", icon: TrendingUp },
-    { title: "Stock Value", value: `${currency} 8.4M`, change: "-2.4%", trend: "down", icon: Package2 },
-    { title: "Avg Transaction", value: `${currency} 4,200`, change: "+1.2%", trend: "up", icon: Activity },
-  ]
+  }, [selectedInstId, !!entries, !!coa, selectedPeriodId]);
 
   return (
     <DashboardLayout>
@@ -167,8 +231,8 @@ export default function HomePage() {
               <ShieldCheck className="size-3 text-emerald-500" /> Multi-Tenant Intelligence Hub
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Select value={selectedInstId} onValueChange={setSelectedInstId}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={selectedInstId} onValueChange={(val) => { setSelectedInstId(val); setSelectedPeriodId(""); }}>
               <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold">
                 <SelectValue placeholder="Select Active Institution" />
               </SelectTrigger>
@@ -178,6 +242,21 @@ export default function HomePage() {
                 ))}
               </SelectContent>
             </Select>
+
+            <Select value={selectedPeriodId} onValueChange={setSelectedPeriodId} disabled={!selectedInstId}>
+              <SelectTrigger className="w-[180px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
+                <Calendar className="size-3.5 mr-2 text-primary" />
+                <SelectValue placeholder="Fiscal Period" />
+              </SelectTrigger>
+              <SelectContent>
+                {periods?.map(p => (
+                  <SelectItem key={p.id} value={p.id} className="text-xs">
+                    {p.name} {p.status === 'Closed' ? '🔒' : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Link href="/ai-insights">
               <Button size="sm" className="gap-2 bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 h-9 font-bold text-[10px] uppercase">
                 <BrainCircuit className="size-4" /> Strategist Hub
@@ -234,7 +313,7 @@ export default function HomePage() {
             )}
             <div className="p-6 bg-primary/5 md:bg-transparent flex flex-col items-center justify-center shrink-0 border-l border-primary/10">
               <RefreshCw 
-                className={`size-12 text-primary/30 transition-all duration-1000 ${isAnalyzing ? 'animate-spin' : 'group-hover:scale-110'}`} 
+                className={`size-12 text-primary/30 cursor-pointer transition-all duration-1000 ${isAnalyzing ? 'animate-spin' : 'group-hover:scale-110'}`} 
                 onClick={generateStrategistInsight}
               />
               <p className="text-[8px] font-black uppercase mt-2 opacity-40">Predictive Engine v2.4</p>
@@ -273,7 +352,7 @@ export default function HomePage() {
                     <div className="flex items-center gap-1 mt-1">
                       {stat.trend === 'up' ? <ArrowUpRight className="size-3 text-emerald-500" /> : <ArrowDownLeft className="size-3 text-destructive" />}
                       <span className={`text-[10px] font-bold ${stat.trend === 'up' ? 'text-emerald-500' : 'text-destructive'}`}>
-                        {stat.change} <span className="font-normal text-muted-foreground ml-1">vs last month</span>
+                        {stat.change}
                       </span>
                     </div>
                   </CardContent>
@@ -301,7 +380,7 @@ export default function HomePage() {
                             <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
                             <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
                           </linearGradient>
-                          <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                          <linearGradient id="colorProfit" x1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3}/>
                             <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0}/>
                           </linearGradient>

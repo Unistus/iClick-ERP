@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Firestore, collection, doc, serverTimestamp, addDoc, updateDoc, increment, runTransaction } from 'firebase/firestore';
@@ -6,19 +5,29 @@ import { logSystemEvent } from '../audit-service';
 
 export interface CustomerPayload {
   name: string;
+  legalName?: string;
+  registrationNumber?: string;
+  registrationDate?: string;
   email: string;
   phone: string;
   status: 'Lead' | 'Active' | 'Blocked';
   tier?: 'Silver' | 'Gold' | 'Platinum';
   creditLimit?: number;
-  birthday?: string;
+  currencyId?: string;
+  assignedSalesPersonId?: string;
   taxPin?: string;
   billingAddress?: string;
   shippingAddress?: string;
-  city?: string;
-  region?: string;
+  geoCountryId?: string;
+  geoTownId?: string;
+  geoAreaId?: string;
   preferredDeliveryTime?: 'Morning' | 'Afternoon' | 'Evening';
   deliveryNotes?: string;
+  contactPerson?: {
+    name: string;
+    role: string;
+    phone: string;
+  };
 }
 
 /**

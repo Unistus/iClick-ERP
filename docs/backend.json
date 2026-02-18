@@ -1,4 +1,3 @@
-
 {
   "entities": {
     "InstitutionSettings": {
@@ -50,9 +49,11 @@
       "type": "object",
       "properties": {
         "id": { "type": "string" },
+        "name": { "type": "string" },
         "legalName": { "type": "string" },
         "tradingName": { "type": "string" },
         "registrationNumber": { "type": "string" },
+        "registrationDate": { "type": "string", "format": "date" },
         "email": { "type": "string", "format": "email" },
         "phone": { "type": "string" },
         "status": { "type": "string", "enum": ["Lead", "Active", "Blocked"] },
@@ -68,7 +69,8 @@
         "loyaltyPoints": { "type": "number" },
         "walletBalance": { "type": "number" },
         "creditLimit": { "type": "number" },
-        "birthday": { "type": "string", "format": "date" },
+        "currencyId": { "type": "string" },
+        "assignedSalesPersonId": { "type": "string" },
         "taxPin": { "type": "string" },
         "billingAddress": { "type": "string" },
         "shippingAddress": { "type": "string" },

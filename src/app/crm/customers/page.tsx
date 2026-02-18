@@ -35,7 +35,10 @@ import {
   BadgeCent,
   ShieldCheck,
   FileText,
-  Clock
+  Clock,
+  Sparkles,
+  Coins,
+  TrendingUp
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
@@ -57,26 +60,35 @@ export default function CustomerDirectoryPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Hierarchy Picking State
+  // Chained Select States
   const [selectedCountryId, setSelectedCountryId] = useState<string>("");
   const [selectedTownId, setSelectedTownId] = useState<string>("");
 
-  // Data Fetching
+  // Data Fetching: Institutions
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instColRef);
 
+  // Data Fetching: Customers
   const customersQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return query(collection(db, 'institutions', selectedInstId, 'customers'), orderBy('name', 'asc'));
   }, [db, selectedInstId]);
   const { data: customers, isLoading } = useCollection(customersQuery);
 
-  // Geo Hierarchy Data
+  // Data Fetching: Geo Nodes
   const geoQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return collection(db, 'institutions', selectedInstId, 'geo_locations');
   }, [db, selectedInstId]);
   const { data: geoNodes } = useCollection(geoQuery);
+
+  // Data Fetching: Currencies
+  const curRef = useMemoFirebase(() => collection(db, 'currencies'), [db]);
+  const { data: currencies } = useCollection(curRef);
+
+  // Data Fetching: Staff (For Sales Person assignment - simplified fetch from users for MVP)
+  const staffRef = useMemoFirebase(() => collection(db, 'users'), [db]);
+  const { data: staffMembers } = useCollection(staffRef);
 
   const countries = geoNodes?.filter(n => n.level === 'Country') || [];
   const towns = geoNodes?.filter(n => n.level === 'Town' && n.parentId === selectedCountryId) || [];
@@ -92,9 +104,12 @@ export default function CustomerDirectoryPage() {
       name: formData.get('name') as string,
       legalName: formData.get('legalName') as string,
       registrationNumber: formData.get('regNumber') as string,
+      registrationDate: formData.get('regDate') as string,
       email: formData.get('email') as string,
       phone: formData.get('phone') as string,
       status: formData.get('status') as any || 'Lead',
+      currencyId: formData.get('currencyId') as string,
+      assignedSalesPersonId: formData.get('salesPersonId') as string,
       tier: 'Silver',
       contactPerson: {
         name: formData.get('cpName') as string,
@@ -102,7 +117,6 @@ export default function CustomerDirectoryPage() {
         phone: formData.get('cpPhone') as string,
       },
       creditLimit: parseFloat(formData.get('creditLimit') as string) || 0,
-      birthday: formData.get('birthday') as string,
       taxPin: formData.get('taxPin') as string,
       billingAddress: formData.get('billingAddress') as string,
       shippingAddress: formData.get('shippingAddress') as string,
@@ -138,7 +152,7 @@ export default function CustomerDirectoryPage() {
               <Users className="size-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-headline font-bold text-foreground">Client Directory</h1>
+              <h1 className="text-2xl font-headline font-bold text-foreground">Customer Directory</h1>
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Master Identity & Relationship Ledger</p>
             </div>
           </div>
@@ -156,7 +170,7 @@ export default function CustomerDirectoryPage() {
             </Select>
 
             <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase shadow-lg shadow-primary/20" disabled={!selectedInstId} onClick={() => setIsCreateOpen(true)}>
-              <Plus className="size-4" /> New Profile
+              <Plus className="size-4" /> New Customer
             </Button>
           </div>
         </div>
@@ -164,7 +178,7 @@ export default function CustomerDirectoryPage() {
         {!selectedInstId ? (
           <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed rounded-2xl bg-secondary/5">
             <UserCircle className="size-12 text-muted-foreground opacity-20 mb-3" />
-            <p className="text-sm font-medium text-muted-foreground">Select an institution to access its client vault.</p>
+            <p className="text-sm font-medium text-muted-foreground">Select an institution to access its customer vault.</p>
           </div>
         ) : (
           <Card className="border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
@@ -186,7 +200,7 @@ export default function CustomerDirectoryPage() {
               <Table>
                 <TableHeader className="bg-secondary/20">
                   <TableRow>
-                    <TableHead className="h-10 text-[10px] uppercase font-black pl-6">Client Identity</TableHead>
+                    <TableHead className="h-10 text-[10px] uppercase font-black pl-6">Customer Identity</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-black">Business Info</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-black text-center">Status</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-black">Territory</TableHead>
@@ -204,7 +218,7 @@ export default function CustomerDirectoryPage() {
                       <TableCell className="pl-6">
                         <div className="flex flex-col">
                           <span className="text-xs font-black uppercase tracking-tight">{c.name}</span>
-                          <span className="text-[9px] text-muted-foreground font-mono uppercase tracking-tighter opacity-60">ID: {c.registrationNumber || 'PERSONAL'}</span>
+                          <span className="text-[9px] text-muted-foreground font-mono uppercase tracking-tighter opacity-60">BRN: {c.registrationNumber || 'PERSONAL'}</span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -249,17 +263,17 @@ export default function CustomerDirectoryPage() {
               <DialogHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <UserCircle className="size-5 text-primary" />
-                  <DialogTitle>Register Professional Profile</DialogTitle>
+                  <DialogTitle>Register Customer Profile</DialogTitle>
                 </div>
-                <CardDescription className="text-xs uppercase font-black tracking-tight text-primary">Client Onboarding v3.5</CardDescription>
+                <CardDescription className="text-xs uppercase font-black tracking-tight text-primary">Strategic Account Initialization v4.0</CardDescription>
               </DialogHeader>
               
               <Tabs defaultValue="basic" className="py-4">
-                <TabsList className="bg-secondary/30 h-10 p-1 mb-4">
-                  <TabsTrigger value="basic" className="text-xs gap-2 px-6">1. Identity</TabsTrigger>
-                  <TabsTrigger value="contact" className="text-xs gap-2 px-6">2. Contact Person</TabsTrigger>
-                  <TabsTrigger value="logistics" className="text-xs gap-2 px-6">3. Logistics</TabsTrigger>
-                  <TabsTrigger value="financial" className="text-xs gap-2 px-6">4. Tax & Financials</TabsTrigger>
+                <TabsList className="bg-secondary/30 h-10 p-1 mb-4 border-b rounded-none w-full justify-start bg-transparent">
+                  <TabsTrigger value="basic" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10">1. Identity</TabsTrigger>
+                  <TabsTrigger value="contact" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10">2. Key Contact</TabsTrigger>
+                  <TabsTrigger value="logistics" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10">3. Logistics</TabsTrigger>
+                  <TabsTrigger value="financial" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10">4. Financial Strategy</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="basic" className="space-y-4">
@@ -270,7 +284,7 @@ export default function CustomerDirectoryPage() {
                         <Input name="name" placeholder="e.g. Acme Hub" required className="h-10 font-bold" />
                       </div>
                       <div className="space-y-2">
-                        <Label>Legal Business Name</Label>
+                        <Label>Legal Registered Name</Label>
                         <Input name="legalName" placeholder="e.g. Acme Global Solutions LTD" className="h-10 font-bold" />
                       </div>
                     </div>
@@ -280,23 +294,17 @@ export default function CustomerDirectoryPage() {
                         <Input name="regNumber" placeholder="e.g. CPR/2023/12345" className="font-mono" />
                       </div>
                       <div className="space-y-2">
-                        <Label>Initial Status</Label>
-                        <Select name="status" defaultValue="Lead">
-                          <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Lead">Lead (Market Prospect)</SelectItem>
-                            <SelectItem value="Active">Active (Invoicing Enabled)</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Label className="flex items-center gap-1.5"><Calendar className="size-3" /> Business Registration Date</Label>
+                        <Input name="regDate" type="date" className="h-10" />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-1.5"><Mail className="size-3" /> Communication Email</Label>
-                        <Input name="email" type="email" placeholder="finance@client.com" required />
+                        <Label className="flex items-center gap-1.5"><Mail className="size-3" /> Corporate Email</Label>
+                        <Input name="email" type="email" placeholder="finance@customer.com" required />
                       </div>
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-1.5"><Phone className="size-3" /> Main Phone</Label>
+                        <Label className="flex items-center gap-1.5"><Phone className="size-3" /> Primary Phone</Label>
                         <Input name="phone" placeholder="+254..." required />
                       </div>
                     </div>
@@ -304,18 +312,18 @@ export default function CustomerDirectoryPage() {
                 </TabsContent>
 
                 <TabsContent value="contact" className="space-y-4">
-                  <div className="grid gap-4 py-4 text-xs bg-secondary/10 p-4 rounded-xl border border-dashed">
+                  <div className="grid gap-4 py-4 text-xs bg-secondary/5 p-6 rounded-2xl border border-dashed">
                     <div className="space-y-2">
-                      <Label className="uppercase font-bold tracking-widest">Main Decision Maker / Contact Full Name</Label>
-                      <Input name="cpName" placeholder="e.g. John Doe" className="bg-background" />
+                      <Label className="uppercase font-black text-primary tracking-widest flex items-center gap-2"><Contact className="size-4" /> Primary Decision Maker</Label>
+                      <Input name="cpName" placeholder="Full Name" className="bg-background h-10 font-bold" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Designation / Role</Label>
-                        <Input name="cpRole" placeholder="e.g. Procurement Manager" className="bg-background" />
+                        <Input name="cpRole" placeholder="e.g. Finance Director" className="bg-background" />
                       </div>
                       <div className="space-y-2">
-                        <Label>Direct Mobile</Label>
+                        <Label>Direct Line</Label>
                         <Input name="cpPhone" placeholder="+254..." className="bg-background" />
                       </div>
                     </div>
@@ -330,7 +338,7 @@ export default function CustomerDirectoryPage() {
                         <Select value={selectedCountryId} onValueChange={setSelectedCountryId}>
                           <SelectTrigger className="h-10"><SelectValue placeholder="Pick Country" /></SelectTrigger>
                           <SelectContent>
-                            {countries.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                            {countries.map(c => <SelectItem key={c.id} value={c.id} className="text-xs">{c.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>
@@ -339,7 +347,7 @@ export default function CustomerDirectoryPage() {
                         <Select value={selectedTownId} onValueChange={setSelectedTownId} disabled={!selectedCountryId}>
                           <SelectTrigger className="h-10"><SelectValue placeholder="Pick Town" /></SelectTrigger>
                           <SelectContent>
-                            {towns.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                            {towns.map(t => <SelectItem key={t.id} value={t.id} className="text-xs">{t.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>
@@ -348,29 +356,29 @@ export default function CustomerDirectoryPage() {
                         <Select name="areaId" disabled={!selectedTownId}>
                           <SelectTrigger className="h-10"><SelectValue placeholder="Pick Area" /></SelectTrigger>
                           <SelectContent>
-                            {areas.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                            {areas.map(a => <SelectItem key={a.id} value={a.id} className="text-xs">{a.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-1.5 text-accent font-bold"><Truck className="size-3" /> Delivery Address</Label>
-                        <Textarea name="shippingAddress" placeholder="e.g. 4th Floor, Westlands Hub, Suite 402" className="min-h-[80px]" />
+                        <Label className="flex items-center gap-1.5 text-accent font-bold"><Truck className="size-3" /> Shipping / Delivery Address</Label>
+                        <Textarea name="shippingAddress" placeholder="Physical site for inventory delivery..." className="min-h-[80px]" />
                       </div>
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-1.5 text-muted-foreground font-bold"><Clock className="size-3" /> Delivery Logistics Notes</Label>
-                        <Textarea name="deliveryNotes" placeholder="e.g. Ring bell at gate, specific entry instructions..." className="min-h-[80px]" />
+                        <Label className="flex items-center gap-1.5 text-muted-foreground font-bold"><Clock className="size-3" /> Delivery Logic Notes</Label>
+                        <Textarea name="deliveryNotes" placeholder="Access codes, gate instructions..." className="min-h-[80px]" />
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label>Preferred Delivery Window</Label>
+                      <Label>Preferred Fulfillment Window</Label>
                       <Select name="preferredDeliveryTime" defaultValue="Afternoon">
-                        <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Morning">Morning (08:00 - 12:00)</SelectItem>
-                          <SelectItem value="Afternoon">Afternoon (12:00 - 17:00)</SelectItem>
-                          <SelectItem value="Evening">Evening (17:00 - 20:00)</SelectItem>
+                          <SelectItem value="Morning" className="text-xs">Morning (08:00 - 12:00)</SelectItem>
+                          <SelectItem value="Afternoon" className="text-xs">Afternoon (12:00 - 17:00)</SelectItem>
+                          <SelectItem value="Evening" className="text-xs">Evening (17:00 - 20:00)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -379,27 +387,57 @@ export default function CustomerDirectoryPage() {
 
                 <TabsContent value="financial" className="space-y-4">
                   <div className="grid gap-6 py-4 text-xs">
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label className="flex items-center gap-1.5 text-primary font-bold"><ShieldCheck className="size-3" /> Tax PIN (KRA PIN / TIN)</Label>
-                          <Input name="taxPin" placeholder="e.g. P051..." className="font-mono font-bold h-10" />
+                    <div className="grid grid-cols-2 gap-8">
+                      <div className="space-y-6">
+                        <div className="space-y-2 p-4 bg-primary/5 rounded-xl border border-primary/10">
+                          <Label className="flex items-center gap-1.5 text-primary font-black uppercase tracking-widest"><ShieldCheck className="size-4" /> Regulatory Tax PIN</Label>
+                          <Input name="taxPin" placeholder="e.g. P051..." className="font-mono font-bold h-10 bg-background" />
+                          <p className="text-[8px] text-muted-foreground italic">Required for verified institutional invoicing.</p>
                         </div>
+                        
                         <div className="space-y-2">
-                          <Label className="flex items-center gap-1.5 text-accent font-bold"><BadgeCent className="size-3" /> Credit Trust Limit</Label>
-                          <Input name="creditLimit" type="number" step="0.01" placeholder="0.00" className="h-10 font-black text-lg" />
-                          <p className="text-[9px] text-muted-foreground italic">Authorized credit ceiling for unpaid finalized invoices.</p>
+                          <Label className="flex items-center gap-1.5 text-emerald-500 font-bold uppercase"><BadgeCent className="size-4" /> Credit Trust Ceiling</Label>
+                          <Input name="creditLimit" type="number" step="0.01" placeholder="0.00" className="h-12 font-black text-xl bg-secondary/10" />
+                          <p className="text-[9px] text-muted-foreground">Authorized credit balance for non-prepaid transactions.</p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-1.5 text-accent font-bold uppercase"><Coins className="size-4" /> Settlement Currency</Label>
+                          <Select name="currencyId" defaultValue="KES">
+                            <SelectTrigger className="h-10 font-bold"><SelectValue placeholder="Select Base..." /></SelectTrigger>
+                            <SelectContent>
+                              {currencies?.map(curr => <SelectItem key={curr.id} value={curr.id} className="text-xs font-bold">{curr.id} - {curr.name}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
-                      <div className="space-y-4">
+
+                      <div className="space-y-6">
                         <div className="space-y-2">
-                          <Label className="flex items-center gap-1.5 text-primary font-bold"><FileText className="size-3" /> Financial / Billing Address</Label>
-                          <Textarea name="billingAddress" placeholder="Address for official invoices and tax reports..." className="min-h-[100px]" />
+                          <Label className="flex items-center gap-1.5 text-primary font-bold uppercase"><FileText className="size-4" /> Financial Billing Address</Label>
+                          <Textarea name="billingAddress" placeholder="Address for official tax statements..." className="min-h-[100px] bg-secondary/5" />
                         </div>
+
+                        <div className="space-y-2 p-4 border rounded-xl border-dashed">
+                          <Label className="flex items-center gap-1.5 text-primary font-black uppercase tracking-widest"><TrendingUp className="size-4" /> Sales Strategist</Label>
+                          <Select name="salesPersonId">
+                            <SelectTrigger className="h-10"><SelectValue placeholder="Assign Account Manager..." /></SelectTrigger>
+                            <SelectContent>
+                              {staffMembers?.map(s => <SelectItem key={s.id} value={s.id} className="text-xs">{s.email?.split('@')[0].toUpperCase()}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-[8px] text-muted-foreground mt-1 uppercase font-bold italic">Assigns customer performance to salesperson incentives.</p>
+                        </div>
+
                         <div className="space-y-2">
-                          <Label className="flex items-center gap-1.5 text-primary font-bold"><Calendar className="size-3" /> Date of Birth</Label>
-                          <Input name="birthday" type="date" className="h-10" />
-                          <p className="text-[9px] text-muted-foreground italic">Used for automated birthday loyalty discounts.</p>
+                          <Label>Customer Standing</Label>
+                          <Select name="status" defaultValue="Lead">
+                            <SelectTrigger className="h-10 font-bold"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Lead" className="text-xs font-bold">LEAD (Prospect)</SelectItem>
+                              <SelectItem value="Active" className="text-xs font-bold">ACTIVE (Pre-approved)</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
                       </div>
                     </div>
@@ -407,10 +445,13 @@ export default function CustomerDirectoryPage() {
                 </TabsContent>
               </Tabs>
 
-              <DialogFooter className="bg-secondary/10 p-6 -mx-6 -mb-6 rounded-b-lg">
-                <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs h-10 font-bold uppercase">Cancel</Button>
-                <Button type="submit" disabled={isProcessing} className="h-10 px-10 font-bold uppercase text-xs shadow-xl shadow-primary/20">
-                  {isProcessing ? <Loader2 className="size-3 animate-spin mr-2" /> : <CheckCircle2 className="size-3 mr-2" />} Finalize Onboarding
+              <DialogFooter className="bg-secondary/10 p-6 -mx-6 -mb-6 rounded-b-lg border-t gap-2">
+                <div className="flex-1 flex items-center gap-2 text-[10px] text-muted-foreground opacity-50 uppercase font-bold">
+                  <Sparkles className="size-3" /> System indexed onboarding
+                </div>
+                <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs h-10 font-bold uppercase">Discard</Button>
+                <Button type="submit" disabled={isProcessing} className="h-10 px-10 font-bold uppercase text-xs shadow-xl shadow-primary/20 gap-2">
+                  {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-4" />} Finalize Customer Profile
                 </Button>
               </DialogFooter>
             </form>

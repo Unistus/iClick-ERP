@@ -35,6 +35,9 @@ service cloud.firestore {
       allow get: if isSignedIn();
       allow update: if isInstitutionMember(institutionId);
       
+      // GEO HIERARCHY
+      match /geo_locations { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
+
       // CRM COLLECTIONS
       match /customers { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }
       match /campaigns { allow list: if isInstitutionMember(institutionId); match /{id} { allow read, write: if isInstitutionMember(institutionId); } }

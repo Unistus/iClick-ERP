@@ -34,25 +34,47 @@
         }
       }
     },
+    "GeoLocation": {
+      "title": "GeoLocation",
+      "type": "object",
+      "description": "Hierarchical geographic node for logistics and grouping.",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "level": { "type": "string", "enum": ["Continent", "Region", "Country", "Town", "Area"] },
+        "parentId": { "type": "string", "description": "ID of the parent node in the hierarchy." }
+      }
+    },
     "Customer": {
       "title": "Customer",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
-        "name": { "type": "string" },
+        "legalName": { "type": "string" },
+        "tradingName": { "type": "string" },
+        "registrationNumber": { "type": "string" },
         "email": { "type": "string", "format": "email" },
         "phone": { "type": "string" },
         "status": { "type": "string", "enum": ["Lead", "Active", "Blocked"] },
+        "contactPerson": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "role": { "type": "string" },
+            "phone": { "type": "string" }
+          }
+        },
         "tier": { "type": "string", "enum": ["Silver", "Gold", "Platinum"] },
         "loyaltyPoints": { "type": "number" },
         "walletBalance": { "type": "number" },
         "creditLimit": { "type": "number" },
         "birthday": { "type": "string", "format": "date" },
-        "taxPin": { "type": "string", "description": "Tax identification number for invoicing." },
+        "taxPin": { "type": "string" },
         "billingAddress": { "type": "string" },
         "shippingAddress": { "type": "string" },
-        "city": { "type": "string" },
-        "region": { "type": "string" },
+        "geoCountryId": { "type": "string" },
+        "geoTownId": { "type": "string" },
+        "geoAreaId": { "type": "string" },
         "preferredDeliveryTime": { "type": "string", "enum": ["Morning", "Afternoon", "Evening"] },
         "deliveryNotes": { "type": "string" }
       }
@@ -95,11 +117,11 @@
         }
       },
       {
-        "path": "/institutions/{institutionId}/campaigns/{id}",
+        "path": "/institutions/{institutionId}/geo_locations/{id}",
         "definition": {
-          "entityName": "MarketingCampaign",
-          "schema": { "$ref": "#/backend/entities/MarketingCampaign" },
-          "description": "Marketing outreach tracking."
+          "entityName": "GeoLocation",
+          "schema": { "$ref": "#/backend/entities/GeoLocation" },
+          "description": "Hierarchical logistics locations."
         }
       }
     ]

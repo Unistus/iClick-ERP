@@ -74,7 +74,8 @@ import {
   Star,
   Gift,
   Mail,
-  UserCircle
+  UserCircle,
+  Globe
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -249,7 +250,7 @@ export const navConfig: NavItem[] = [
       { title: "Employee List", icon: Users, url: "/hr", id: "employees" },
       { title: "Payroll Runs", icon: CreditCard, url: "/hr/payroll", id: "payroll" },
       { title: "Leave Requests", icon: CalendarDays, url: "/hr/leave", id: "leave" },
-      { title: "Recruitment", icon: UserPlus, url: "/hr/recruitment", id: "recruitment" },
+      { title: "Recruitment", icon: UserPlus, url: "/hr/recruitment", id: "reruitment" },
     ]
   },
   { 
@@ -263,6 +264,7 @@ export const navConfig: NavItem[] = [
       { title: "Institutions", icon: Store, url: "/admin/institutions", id: "institutions" },
       { title: "Branches", icon: MapPin, url: "/admin/branches", id: "branches" },
       { title: "Departments", icon: Briefcase, url: "/admin/departments", id: "departments" },
+      { title: "Geo Hierarchy", icon: Globe, url: "/admin/geo-hierarchy", id: "geo_hierarchy" },
       { title: "Roles & Permissions", icon: Shield, url: "/admin/roles", id: "roles" },
       { title: "Approval Workflows", icon: GitPullRequest, url: "/admin/approval-workflows", id: "workflows" },
       { title: "Tax Config", icon: Percent, url: "/admin/tax", id: "tax_config" },

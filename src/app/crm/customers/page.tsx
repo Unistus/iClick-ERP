@@ -31,7 +31,11 @@ import {
   MapPin,
   Truck,
   FileText,
-  Clock
+  Clock,
+  Building2,
+  Contact,
+  Hash,
+  Globe
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
@@ -53,6 +57,10 @@ export default function CustomerDirectoryPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Hierarchy Picking State
+  const [selectedCountryId, setSelectedCountryId] = useState<string>("");
+  const [selectedTownId, setSelectedTownId] = useState<string>("");
+
   // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instColRef);
@@ -63,6 +71,17 @@ export default function CustomerDirectoryPage() {
   }, [db, selectedInstId]);
   const { data: customers, isLoading } = useCollection(customersQuery);
 
+  // Geo Hierarchy Data
+  const geoQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'geo_locations');
+  }, [db, selectedInstId]);
+  const { data: geoNodes } = useCollection(geoQuery);
+
+  const countries = geoNodes?.filter(n => n.level === 'Country') || [];
+  const towns = geoNodes?.filter(n => n.level === 'Town' && n.parentId === selectedCountryId) || [];
+  const areas = geoNodes?.filter(n => n.level === 'Area' && n.parentId === selectedTownId) || [];
+
   const handleCreateCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || isProcessing) return;
@@ -71,24 +90,32 @@ export default function CustomerDirectoryPage() {
     const formData = new FormData(e.currentTarget);
     const data = {
       name: formData.get('name') as string,
+      legalName: formData.get('legalName') as string,
+      registrationNumber: formData.get('regNumber') as string,
       email: formData.get('email') as string,
       phone: formData.get('phone') as string,
       status: formData.get('status') as any || 'Lead',
       tier: 'Silver',
+      contactPerson: {
+        name: formData.get('cpName') as string,
+        role: formData.get('cpRole') as string,
+        phone: formData.get('cpPhone') as string,
+      },
       creditLimit: parseFloat(formData.get('creditLimit') as string) || 0,
       birthday: formData.get('birthday') as string,
       taxPin: formData.get('taxPin') as string,
       billingAddress: formData.get('billingAddress') as string,
       shippingAddress: formData.get('shippingAddress') as string,
-      city: formData.get('city') as string,
-      region: formData.get('region') as string,
+      geoCountryId: selectedCountryId,
+      geoTownId: selectedTownId,
+      geoAreaId: formData.get('areaId') as string,
       preferredDeliveryTime: formData.get('preferredDeliveryTime') as any,
       deliveryNotes: formData.get('deliveryNotes') as string,
     };
 
     try {
       await registerCustomer(db, selectedInstId, data);
-      toast({ title: "Customer Onboarded", description: "Identity verified and profile indexed." });
+      toast({ title: "Customer Onboarded", description: "Profile indexed with hierarchical logistics." });
       setIsCreateOpen(false);
     } catch (err) {
       toast({ variant: "destructive", title: "Registration Failed" });
@@ -97,16 +124,9 @@ export default function CustomerDirectoryPage() {
     }
   };
 
-  const updateStatus = async (customerId: string, status: string) => {
-    const ref = doc(db, 'institutions', selectedInstId, 'customers', customerId);
-    await updateDoc(ref, { status });
-    toast({ title: `Status Updated to ${status}` });
-  };
-
   const filteredCustomers = customers?.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.phone.includes(searchTerm)
+    c.email.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
   return (
@@ -118,7 +138,7 @@ export default function CustomerDirectoryPage() {
               <Users className="size-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-headline font-bold text-foreground">Customer Directory</h1>
+              <h1 className="text-2xl font-headline font-bold text-foreground">Client Directory</h1>
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Master Identity & Relationship Ledger</p>
             </div>
           </div>
@@ -167,9 +187,9 @@ export default function CustomerDirectoryPage() {
                 <TableHeader className="bg-secondary/20">
                   <TableRow>
                     <TableHead className="h-10 text-[10px] uppercase font-black pl-6">Client Identity</TableHead>
-                    <TableHead className="h-10 text-[10px] uppercase font-black">Contact & Tax</TableHead>
+                    <TableHead className="h-10 text-[10px] uppercase font-black">Business Info</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-black text-center">Status</TableHead>
-                    <TableHead className="h-10 text-[10px] uppercase font-black">Logistics Area</TableHead>
+                    <TableHead className="h-10 text-[10px] uppercase font-black">Territory</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-black text-right">Points</TableHead>
                     <TableHead className="h-10 text-right text-[10px] uppercase font-black pr-6">Management</TableHead>
                   </TableRow>
@@ -184,13 +204,13 @@ export default function CustomerDirectoryPage() {
                       <TableCell className="pl-6">
                         <div className="flex flex-col">
                           <span className="text-xs font-black uppercase tracking-tight">{c.name}</span>
-                          <span className="text-[9px] text-muted-foreground font-mono uppercase tracking-tighter opacity-60">REF: {c.id.slice(0, 8)}</span>
+                          <span className="text-[9px] text-muted-foreground font-mono uppercase tracking-tighter opacity-60">ID: {c.registrationNumber || 'PERSONAL'}</span>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium truncate max-w-[180px]"><Mail className="size-3" /> {c.email}</div>
-                          {c.taxPin && <div className="flex items-center gap-1.5 text-[9px] text-primary font-bold uppercase"><FileText className="size-3" /> {c.taxPin}</div>}
+                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-bold uppercase"><Building2 className="size-3" /> {c.legalName || c.name}</div>
+                          <div className="flex items-center gap-1.5 text-[9px] text-primary opacity-60 uppercase"><Contact className="size-3" /> {c.contactPerson?.name || 'N/A'}</div>
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
@@ -203,7 +223,7 @@ export default function CustomerDirectoryPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
-                          <span className="text-[10px] font-bold uppercase">{c.city || 'N/A'}</span>
+                          <span className="text-[10px] font-bold uppercase">{geoNodes?.find(n => n.id === c.geoTownId)?.name || 'UNMAPPED'}</span>
                           <span className="text-[9px] text-muted-foreground opacity-60 truncate max-w-[120px]">{c.shippingAddress}</span>
                         </div>
                       </TableCell>
@@ -211,18 +231,9 @@ export default function CustomerDirectoryPage() {
                         {(c.loyaltyPoints || 0).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right pr-6">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100"><MoreVertical className="size-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest">Profile Control</DropdownMenuLabel>
-                            <DropdownMenuItem className="text-xs gap-2" onClick={() => updateStatus(c.id, 'Active')}><CheckCircle2 className="size-3.5 text-emerald-500" /> Approve Profile</DropdownMenuItem>
-                            <DropdownMenuItem className="text-xs gap-2" onClick={() => updateStatus(c.id, 'Blocked')}><XCircle className="size-3.5 text-destructive" /> Block Client</DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-xs gap-2"><CreditCard className="size-3.5" /> Adjust Wallet</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <MoreVertical className="size-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -233,109 +244,117 @@ export default function CustomerDirectoryPage() {
         )}
 
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh]">
+          <DialogContent className="max-w-3xl overflow-y-auto max-h-[90vh]">
             <form onSubmit={handleCreateCustomer}>
               <DialogHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <UserCircle className="size-5 text-primary" />
-                  <DialogTitle>Register Client Profile</DialogTitle>
+                  <DialogTitle>Register Professional Profile</DialogTitle>
                 </div>
-                <CardDescription className="text-xs uppercase font-black tracking-tight">Identity & Logistics Initialization v2.0</CardDescription>
+                <CardDescription className="text-xs uppercase font-black tracking-tight text-primary">Client Onboarding v3.0</CardDescription>
               </DialogHeader>
               
               <Tabs defaultValue="basic" className="py-4">
                 <TabsList className="bg-secondary/30 h-10 p-1 mb-4">
-                  <TabsTrigger value="basic" className="text-xs gap-2 px-6">Basic Info</TabsTrigger>
-                  <TabsTrigger value="billing" className="text-xs gap-2 px-6">Billing & Tax</TabsTrigger>
-                  <TabsTrigger value="logistics" className="text-xs gap-2 px-6">Logistics</TabsTrigger>
+                  <TabsTrigger value="basic" className="text-xs gap-2 px-6">Basic & Identity</TabsTrigger>
+                  <TabsTrigger value="contact" className="text-xs gap-2 px-6">Contact Person</TabsTrigger>
+                  <TabsTrigger value="logistics" className="text-xs gap-2 px-6">Logistics Hierarchy</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="basic" className="space-y-4">
                   <div className="grid gap-4 py-4 text-xs">
-                    <div className="space-y-2">
-                      <Label>Full Trading Name / Individual</Label>
-                      <Input name="name" placeholder="e.g. Acme Corp or Jane Doe" required className="h-10 font-bold" />
-                    </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-1.5"><Mail className="size-3" /> Email Address</Label>
-                        <Input name="email" type="email" placeholder="jane@example.com" required />
+                        <Label>Trading / Display Name</Label>
+                        <Input name="name" placeholder="e.g. Acme Hub" required className="h-10 font-bold" />
                       </div>
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-1.5"><Phone className="size-3" /> Phone Contact</Label>
-                        <Input name="phone" placeholder="+254..." required />
+                        <Label>Legal Business Name</Label>
+                        <Input name="legalName" placeholder="e.g. Acme Global Solutions LTD" className="h-10 font-bold" />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-1.5"><Calendar className="size-3" /> Birthday (Promo Trigger)</Label>
-                        <Input name="birthday" type="date" />
+                        <Label className="flex items-center gap-1.5"><Hash className="size-3" /> Registration Number (BRN)</Label>
+                        <Input name="regNumber" placeholder="e.g. CPR/2023/12345" className="font-mono" />
                       </div>
                       <div className="space-y-2">
                         <Label>Initial Status</Label>
                         <Select name="status" defaultValue="Lead">
                           <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Lead">Lead (Awaiting verification)</SelectItem>
-                            <SelectItem value="Active">Active (Ready for billing)</SelectItem>
+                            <SelectItem value="Lead">Lead (Market Prospect)</SelectItem>
+                            <SelectItem value="Active">Active (Invoicing Enabled)</SelectItem>
                           </SelectContent>
                         </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1.5"><Mail className="size-3" /> Billing Email</Label>
+                        <Input name="email" type="email" placeholder="finance@client.com" required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1.5"><Phone className="size-3" /> Main Phone</Label>
+                        <Input name="phone" placeholder="+254..." required />
                       </div>
                     </div>
                   </div>
                 </TabsContent>
 
-                <TabsContent value="billing" className="space-y-4">
-                  <div className="grid gap-4 py-4 text-xs">
+                <TabsContent value="contact" className="space-y-4">
+                  <div className="grid gap-4 py-4 text-xs bg-secondary/10 p-4 rounded-xl border border-dashed">
+                    <div className="space-y-2">
+                      <Label className="uppercase font-bold tracking-widest">Main Contact Person Full Name</Label>
+                      <Input name="cpName" placeholder="e.g. John Doe" className="bg-background" />
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-1.5 text-primary font-bold"><FileText className="size-3" /> Tax Identification (PIN)</Label>
-                        <Input name="taxPin" placeholder="e.g. P051..." className="font-mono uppercase" />
+                        <Label>Designation / Role</Label>
+                        <Input name="cpRole" placeholder="e.g. Procurement Manager" className="bg-background" />
                       </div>
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-1.5"><CreditCard className="size-3" /> Approved Credit Limit</Label>
-                        <Input name="creditLimit" type="number" step="0.01" placeholder="0.00" className="font-bold" />
+                        <Label>Direct Mobile</Label>
+                        <Input name="cpPhone" placeholder="+254..." className="bg-background" />
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Standard Billing Address</Label>
-                      <Textarea name="billingAddress" placeholder="Enter formal billing address for invoices..." className="min-h-[100px]" />
                     </div>
                   </div>
                 </TabsContent>
 
                 <TabsContent value="logistics" className="space-y-4">
                   <div className="grid gap-4 py-4 text-xs">
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-1.5 text-accent font-bold"><MapPin className="size-3" /> Primary Shipping Address</Label>
-                      <Input name="shippingAddress" placeholder="e.g. 4th Floor, Westlands Hub" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
-                        <Label>City / Town</Label>
-                        <Input name="city" placeholder="Nairobi" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Region / County</Label>
-                        <Input name="region" placeholder="Nairobi County" />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="flex items-center gap-1.5"><Clock className="size-3" /> Preferred Delivery Window</Label>
-                        <Select name="preferredDeliveryTime" defaultValue="Morning">
-                          <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                        <Label className="flex items-center gap-1.5 text-primary"><Globe className="size-3" /> Country</Label>
+                        <Select value={selectedCountryId} onValueChange={setSelectedCountryId}>
+                          <SelectTrigger className="h-10"><SelectValue placeholder="Pick Country" /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Morning">Morning (08:00 - 12:00)</SelectItem>
-                            <SelectItem value="Afternoon">Afternoon (12:00 - 17:00)</SelectItem>
-                            <SelectItem value="Evening">Evening (17:00 - 20:00)</SelectItem>
+                            {countries.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-1.5"><Truck className="size-3" /> Delivery Instructions</Label>
-                        <Input name="deliveryNotes" placeholder="e.g. Call upon arrival at gate" />
+                        <Label className="flex items-center gap-1.5 text-primary"><MapPin className="size-3" /> Town / City</Label>
+                        <Select value={selectedTownId} onValueChange={setSelectedTownId} disabled={!selectedCountryId}>
+                          <SelectTrigger className="h-10"><SelectValue placeholder="Pick Town" /></SelectTrigger>
+                          <SelectContent>
+                            {towns.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
                       </div>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1.5 text-primary"><LayoutGrid className="size-3" /> Specific Area</Label>
+                        <Select name="areaId" disabled={!selectedTownId}>
+                          <SelectTrigger className="h-10"><SelectValue placeholder="Pick Area" /></SelectTrigger>
+                          <SelectContent>
+                            {areas.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-2 pt-2 border-t border-border/50">
+                      <Label className="flex items-center gap-1.5 text-accent font-bold"><Truck className="size-3" /> Detailed Delivery Address</Label>
+                      <Textarea name="shippingAddress" placeholder="e.g. 4th Floor, Westlands Hub, Suite 402" className="min-h-[80px]" />
                     </div>
                   </div>
                 </TabsContent>
@@ -344,7 +363,7 @@ export default function CustomerDirectoryPage() {
               <DialogFooter className="bg-secondary/10 p-6 -mx-6 -mb-6 rounded-b-lg">
                 <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs h-10 font-bold uppercase">Cancel</Button>
                 <Button type="submit" disabled={isProcessing} className="h-10 px-10 font-bold uppercase text-xs shadow-xl shadow-primary/20">
-                  {isProcessing ? <Loader2 className="size-3 animate-spin mr-2" /> : <CheckCircle2 className="size-3 mr-2" />} Finalize Global Profile
+                  {isProcessing ? <Loader2 className="size-3 animate-spin mr-2" /> : <CheckCircle2 className="size-3 mr-2" />} Finalize Onboarding
                 </Button>
               </DialogFooter>
             </form>

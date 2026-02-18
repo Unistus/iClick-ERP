@@ -1,6 +1,6 @@
 'use client';
 
-import { Firestore, collection, doc, serverTimestamp, addDoc, updateDoc, increment, runTransaction } from 'firebase/firestore';
+import { Firestore, collection, doc, serverTimestamp, addDoc, updateDoc, increment, runTransaction, deleteDoc } from 'firebase/firestore';
 import { logSystemEvent } from '../audit-service';
 
 export interface CustomerPayload {
@@ -44,6 +44,25 @@ export async function registerCustomer(db: Firestore, institutionId: string, pay
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   });
+}
+
+/**
+ * Updates an existing customer profile.
+ */
+export async function updateCustomer(db: Firestore, institutionId: string, customerId: string, payload: Partial<CustomerPayload>) {
+  const customerRef = doc(db, 'institutions', institutionId, 'customers', customerId);
+  return updateDoc(customerRef, {
+    ...payload,
+    updatedAt: serverTimestamp()
+  });
+}
+
+/**
+ * Removes a customer profile from the active directory.
+ */
+export async function archiveCustomer(db: Firestore, institutionId: string, customerId: string) {
+  const customerRef = doc(db, 'institutions', institutionId, 'customers', customerId);
+  return deleteDoc(customerRef);
 }
 
 export async function updateCustomerWallet(db: Firestore, institutionId: string, customerId: string, amount: number, reference: string) {

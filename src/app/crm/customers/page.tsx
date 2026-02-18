@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, query, orderBy, doc } from "firebase/firestore";
-import { registerCustomer } from "@/lib/crm/crm.service";
+import { registerCustomer, updateCustomer, archiveCustomer } from "@/lib/crm/crm.service";
 import { 
   Users, 
   Plus, 
@@ -40,7 +40,13 @@ import {
   TrendingUp,
   Tag,
   Briefcase,
-  ArrowRight
+  ArrowRight,
+  Edit2,
+  Trash2,
+  History,
+  Star,
+  Ban,
+  UserCheck
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
@@ -59,6 +65,7 @@ export default function CustomerDirectoryPage() {
   const db = useFirestore();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<any>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("basic");
@@ -123,7 +130,7 @@ export default function CustomerDirectoryPage() {
     setIsProcessing(true);
 
     const formData = new FormData(e.currentTarget);
-    const data = {
+    const data: any = {
       name: formData.get('name') as string,
       legalName: formData.get('legalName') as string,
       registrationNumber: formData.get('regNumber') as string,
@@ -135,7 +142,6 @@ export default function CustomerDirectoryPage() {
       segmentId: formData.get('segmentId') as string,
       currencyId: formData.get('currencyId') as string,
       assignedSalesPersonId: formData.get('salesPersonId') as string,
-      tier: 'Silver',
       contactPerson: {
         name: formData.get('cpName') as string,
         role: formData.get('cpRole') as string,
@@ -153,14 +159,38 @@ export default function CustomerDirectoryPage() {
     };
 
     try {
-      await registerCustomer(db, selectedInstId, data);
-      toast({ title: "Customer Profile Finalized", description: "Identity indexed for sales and logistics." });
+      if (editingCustomer) {
+        await updateCustomer(db, selectedInstId, editingCustomer.id, data);
+        toast({ title: "Profile Updated" });
+      } else {
+        await registerCustomer(db, selectedInstId, data);
+        toast({ title: "Customer Registered" });
+      }
       setIsCreateOpen(false);
+      setEditingCustomer(null);
       setActiveTab("basic");
     } catch (err) {
-      toast({ variant: "destructive", title: "Registration Failed" });
+      toast({ variant: "destructive", title: "Operation Failed" });
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const openEdit = (customer: any) => {
+    setEditingCustomer(customer);
+    setSelectedCountryId(customer.geoCountryId || "");
+    setSelectedTownId(customer.geoTownId || "");
+    setIsCreateOpen(true);
+    setActiveTab("basic");
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!selectedInstId || !confirm("Are you sure you want to archive this customer?")) return;
+    try {
+      await archiveCustomer(db, selectedInstId, id);
+      toast({ title: "Customer Archived" });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Archive Failed" });
     }
   };
 
@@ -196,6 +226,7 @@ export default function CustomerDirectoryPage() {
             </Select>
 
             <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase shadow-lg shadow-primary/20" disabled={!selectedInstId} onClick={() => {
+              setEditingCustomer(null);
               setIsCreateOpen(true);
               setActiveTab("basic");
             }}>
@@ -274,9 +305,36 @@ export default function CustomerDirectoryPage() {
                         {(c.loyaltyPoints || 0).toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right pr-6">
-                        <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <MoreVertical className="size-4" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="size-8">
+                              <MoreVertical className="size-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Directory Ops</DropdownMenuLabel>
+                            <DropdownMenuItem className="text-xs gap-2" onClick={() => openEdit(c)}>
+                              <Edit2 className="size-3.5 text-primary" /> Edit Profile
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-xs gap-2">
+                              <FileText className="size-3.5 text-accent" /> View Statement
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-xs gap-2">
+                              <Star className="size-3.5 text-primary" /> Adjust Points
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-xs gap-2">
+                              <History className="size-3.5" /> Interaction Log
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-xs gap-2">
+                              <UserCheck className="size-3.5 text-emerald-500" /> Verify Identity
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-xs gap-2 text-destructive" onClick={() => handleDelete(c.id)}>
+                              <Trash2 className="size-3.5" /> Archive Profile
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -292,7 +350,7 @@ export default function CustomerDirectoryPage() {
               <DialogHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <UserCircle className="size-5 text-primary" />
-                  <DialogTitle>Register Customer Profile</DialogTitle>
+                  <DialogTitle>{editingCustomer ? 'Refine' : 'Register'} Customer Profile</DialogTitle>
                 </div>
                 <CardDescription className="text-xs uppercase font-black tracking-tight text-primary">Institutional Onboarding v4.2</CardDescription>
               </DialogHeader>
@@ -310,25 +368,25 @@ export default function CustomerDirectoryPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Trading / Display Name</Label>
-                        <Input name="name" placeholder="e.g. Acme Hub" required className="h-10 font-bold" />
+                        <Input name="name" defaultValue={editingCustomer?.name} placeholder="e.g. Acme Hub" required className="h-10 font-bold" />
                       </div>
                       <div className="space-y-2">
                         <Label>Legal Registered Name</Label>
-                        <Input name="legalName" placeholder="e.g. Acme Global Solutions LTD" className="h-10 font-bold" />
+                        <Input name="legalName" defaultValue={editingCustomer?.legalName} placeholder="e.g. Acme Global Solutions LTD" className="h-10 font-bold" />
                       </div>
                     </div>
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label className="flex items-center gap-1.5"><Hash className="size-3" /> Registration Number (BRN)</Label>
-                        <Input name="regNumber" placeholder="e.g. CPR/2023/12345" className="font-mono" />
+                        <Input name="regNumber" defaultValue={editingCustomer?.registrationNumber} placeholder="e.g. CPR/2023/12345" className="font-mono" />
                       </div>
                       <div className="space-y-2">
                         <Label className="flex items-center gap-1.5"><Calendar className="size-3" /> Business Reg. Date</Label>
-                        <Input name="regDate" type="date" className="h-10" />
+                        <Input name="regDate" type="date" defaultValue={editingCustomer?.registrationDate} className="h-10" />
                       </div>
                       <div className="space-y-2">
                         <Label className="flex items-center gap-1.5"><Briefcase className="size-3" /> Profile Type</Label>
-                        <Select name="typeId">
+                        <Select name="typeId" defaultValue={editingCustomer?.typeId}>
                           <SelectTrigger className="h-10"><SelectValue placeholder="Dynamic Type..." /></SelectTrigger>
                           <SelectContent>
                             {customerTypes?.map(t => <SelectItem key={t.id} value={t.id} className="text-xs uppercase font-bold">{t.name}</SelectItem>)}
@@ -339,11 +397,11 @@ export default function CustomerDirectoryPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="flex items-center gap-1.5"><Mail className="size-3" /> Corporate Email</Label>
-                        <Input name="email" type="email" placeholder="finance@customer.com" required />
+                        <Input name="email" type="email" defaultValue={editingCustomer?.email} placeholder="finance@customer.com" required />
                       </div>
                       <div className="space-y-2">
                         <Label className="flex items-center gap-1.5"><Phone className="size-3" /> Primary Phone</Label>
-                        <Input name="phone" placeholder="+254..." required />
+                        <Input name="phone" defaultValue={editingCustomer?.phone} placeholder="+254..." required />
                       </div>
                     </div>
                   </div>
@@ -358,16 +416,16 @@ export default function CustomerDirectoryPage() {
                   <div className="grid gap-4 py-4 text-xs bg-secondary/5 p-6 rounded-2xl border border-dashed">
                     <div className="space-y-2">
                       <Label className="uppercase font-black text-primary tracking-widest flex items-center gap-2"><Contact className="size-4" /> Primary Decision Maker</Label>
-                      <Input name="cpName" placeholder="Full Name" className="bg-background h-10 font-bold" />
+                      <Input name="cpName" defaultValue={editingCustomer?.contactPerson?.name} placeholder="Full Name" className="bg-background h-10 font-bold" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Designation / Role</Label>
-                        <Input name="cpRole" placeholder="e.g. Finance Director" className="bg-background" />
+                        <Input name="cpRole" defaultValue={editingCustomer?.contactPerson?.role} placeholder="e.g. Finance Director" className="bg-background" />
                       </div>
                       <div className="space-y-2">
                         <Label>Direct Line</Label>
-                        <Input name="cpPhone" placeholder="+254..." className="bg-background" />
+                        <Input name="cpPhone" defaultValue={editingCustomer?.contactPerson?.phone} placeholder="+254..." className="bg-background" />
                       </div>
                     </div>
                   </div>
@@ -401,7 +459,7 @@ export default function CustomerDirectoryPage() {
                       </div>
                       <div className="space-y-2">
                         <Label className="flex items-center gap-1.5 text-primary"><LayoutGrid className="size-3" /> Specific Area</Label>
-                        <Select name="areaId" disabled={!selectedTownId}>
+                        <Select name="areaId" defaultValue={editingCustomer?.geoAreaId} disabled={!selectedTownId}>
                           <SelectTrigger className="h-10"><SelectValue placeholder="Pick Area" /></SelectTrigger>
                           <SelectContent>
                             {areas.map(a => <SelectItem key={a.id} value={a.id} className="text-xs">{a.name}</SelectItem>)}
@@ -412,16 +470,16 @@ export default function CustomerDirectoryPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="flex items-center gap-1.5 text-accent font-bold"><Truck className="size-3" /> Shipping / Delivery Address</Label>
-                        <Textarea name="shippingAddress" placeholder="Physical site for inventory delivery..." className="min-h-[80px]" />
+                        <Textarea name="shippingAddress" defaultValue={editingCustomer?.shippingAddress} placeholder="Physical site for inventory delivery..." className="min-h-[80px]" />
                       </div>
                       <div className="space-y-2">
                         <Label className="flex items-center gap-1.5 text-muted-foreground font-bold"><Clock className="size-3" /> Delivery Logic Notes</Label>
-                        <Textarea name="deliveryNotes" placeholder="Access codes, gate instructions..." className="min-h-[80px]" />
+                        <Textarea name="deliveryNotes" defaultValue={editingCustomer?.deliveryNotes} placeholder="Access codes, gate instructions..." className="min-h-[80px]" />
                       </div>
                     </div>
                     <div className="space-y-2">
                       <Label>Preferred Fulfillment Window</Label>
-                      <Select name="preferredDeliveryTime" defaultValue="Afternoon">
+                      <Select name="preferredDeliveryTime" defaultValue={editingCustomer?.preferredDeliveryTime || "Afternoon"}>
                         <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Morning" className="text-xs">Morning (08:00 - 12:00)</SelectItem>
@@ -444,19 +502,19 @@ export default function CustomerDirectoryPage() {
                       <div className="space-y-6">
                         <div className="space-y-2 p-4 bg-primary/5 rounded-xl border border-primary/10">
                           <Label className="flex items-center gap-1.5 text-primary font-black uppercase tracking-widest"><ShieldCheck className="size-4" /> Regulatory Tax PIN</Label>
-                          <Input name="taxPin" placeholder="e.g. P051..." className="font-mono font-bold h-10 bg-background" />
+                          <Input name="taxPin" defaultValue={editingCustomer?.taxPin} placeholder="e.g. P051..." className="font-mono font-bold h-10 bg-background" />
                           <p className="text-[8px] text-muted-foreground italic">Required for verified institutional invoicing.</p>
                         </div>
                         
                         <div className="space-y-2">
                           <Label className="flex items-center gap-1.5 text-emerald-500 font-bold uppercase"><BadgeCent className="size-4" /> Credit Trust Ceiling</Label>
-                          <Input name="creditLimit" type="number" step="0.01" placeholder={crmSetup?.defaultCreditLimit || "0.00"} className="h-12 font-black text-xl bg-secondary/10" />
+                          <Input name="creditLimit" type="number" step="0.01" defaultValue={editingCustomer?.creditLimit || crmSetup?.defaultCreditLimit} className="h-12 font-black text-xl bg-secondary/10" />
                           <p className="text-[9px] text-muted-foreground">Authorized credit balance for non-prepaid transactions.</p>
                         </div>
 
                         <div className="space-y-2">
                           <Label className="flex items-center gap-1.5 text-accent font-bold uppercase"><Coins className="size-4" /> Settlement Currency</Label>
-                          <Select name="currencyId" defaultValue="KES">
+                          <Select name="currencyId" defaultValue={editingCustomer?.currencyId || "KES"}>
                             <SelectTrigger className="h-10 font-bold"><SelectValue placeholder="Select Base..." /></SelectTrigger>
                             <SelectContent>
                               {currencies?.map(curr => <SelectItem key={curr.id} value={curr.id} className="text-xs font-bold">{curr.id} - {curr.name}</SelectItem>)}
@@ -468,13 +526,13 @@ export default function CustomerDirectoryPage() {
                       <div className="space-y-6">
                         <div className="space-y-2">
                           <Label className="flex items-center gap-1.5 text-primary font-bold uppercase"><FileText className="size-4" /> Financial Billing Address</Label>
-                          <Textarea name="billingAddress" placeholder="Address for official tax statements..." className="min-h-[100px] bg-secondary/5" />
+                          <Textarea name="billingAddress" defaultValue={editingCustomer?.billingAddress} placeholder="Address for official tax statements..." className="min-h-[100px] bg-secondary/5" />
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <Label className="flex items-center gap-1.5 text-primary font-black uppercase tracking-widest"><Tag className="size-4" /> Segment</Label>
-                            <Select name="segmentId">
+                            <Select name="segmentId" defaultValue={editingCustomer?.segmentId}>
                               <SelectTrigger className="h-10"><SelectValue placeholder="Select Cluster..." /></SelectTrigger>
                               <SelectContent>
                                 {segments?.map(s => <SelectItem key={s.id} value={s.id} className="text-xs font-bold uppercase">{s.name}</SelectItem>)}
@@ -483,7 +541,7 @@ export default function CustomerDirectoryPage() {
                           </div>
                           <div className="space-y-2">
                             <Label className="flex items-center gap-1.5 text-primary font-black uppercase tracking-widest"><TrendingUp className="size-4" /> Strategist</Label>
-                            <Select name="salesPersonId">
+                            <Select name="salesPersonId" defaultValue={editingCustomer?.assignedSalesPersonId}>
                               <SelectTrigger className="h-10"><SelectValue placeholder="Assign Manager..." /></SelectTrigger>
                               <SelectContent>
                                 {staffMembers?.map(s => <SelectItem key={s.id} value={s.id} className="text-xs">{s.email?.split('@')[0].toUpperCase()}</SelectItem>)}
@@ -494,11 +552,12 @@ export default function CustomerDirectoryPage() {
 
                         <div className="space-y-2">
                           <Label>Customer Standing</Label>
-                          <Select name="status" defaultValue="Lead">
+                          <Select name="status" defaultValue={editingCustomer?.status || "Lead"}>
                             <SelectTrigger className="h-10 font-bold"><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="Lead" className="text-xs font-bold">LEAD (Prospect)</SelectItem>
                               <SelectItem value="Active" className="text-xs font-bold">ACTIVE (Pre-approved)</SelectItem>
+                              <SelectItem value="Blocked" className="text-xs font-bold text-destructive">BLOCKED (Locked)</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -512,9 +571,9 @@ export default function CustomerDirectoryPage() {
                 <div className="flex-1 flex items-center gap-2 text-[10px] text-muted-foreground opacity-50 uppercase font-bold">
                   <Sparkles className="size-3" /> System indexed onboarding
                 </div>
-                <Button type="button" variant="ghost" onClick={() => { setIsCreateOpen(false); setActiveTab("basic"); }} className="text-xs h-10 font-bold uppercase">Discard</Button>
+                <Button type="button" variant="ghost" onClick={() => { setIsCreateOpen(false); setEditingCustomer(null); setActiveTab("basic"); }} className="text-xs h-10 font-bold uppercase">Discard</Button>
                 <Button type="submit" disabled={isProcessing} className="h-10 px-10 font-bold uppercase text-xs shadow-xl shadow-primary/20 gap-2">
-                  {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-4" />} Finalize Customer Profile
+                  {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-4" />} {editingCustomer ? 'Update Profile' : 'Finalize Customer Profile'}
                 </Button>
               </DialogFooter>
             </form>

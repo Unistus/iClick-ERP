@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -35,7 +34,8 @@ import {
   Building2,
   Contact,
   Hash,
-  Globe
+  Globe,
+  LayoutGrid
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";

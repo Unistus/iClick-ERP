@@ -8,8 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, limit } from "firebase/firestore";
+import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
+import { collection, query, orderBy, limit, doc } from "firebase/firestore";
 import { 
   Star, 
   Crown, 
@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import Link from 'next/link';
 
 export default function LoyaltyManagementPage() {
   const db = useFirestore();
@@ -31,11 +33,19 @@ export default function LoyaltyManagementPage() {
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instColRef);
 
+  const crmSetupRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return doc(db, 'institutions', selectedInstId, 'settings', 'crm');
+  }, [db, selectedInstId]);
+  const { data: crmSetup } = useDoc(crmSetupRef);
+
   const customersQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return query(collection(db, 'institutions', selectedInstId, 'customers'), orderBy('loyaltyPoints', 'desc'), limit(50));
   }, [db, selectedInstId]);
   const { data: leaderboards, isLoading } = useCollection(customersQuery);
+
+  const pointsEarnRate = crmSetup?.pointsEarnRate || 1;
 
   return (
     <DashboardLayout>
@@ -62,9 +72,11 @@ export default function LoyaltyManagementPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Button size="sm" variant="outline" className="gap-2 h-9 text-xs font-bold uppercase shadow-sm" disabled={!selectedInstId}>
-              <Settings2 className="size-3.5" /> Program Config
-            </Button>
+            <Link href="/crm/setup">
+              <Button size="sm" variant="outline" className="gap-2 h-9 text-xs font-bold uppercase shadow-sm" disabled={!selectedInstId}>
+                <Settings2 className="size-3.5" /> Program Config
+              </Button>
+            </Link>
           </div>
         </div>
 
@@ -104,7 +116,7 @@ export default function LoyaltyManagementPage() {
                 <div className="flex flex-col gap-2 relative z-10">
                   <p className="text-[10px] font-black uppercase text-emerald-500 tracking-widest">Logic: Earn & Burn</p>
                   <p className="text-[11px] leading-relaxed text-muted-foreground font-medium">
-                    Program configured at **1 Point per KES 100** spent. Points are calculated on finalized invoices only.
+                    Program configured at **{pointsEarnRate} Point per 100** spent. Points are calculated on finalized invoices only.
                   </p>
                 </div>
               </Card>

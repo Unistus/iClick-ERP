@@ -75,7 +75,8 @@ import {
   Gift,
   Mail,
   UserCircle,
-  Globe
+  Globe,
+  Settings2
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -129,6 +130,7 @@ export const navConfig: NavItem[] = [
       { title: "Marketing Cloud", icon: Mail, url: "/crm/marketing", id: "marketing" },
       { title: "Promo Manager", icon: Percent, url: "/crm/promos", id: "promos" },
       { title: "Gift Cards", icon: Gift, url: "/crm/gift-cards", id: "gift_cards" },
+      { title: "CRM Setup", icon: Settings2, url: "/crm/setup", id: "setup" },
     ]
   },
   {

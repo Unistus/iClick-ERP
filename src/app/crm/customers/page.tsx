@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -9,8 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
-import { collection, query, orderBy, doc, deleteDoc } from "firebase/firestore";
+import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
+import { collection, query, orderBy, doc } from "firebase/firestore";
 import { registerCustomer } from "@/lib/crm/crm.service";
 import { 
   Users, 
@@ -38,7 +39,9 @@ import {
   Clock,
   Sparkles,
   Coins,
-  TrendingUp
+  TrendingUp,
+  Tag,
+  Briefcase
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
@@ -68,6 +71,25 @@ export default function CustomerDirectoryPage() {
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instColRef);
 
+  // Data Fetching: CRM Settings & Dictionaries
+  const segmentsRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'customer_segments');
+  }, [db, selectedInstId]);
+  const { data: segments } = useCollection(segmentsRef);
+
+  const typesRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'customer_types');
+  }, [db, selectedInstId]);
+  const { data: customerTypes } = useCollection(typesRef);
+
+  const crmSetupRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return doc(db, 'institutions', selectedInstId, 'settings', 'crm');
+  }, [db, selectedInstId]);
+  const { data: crmSetup } = useDoc(crmSetupRef);
+
   // Data Fetching: Customers
   const customersQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -86,7 +108,7 @@ export default function CustomerDirectoryPage() {
   const curRef = useMemoFirebase(() => collection(db, 'currencies'), [db]);
   const { data: currencies } = useCollection(curRef);
 
-  // Data Fetching: Staff (For Sales Person assignment - simplified fetch from users for MVP)
+  // Data Fetching: Staff
   const staffRef = useMemoFirebase(() => collection(db, 'users'), [db]);
   const { data: staffMembers } = useCollection(staffRef);
 
@@ -108,6 +130,8 @@ export default function CustomerDirectoryPage() {
       email: formData.get('email') as string,
       phone: formData.get('phone') as string,
       status: formData.get('status') as any || 'Lead',
+      typeId: formData.get('typeId') as string,
+      segmentId: formData.get('segmentId') as string,
       currencyId: formData.get('currencyId') as string,
       assignedSalesPersonId: formData.get('salesPersonId') as string,
       tier: 'Silver',
@@ -116,7 +140,7 @@ export default function CustomerDirectoryPage() {
         role: formData.get('cpRole') as string,
         phone: formData.get('cpPhone') as string,
       },
-      creditLimit: parseFloat(formData.get('creditLimit') as string) || 0,
+      creditLimit: parseFloat(formData.get('creditLimit') as string) || (crmSetup?.defaultCreditLimit || 0),
       taxPin: formData.get('taxPin') as string,
       billingAddress: formData.get('billingAddress') as string,
       shippingAddress: formData.get('shippingAddress') as string,
@@ -129,7 +153,7 @@ export default function CustomerDirectoryPage() {
 
     try {
       await registerCustomer(db, selectedInstId, data);
-      toast({ title: "Customer Onboarded", description: "Profile indexed with hierarchical logistics." });
+      toast({ title: "Customer Onboarded", description: "Profile indexed with dynamic segments." });
       setIsCreateOpen(false);
     } catch (err) {
       toast({ variant: "destructive", title: "Registration Failed" });
@@ -203,7 +227,7 @@ export default function CustomerDirectoryPage() {
                     <TableHead className="h-10 text-[10px] uppercase font-black pl-6">Customer Identity</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-black">Business Info</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-black text-center">Status</TableHead>
-                    <TableHead className="h-10 text-[10px] uppercase font-black">Territory</TableHead>
+                    <TableHead className="h-10 text-[10px] uppercase font-black">Segment</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-black text-right">Points</TableHead>
                     <TableHead className="h-10 text-right text-[10px] uppercase font-black pr-6">Management</TableHead>
                   </TableRow>
@@ -237,8 +261,8 @@ export default function CustomerDirectoryPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col">
-                          <span className="text-[10px] font-bold uppercase">{geoNodes?.find(n => n.id === c.geoTownId)?.name || 'UNMAPPED'}</span>
-                          <span className="text-[9px] text-muted-foreground opacity-60 truncate max-w-[120px]">{c.shippingAddress}</span>
+                          <span className="text-[10px] font-bold uppercase">{segments?.find(s => s.id === c.segmentId)?.name || 'GENERAL'}</span>
+                          <span className="text-[9px] text-muted-foreground opacity-60 truncate max-w-[120px]">{customerTypes?.find(t => t.id === c.typeId)?.name || 'INDIVIDUAL'}</span>
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-mono text-xs font-black text-primary">
@@ -288,14 +312,23 @@ export default function CustomerDirectoryPage() {
                         <Input name="legalName" placeholder="e.g. Acme Global Solutions LTD" className="h-10 font-bold" />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label className="flex items-center gap-1.5"><Hash className="size-3" /> Registration Number (BRN)</Label>
                         <Input name="regNumber" placeholder="e.g. CPR/2023/12345" className="font-mono" />
                       </div>
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-1.5"><Calendar className="size-3" /> Business Registration Date</Label>
+                        <Label className="flex items-center gap-1.5"><Calendar className="size-3" /> Registration Date</Label>
                         <Input name="regDate" type="date" className="h-10" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1.5"><Briefcase className="size-3" /> Profile Type</Label>
+                        <Select name="typeId">
+                          <SelectTrigger className="h-10"><SelectValue placeholder="Dynamic Type..." /></SelectTrigger>
+                          <SelectContent>
+                            {customerTypes?.map(t => <SelectItem key={t.id} value={t.id} className="text-xs uppercase font-bold">{t.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -397,7 +430,7 @@ export default function CustomerDirectoryPage() {
                         
                         <div className="space-y-2">
                           <Label className="flex items-center gap-1.5 text-emerald-500 font-bold uppercase"><BadgeCent className="size-4" /> Credit Trust Ceiling</Label>
-                          <Input name="creditLimit" type="number" step="0.01" placeholder="0.00" className="h-12 font-black text-xl bg-secondary/10" />
+                          <Input name="creditLimit" type="number" step="0.01" placeholder={crmSetup?.defaultCreditLimit || "0.00"} className="h-12 font-black text-xl bg-secondary/10" />
                           <p className="text-[9px] text-muted-foreground">Authorized credit balance for non-prepaid transactions.</p>
                         </div>
 
@@ -418,15 +451,25 @@ export default function CustomerDirectoryPage() {
                           <Textarea name="billingAddress" placeholder="Address for official tax statements..." className="min-h-[100px] bg-secondary/5" />
                         </div>
 
-                        <div className="space-y-2 p-4 border rounded-xl border-dashed">
-                          <Label className="flex items-center gap-1.5 text-primary font-black uppercase tracking-widest"><TrendingUp className="size-4" /> Sales Strategist</Label>
-                          <Select name="salesPersonId">
-                            <SelectTrigger className="h-10"><SelectValue placeholder="Assign Account Manager..." /></SelectTrigger>
-                            <SelectContent>
-                              {staffMembers?.map(s => <SelectItem key={s.id} value={s.id} className="text-xs">{s.email?.split('@')[0].toUpperCase()}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                          <p className="text-[8px] text-muted-foreground mt-1 uppercase font-bold italic">Assigns customer performance to salesperson incentives.</p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label className="flex items-center gap-1.5 text-primary font-black uppercase tracking-widest"><Tag className="size-4" /> Segment</Label>
+                            <Select name="segmentId">
+                              <SelectTrigger className="h-10"><SelectValue placeholder="Select Cluster..." /></SelectTrigger>
+                              <SelectContent>
+                                {segments?.map(s => <SelectItem key={s.id} value={s.id} className="text-xs font-bold uppercase">{s.name}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="flex items-center gap-1.5 text-primary font-black uppercase tracking-widest"><TrendingUp className="size-4" /> Strategist</Label>
+                            <Select name="salesPersonId">
+                              <SelectTrigger className="h-10"><SelectValue placeholder="Assign Manager..." /></SelectTrigger>
+                              <SelectContent>
+                                {staffMembers?.map(s => <SelectItem key={s.id} value={s.id} className="text-xs">{s.email?.split('@')[0].toUpperCase()}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
 
                         <div className="space-y-2">

@@ -35,6 +35,8 @@ const SEQUENCE_DEFINITIONS = [
   { id: "customer_id", title: "Customer Account", prefix: "CUST-", nextNumber: 1000, padding: 4 },
   { id: "employee_id", title: "Employee Number", prefix: "EMP-", nextNumber: 100, padding: 3 },
   { id: "approval_req", title: "Approval Request", prefix: "APR-", nextNumber: 1, padding: 4 },
+  { id: "promo_code", title: "Promo Code", prefix: "OFFER-", nextNumber: 1, padding: 4 },
+  { id: "gift_card", title: "Gift Card", prefix: "GC-", nextNumber: 1, padding: 8 },
 ];
 
 export default function DocumentNumbering() {

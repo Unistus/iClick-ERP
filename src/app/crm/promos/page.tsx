@@ -46,6 +46,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import { getNextSequence } from "@/lib/sequence-service";
 
 export default function PromoManagerPage() {
   const db = useFirestore();
@@ -83,8 +84,20 @@ export default function PromoManagerPage() {
     setIsProcessing(true);
 
     const formData = new FormData(e.currentTarget);
+    let code = formData.get('code') as string;
+
+    // AUTOMATION KING: Secure Sequencing
+    if (!code) {
+      try {
+        code = await getNextSequence(db, selectedInstId, 'promo_code');
+      } catch (err) {
+        // Fallback safety
+        code = `PR-${Date.now().toString().slice(-6)}`;
+      }
+    }
+
     const data = {
-      code: (formData.get('code') as string).toUpperCase(),
+      code: code.toUpperCase(),
       type: formData.get('type') as 'Percentage' | 'Fixed',
       value: parseFloat(formData.get('value') as string) || 0,
       minOrder: parseFloat(formData.get('minOrder') as string) || 0,
@@ -190,7 +203,6 @@ export default function PromoManagerPage() {
                   <div className="text-xl font-black font-headline text-emerald-500">{avgDiscount.toFixed(1)}% AVG</div>
                   <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Margin Contribution</p>
                 </CardContent>
-              </Card>
 
               <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm relative overflow-hidden">
                 <div className="absolute -right-4 -bottom-4 opacity-10"><Clock className="size-24 text-primary" /></div>
@@ -217,7 +229,7 @@ export default function PromoManagerPage() {
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="ghost" size="icon" className="size-10"><Filter className="size-4" /></Button>
-                <Button variant="ghost" size="icon" className="size-10"><RefreshCw className="size-4" /></Button>
+                <Button variant="ghost" size="icon" className="size-10" onClick={() => toast({ title: "Refreshing Vault" })}><RefreshCw className="size-4" /></Button>
               </div>
             </div>
 
@@ -350,7 +362,7 @@ export default function PromoManagerPage() {
               <div className="grid gap-6 py-6 text-xs">
                 <div className="space-y-2">
                   <Label className="uppercase font-bold tracking-widest opacity-60">Promo Code (Unique)</Label>
-                  <Input name="code" placeholder="e.g. FLASH20" required className="h-11 border-none ring-1 ring-border bg-secondary/5 font-black uppercase font-mono text-lg text-primary tracking-widest" />
+                  <Input name="code" placeholder="Leave empty for auto-seq" className="h-11 border-none ring-1 ring-border bg-secondary/5 font-black uppercase font-mono text-lg text-primary tracking-widest" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -399,7 +411,7 @@ export default function PromoManagerPage() {
                   <div className="space-y-1">
                     <p className="text-[10px] font-black uppercase tracking-widest">Revenue Integrity</p>
                     <p className="text-[11px] leading-relaxed italic font-medium">
-                      Automated yield protection will cap this promo at your set Maximum Discount if using the Percentage strategy.
+                      Automated yield protection will fetch from <strong>Admin > Doc Numbering</strong> if code is left empty.
                     </p>
                   </div>
                 </div>

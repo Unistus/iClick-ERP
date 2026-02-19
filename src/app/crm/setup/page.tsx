@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,17 +30,27 @@ import {
   BadgeCent,
   Zap,
   TrendingUp,
-  Info
+  Info,
+  Layers,
+  History
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
 import { Badge } from "@/components/ui/badge";
+
+interface IncentiveRule {
+  threshold: number;
+  promoId: string;
+}
 
 export default function CRMSetupPage() {
   const db = useFirestore();
   const { user } = useUser();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Dynamic Incentive Rules State
+  const [incentiveRules, setIncentiveRules] = useState<IncentiveRule[]>([]);
 
   // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
@@ -76,13 +86,16 @@ export default function CRMSetupPage() {
   }, [db, selectedInstId]);
   const { data: promos } = useCollection(promosRef);
 
-  const coaRef = useMemoFirebase(() => {
-    if (!selectedInstId) return null;
-    return collection(db, 'institutions', selectedInstId, 'coa');
-  }, [db, selectedInstId]);
-  const { data: accounts } = useCollection(coaRef);
-
   const currency = globalSettings?.general?.currencySymbol || "KES";
+
+  // Sync incentive rules from setup
+  useEffect(() => {
+    if (setup?.incentiveRules) {
+      setIncentiveRules(setup.incentiveRules);
+    } else {
+      setIncentiveRules([]);
+    }
+  }, [setup]);
 
   const handleSavePolicy = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -94,12 +107,15 @@ export default function CRMSetupPage() {
     formData.forEach((value, key) => {
       if (key === 'autoAwardPoints' || key === 'strictCreditControl' || key === 'autoAssignPromo') {
         updates[key] = value === 'on';
-      } else if (key === 'promoThresholdAmount' || key === 'pointsEarnRate' || key === 'defaultCreditLimit') {
+      } else if (key === 'pointsEarnRate' || key === 'defaultCreditLimit') {
         updates[key] = parseFloat(value as string) || 0;
       } else {
         updates[key] = value;
       }
     });
+
+    // Add the dynamic rules to the update payload
+    updates.incentiveRules = incentiveRules;
 
     try {
       await setDoc(setupRef, {
@@ -116,6 +132,20 @@ export default function CRMSetupPage() {
     }
   };
 
+  const addIncentiveRule = () => {
+    setIncentiveRules(prev => [...prev, { threshold: 0, promoId: "" }]);
+  };
+
+  const updateIncentiveRule = (index: number, field: keyof IncentiveRule, value: any) => {
+    const updated = [...incentiveRules];
+    updated[index] = { ...updated[index], [field]: value };
+    setIncentiveRules(updated);
+  };
+
+  const removeIncentiveRule = (index: number) => {
+    setIncentiveRules(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleAddSubItem = (col: string, e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId) return;
@@ -127,11 +157,6 @@ export default function CRMSetupPage() {
     addDocumentNonBlocking(collection(db, 'institutions', selectedInstId, col), data);
     e.currentTarget.reset();
     toast({ title: "Requirement Added" });
-  };
-
-  const deleteSubItem = (col: string, id: string) => {
-    deleteDoc(doc(db, 'institutions', selectedInstId, col, id));
-    toast({ title: "Item Removed" });
   };
 
   return (
@@ -154,7 +179,7 @@ export default function CRMSetupPage() {
             </SelectTrigger>
             <SelectContent>
               {institutions?.map(i => (
-                <SelectItem key={i.id} value={i.id} className="text-xs">{i.name}</SelectItem>
+                <SelectItem key={i.id} value={i.id} className="text-xs font-bold">{i.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -231,7 +256,7 @@ export default function CRMSetupPage() {
                   <CardContent className="p-0">
                     <div className="p-4 border-b bg-secondary/5">
                       <form onSubmit={(e) => handleAddSubItem('customer_segments', e)} className="flex gap-2">
-                        <Input name="name" placeholder="Segment Name (e.g. VIP, Wholesale)" required className="h-9 text-xs" />
+                        <Input name="name" placeholder="Segment Name" required className="h-9 text-xs" />
                         <Button type="submit" size="sm" className="h-9 px-4 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
                       </form>
                     </div>
@@ -261,7 +286,7 @@ export default function CRMSetupPage() {
                   <CardContent className="p-0">
                     <div className="p-4 border-b bg-secondary/5">
                       <form onSubmit={(e) => handleAddSubItem('customer_types', e)} className="flex gap-2">
-                        <Input name="name" placeholder="Type (e.g. Corporate, Individual)" required className="h-9 text-xs" />
+                        <Input name="name" placeholder="Type Name" required className="h-9 text-xs" />
                         <Button type="submit" size="sm" className="h-9 px-4 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
                       </form>
                     </div>
@@ -321,41 +346,83 @@ export default function CRMSetupPage() {
               <form onSubmit={handleSavePolicy}>
                 <div className="grid gap-6 lg:grid-cols-12">
                   <div className="lg:col-span-8 space-y-6">
-                    <Card className="border-none ring-1 ring-border shadow-2xl bg-card">
+                    <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
                       <CardHeader className="border-b border-border/50 bg-secondary/10">
                         <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                          <Zap className="size-4 text-primary" /> Automated Rewards
+                          <Zap className="size-4 text-primary" /> Tiered Incentive Matrix
                         </CardTitle>
+                        <CardDescription className="text-[10px]">Configure multiple reward triggers based on invoice volume.</CardDescription>
                       </CardHeader>
                       <CardContent className="p-6 space-y-6">
-                        <div className="grid md:grid-cols-2 gap-8">
-                          <div className="space-y-4">
-                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Trigger Threshold Amount ({currency})</Label>
-                            <Input name="promoThresholdAmount" type="number" defaultValue={setup?.promoThresholdAmount || 5000} className="h-10 font-black bg-secondary/5" />
-                            <p className="text-[9px] text-muted-foreground italic">Min. invoice total to automatically assign a reward.</p>
-                          </div>
-                          <div className="space-y-4">
-                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Auto-Assign Promo Code</Label>
-                            <Select name="autoPromoId" defaultValue={setup?.autoPromoId}>
-                              <SelectTrigger className="h-10 font-bold uppercase bg-secondary/5">
-                                <SelectValue placeholder="Select Reward Rule..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {promos?.map(p => (
-                                  <SelectItem key={p.id} value={p.id} className="text-xs font-bold uppercase">{p.code} ({p.value}{p.type === 'Percentage' ? '%' : ''} Off)</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <p className="text-[9px] text-muted-foreground italic">This promo will be tagged during invoice creation.</p>
-                          </div>
-                        </div>
-
                         <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl border border-primary/10">
                           <div className="space-y-0.5">
                             <Label className="text-xs font-bold">Enable Auto-Promotion</Label>
                             <p className="text-[10px] text-muted-foreground">Trigger rewards instantly when threshold is breached in Sales.</p>
                           </div>
                           <Switch name="autoAssignPromo" defaultChecked={setup?.autoAssignPromo} />
+                        </div>
+
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60">Reward Thresholds</Label>
+                            <Button type="button" size="sm" variant="outline" className="h-7 text-[9px] font-bold uppercase gap-1.5" onClick={addIncentiveRule}>
+                              <Plus className="size-3" /> Add Tier
+                            </Button>
+                          </div>
+
+                          <div className="border rounded-xl bg-secondary/5 ring-1 ring-border overflow-hidden">
+                            <Table>
+                              <TableHeader className="bg-secondary/20">
+                                <TableRow>
+                                  <TableHead className="text-[10px] uppercase font-black pl-6">Min. Amount ({currency})</TableHead>
+                                  <TableHead className="text-[10px] uppercase font-black">Applied Promo Rule</TableHead>
+                                  <TableHead className="w-10"></TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {incentiveRules.length === 0 ? (
+                                  <TableRow>
+                                    <TableCell colSpan={3} className="text-center py-12 text-[10px] text-muted-foreground uppercase font-black tracking-widest opacity-30 italic">
+                                      No incentive tiers defined.
+                                    </TableCell>
+                                  </TableRow>
+                                ) : incentiveRules.map((rule, idx) => (
+                                  <TableRow key={idx} className="h-12 border-b-border/30">
+                                    <TableCell className="pl-6">
+                                      <Input 
+                                        type="number" 
+                                        value={rule.threshold} 
+                                        onChange={(e) => updateIncentiveRule(idx, 'threshold', parseFloat(e.target.value) || 0)}
+                                        className="h-8 text-xs font-black bg-background border-none ring-1 ring-border w-32"
+                                      />
+                                    </TableCell>
+                                    <TableCell>
+                                      <Select 
+                                        value={rule.promoId} 
+                                        onValueChange={(val) => updateIncentiveRule(idx, 'promoId', val)}
+                                      >
+                                        <SelectTrigger className="h-8 text-[10px] font-bold uppercase border-none ring-1 ring-border bg-background">
+                                          <SelectValue placeholder="Select Promo..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {promos?.map(p => (
+                                            <SelectItem key={p.id} value={p.id} className="text-[10px] font-bold uppercase">
+                                              {p.code} ({p.value}{p.type === 'Percentage' ? '%' : ''} Off)
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </TableCell>
+                                    <TableCell className="pr-4">
+                                      <Button type="button" variant="ghost" size="icon" className="size-7 text-destructive" onClick={() => removeIncentiveRule(idx)}>
+                                        <Trash2 className="size-3.5" />
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -368,7 +435,7 @@ export default function CRMSetupPage() {
                         <div className="flex gap-3 items-start">
                           <Info className="size-4 text-primary shrink-0 mt-0.5" />
                           <p className="text-[11px] leading-relaxed text-muted-foreground font-medium italic">
-                            "Incentive automation reduces manual staff friction at checkout. High-value transactions are instantly recognized and rewarded, improving customer retention cycles."
+                            "Defining multiple thresholds allows for automated cross-selling. The system will automatically select the **highest qualifying tier** based on the invoice total."
                           </p>
                         </div>
                         <Button type="submit" disabled={isSaving} className="w-full h-11 font-black uppercase text-[10px] gap-2 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90">

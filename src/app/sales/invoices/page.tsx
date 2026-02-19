@@ -103,11 +103,17 @@ export default function SalesInvoicesPage() {
     return { subtotal, taxTotal, total: subtotal + taxTotal };
   }, [items]);
 
-  // Qualification Check
+  // TIERED QUALIFICATION LOGIC
   const qualifiedPromo = useMemo(() => {
-    if (!crmSetup?.autoAssignPromo || !crmSetup?.promoThresholdAmount) return null;
-    if (totals.total >= crmSetup.promoThresholdAmount) {
-      return promos?.find(p => p.id === crmSetup.autoPromoId);
+    if (!crmSetup?.autoAssignPromo || !crmSetup?.incentiveRules || crmSetup.incentiveRules.length === 0) return null;
+    
+    // Sort rules by threshold descending to find the HIGHEST qualifying one
+    const sortedRules = [...crmSetup.incentiveRules].sort((a, b) => b.threshold - a.threshold);
+    
+    const winningRule = sortedRules.find(rule => totals.total >= rule.threshold);
+    
+    if (winningRule) {
+      return promos?.find(p => p.id === winningRule.promoId);
     }
     return null;
   }, [totals.total, crmSetup, promos]);
@@ -128,7 +134,7 @@ export default function SalesInvoicesPage() {
         appliedPromoId: qualifiedPromo?.id
       }, user.uid);
 
-      logSystemEvent(db, selectedInstId, user, 'SALES', 'Create Invoice', `Invoice for ${customerName} initiated. Qualified: ${!!qualifiedPromo}`);
+      logSystemEvent(db, selectedInstId, user, 'SALES', 'Create Invoice', `Invoice for ${customerName} initiated. Tiered Promo: ${qualifiedPromo?.code || 'None'}`);
       toast({ title: "Invoice Record Created" });
       setIsCreateOpen(false);
       setItems([]);
@@ -171,7 +177,7 @@ export default function SalesInvoicesPage() {
           <div className="flex gap-2 w-full md:w-auto">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
               <SelectTrigger className="w-[240px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
-                <SelectValue placeholder="Select Institution" />
+                <SelectValue placeholder={instLoading ? "Validating..." : "Select Institution"} />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (
@@ -251,7 +257,18 @@ export default function SalesInvoicesPage() {
                                 <CheckCircle2 className="size-3.5" /> Post GL
                               </Button>
                             )}
-                            <Button variant="ghost" size="icon" className="size-9 opacity-0 group-hover:opacity-100 transition-all"><MoreVertical className="size-4" /></Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="size-9 opacity-0 group-hover:opacity-100 transition-all"><MoreVertical className="size-4" /></Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-52">
+                                <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Invoice Ops</DropdownMenuLabel>
+                                <DropdownMenuItem className="text-xs gap-2"><ArrowRight className="size-3.5" /> View Details</DropdownMenuItem>
+                                <DropdownMenuItem className="text-xs gap-2"><History className="size-3.5" /> Audit Trail</DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-xs gap-2 text-destructive"><Zap className="size-3.5" /> Force Void</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -274,7 +291,6 @@ export default function SalesInvoicesPage() {
             </DialogHeader>
             
             <div className="grid gap-8 py-6 text-xs lg:grid-cols-12">
-              {/* Left Form: Identity & Items */}
               <div className="lg:col-span-8 space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -331,15 +347,13 @@ export default function SalesInvoicesPage() {
                 </div>
               </div>
 
-              {/* Right Panel: Incentives & Total */}
               <div className="lg:col-span-4 space-y-6">
-                {/* AUTO-PROMO SECTION */}
                 {qualifiedPromo && (
                   <Card className="bg-primary/10 border-none ring-1 ring-primary/30 shadow-xl overflow-hidden animate-in zoom-in-95 duration-500">
                     <CardHeader className="py-3 bg-primary/20 border-b border-primary/20">
                       <div className="flex items-center gap-2">
                         <Sparkles className="size-4 text-primary animate-pulse" />
-                        <CardTitle className="text-[10px] font-black uppercase tracking-widest">Target Reward Active</CardTitle>
+                        <CardTitle className="text-[10px] font-black uppercase tracking-widest">Tiered Reward Triggered</CardTitle>
                       </div>
                     </CardHeader>
                     <CardContent className="pt-4 pb-4">
@@ -348,13 +362,12 @@ export default function SalesInvoicesPage() {
                         <Badge variant="secondary" className="text-[8px] bg-primary text-white border-none font-black">{qualifiedPromo.value}% OFF</Badge>
                       </div>
                       <p className="text-[10px] leading-relaxed text-muted-foreground font-medium italic">
-                        "Threshold breached. Automatic yield adjustment applied to this institutional cycle."
+                        "High-volume threshold breached. Maximum applicable discount tier assigned automatically."
                       </p>
                     </CardContent>
                   </Card>
                 )}
 
-                {/* GIFT CARD ISSUANCE */}
                 <Card className="border-none ring-1 ring-border bg-secondary/5 overflow-hidden">
                   <CardHeader className="py-3 bg-secondary/10 border-b">
                     <div className="flex items-center justify-between">
@@ -375,15 +388,10 @@ export default function SalesInvoicesPage() {
                           className="h-9 font-black font-mono bg-background" 
                         />
                       </div>
-                      <div className="p-3 rounded-lg bg-accent/5 border border-accent/10 flex gap-2 items-start">
-                        <Info className="size-3 text-accent shrink-0 mt-0.5" />
-                        <p className="text-[9px] leading-tight text-muted-foreground">The asset will be initialized and linked to this invoice upon finalization.</p>
-                      </div>
                     </CardContent>
                   )}
                 </Card>
 
-                {/* FINAL TOTALS */}
                 <Card className="border-none ring-1 ring-primary/20 bg-primary/5 overflow-hidden shadow-2xl">
                   <CardContent className="p-6 space-y-4">
                     <div className="space-y-1.5">

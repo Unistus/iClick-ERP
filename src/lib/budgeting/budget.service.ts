@@ -15,12 +15,6 @@ export interface BudgetAllocation {
   utilization: number;
 }
 
-export interface DepartmentSpend {
-  branchId: string;
-  branchName: string;
-  actual: number;
-}
-
 /**
  * Service to manage period-based budget allocations and calculate real-time variance.
  */
@@ -42,12 +36,13 @@ export async function saveBudgetAllocations(
     }, { merge: true });
   });
 
-  return batch.commit().catch(err => {
-    errorEmitter.emit('permission-error', new FirestorePermissionError({
+  return batch.commit().catch(async (err) => {
+    const permissionError = new FirestorePermissionError({
       path: baseRef.path,
       operation: 'write',
       requestResourceData: allocations
-    } satisfies SecurityRuleContext));
+    } satisfies SecurityRuleContext);
+    errorEmitter.emit('permission-error', permissionError);
     throw err;
   });
 }
@@ -69,6 +64,7 @@ export async function calculatePeriodVariance(
     const start = new Date(period.startDate);
     const end = new Date(period.endDate);
 
+    // 1. Fetch budgeted accounts
     const coaQuery = query(
       collection(db, 'institutions', institutionId, 'coa'),
       where('isTrackedForBudget', '==', true)
@@ -76,6 +72,7 @@ export async function calculatePeriodVariance(
     const coaSnap = await getDocs(coaQuery);
     const accounts = coaSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
 
+    // 2. Fetch allocations
     const allocRef = collection(db, 'institutions', institutionId, 'fiscal_periods', periodId, 'allocations');
     const allocSnap = await getDocs(allocRef);
     const allocations = allocSnap.docs.reduce((acc, d) => {
@@ -83,6 +80,7 @@ export async function calculatePeriodVariance(
       return acc;
     }, {} as Record<string, number>);
 
+    // 3. Aggregate Journal Entries
     const jeQuery = query(
       collection(db, 'institutions', institutionId, 'journal_entries'),
       where('date', '>=', start),
@@ -96,35 +94,31 @@ export async function calculatePeriodVariance(
       entry.items?.forEach((item: any) => {
         if (allocations[item.accountId] !== undefined) {
           const amount = item.amount || 0;
-          if (item.type === 'Debit') {
-            actuals[item.accountId] = (actuals[item.accountId] || 0) + amount;
-          } else {
-            actuals[item.accountId] = (actuals[item.accountId] || 0) - amount;
-          }
+          const impact = item.type === 'Debit' ? amount : -amount;
+          actuals[item.accountId] = (actuals[item.accountId] || 0) + impact;
         }
       });
     });
 
     return accounts.map(acc => {
-      const limit = allocations[acc.id] || 0;
-      const actual = actuals[acc.id] || 0;
+      const limitValue = allocations[acc.id] || 0;
+      const actualValue = actuals[acc.id] || 0;
       return {
         accountId: acc.id,
         accountName: acc.name,
         accountCode: acc.code,
-        limit,
-        actual,
-        variance: limit - actual,
-        utilization: limit > 0 ? (actual / limit) * 100 : 0
+        limit: limitValue,
+        actual: actualValue,
+        variance: limitValue - actualValue,
+        utilization: limitValue > 0 ? (actualValue / limitValue) * 100 : 0
       };
     });
   } catch (err: any) {
-    if (err.code === 'permission-denied') {
-      errorEmitter.emit('permission-error', new FirestorePermissionError({
-        path: `institutions/${institutionId}/fiscal_periods/${periodId}`,
-        operation: 'list'
-      } satisfies SecurityRuleContext));
-    }
+    const permissionError = new FirestorePermissionError({
+      path: `institutions/${institutionId}/fiscal_periods/${periodId}`,
+      operation: 'list'
+    } satisfies SecurityRuleContext);
+    errorEmitter.emit('permission-error', permissionError);
     throw err;
   }
 }
@@ -174,12 +168,11 @@ export async function calculateDepartmentalSpend(
 
     return branchSpend;
   } catch (err: any) {
-    if (err.code === 'permission-denied') {
-      errorEmitter.emit('permission-error', new FirestorePermissionError({
-        path: `institutions/${institutionId}/journal_entries`,
-        operation: 'list'
-      } satisfies SecurityRuleContext));
-    }
+    const permissionError = new FirestorePermissionError({
+      path: `institutions/${institutionId}/journal_entries`,
+      operation: 'list'
+    } satisfies SecurityRuleContext);
+    errorEmitter.emit('permission-error', permissionError);
     throw err;
   }
 }

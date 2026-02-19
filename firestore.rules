@@ -9,6 +9,9 @@ service cloud.firestore {
     }
 
     function isGlobalAdmin() {
+      // PRIORITY 1: Explicit UID Override (Absolute bypass)
+      // PRIORITY 2: Token-based email verification
+      // PRIORITY 3: Registry-based check
       return isSignedIn() && (
         request.auth.uid == "zWbypB57xVSHFYe3GKf5epvnWLr2" ||
         request.auth.token.email == "enquiry@unistus.co.ke" ||
@@ -24,49 +27,38 @@ service cloud.firestore {
     }
 
     // GLOBAL SUPERUSER OVERRIDE
-    // This allows the superadmin absolute read/write access to every document in the database.
+    // High-level match for broad administrative access
     match /{allPaths=**} {
       allow read, write: if isGlobalAdmin();
     }
 
     // INSTITUTION CORE
-    match /institutions {
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-    }
-
     match /institutions/{institutionId} {
       allow get: if isSignedIn();
+      allow list: if isSignedIn();
       allow update: if isInstitutionMember(institutionId);
       
       // RECURSIVE SUB-COLLECTION ACCESS
-      // This ensures all sub-collections (budgeting, sales, inventory, etc.)
-      // inherit the same membership-based access logic.
+      // This ensure that all nested resources (budgeting, sales, etc.) inherit membership checks
       match /{allSubPaths=**} {
         allow read, write: if isInstitutionMember(institutionId);
       }
 
-      // Explicit matches for specific query types if needed for list operations
-      match /fiscal_periods { allow list: if isInstitutionMember(institutionId); }
-      match /coa { allow list: if isInstitutionMember(institutionId); }
-      match /journal_entries { allow list: if isInstitutionMember(institutionId); }
-      match /products { allow list: if isInstitutionMember(institutionId); }
-      match /customers { allow list: if isInstitutionMember(institutionId); }
-      match /campaigns { allow list: if isInstitutionMember(institutionId); }
-      match /gift_cards { allow list: if isInstitutionMember(institutionId); }
-      match /wallets { allow list: if isInstitutionMember(institutionId); }
-      match /promo_codes { allow list: if isInstitutionMember(institutionId); }
-      match /branches { allow list: if isInstitutionMember(institutionId); }
-      match /roles { allow list: if isInstitutionMember(institutionId); }
-      match /sales_orders { allow list: if isInstitutionMember(institutionId); }
-      match /sales_invoices { allow list: if isInstitutionMember(institutionId); }
-      match /purchase_orders { allow list: if isInstitutionMember(institutionId); }
-      match /payables { allow list: if isInstitutionMember(institutionId); }
-      match /grns { allow list: if isInstitutionMember(institutionId); }
-      match /assets { allow list: if isInstitutionMember(institutionId); }
-      match /expenses { allow list: if isInstitutionMember(institutionId); }
-      match /tax_returns { allow list: if isInstitutionMember(institutionId); }
-      match /geo_locations { allow list: if isInstitutionMember(institutionId); }
+      // Explicit matchers for Budgeting Sub-collections
+      match /fiscal_periods/{periodId} {
+        allow read, write: if isInstitutionMember(institutionId);
+        match /allocations/{accountId} {
+          allow read, write: if isInstitutionMember(institutionId);
+        }
+      }
+
+      match /journal_entries/{entryId} {
+        allow read, write: if isInstitutionMember(institutionId);
+      }
+
+      match /coa/{accountId} {
+        allow read, write: if isInstitutionMember(institutionId);
+      }
     }
 
     // USER PROFILES & MEMBERSHIPS

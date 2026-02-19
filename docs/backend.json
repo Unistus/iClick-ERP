@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "InstitutionSettings": {
@@ -22,26 +23,31 @@
             "printReceiptOnComplete": { "type": "boolean" },
             "allowCustomDiscounts": { "type": "boolean" }
           }
-        },
-        "gateways": {
-          "type": "object",
-          "properties": {
-            "mpesaConsumerKey": { "type": "string" },
-            "mpesaConsumerSecret": { "type": "string" },
-            "mpesaShortcode": { "type": "string" }
-          }
         }
       }
     },
-    "GeoLocation": {
-      "title": "GeoLocation",
+    "FiscalPeriod": {
+      "title": "FiscalPeriod",
       "type": "object",
-      "description": "Hierarchical geographic node for logistics and grouping.",
+      "description": "A defined accounting cycle for budgeting and auditing.",
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "level": { "type": "string", "enum": ["Continent", "Region", "Country", "Town", "Area"] },
-        "parentId": { "type": "string", "description": "ID of the parent node in the hierarchy." }
+        "startDate": { "type": "string", "format": "date" },
+        "endDate": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["Open", "Closed"] }
+      },
+      "required": ["name", "startDate", "endDate", "status"]
+    },
+    "BudgetAllocation": {
+      "title": "BudgetAllocation",
+      "type": "object",
+      "description": "A defined spend ceiling for a specific ledger account within a fiscal period.",
+      "properties": {
+        "accountId": { "type": "string" },
+        "limit": { "type": "number" },
+        "actual": { "type": "number" },
+        "utilization": { "type": "number" }
       }
     },
     "Customer": {
@@ -50,58 +56,12 @@
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "legalName": { "type": "string" },
-        "tradingName": { "type": "string" },
-        "registrationNumber": { "type": "string" },
-        "registrationDate": { "type": "string", "format": "date" },
         "email": { "type": "string", "format": "email" },
         "phone": { "type": "string" },
         "status": { "type": "string", "enum": ["Lead", "Active", "Blocked"] },
-        "contactPerson": {
-          "type": "object",
-          "properties": {
-            "name": { "type": "string" },
-            "role": { "type": "string" },
-            "phone": { "type": "string" }
-          }
-        },
         "tier": { "type": "string", "enum": ["Silver", "Gold", "Platinum"] },
         "loyaltyPoints": { "type": "number" },
-        "walletBalance": { "type": "number" },
-        "creditLimit": { "type": "number" },
-        "currencyId": { "type": "string" },
-        "assignedSalesPersonId": { "type": "string" },
-        "taxPin": { "type": "string" },
-        "billingAddress": { "type": "string" },
-        "shippingAddress": { "type": "string" },
-        "geoCountryId": { "type": "string" },
-        "geoTownId": { "type": "string" },
-        "geoAreaId": { "type": "string" },
-        "preferredDeliveryTime": { "type": "string", "enum": ["Morning", "Afternoon", "Evening"] },
-        "deliveryNotes": { "type": "string" }
-      }
-    },
-    "LoyaltyLog": {
-      "title": "LoyaltyLog",
-      "type": "object",
-      "properties": {
-        "customerId": { "type": "string" },
-        "points": { "type": "number" },
-        "type": { "type": "string", "enum": ["Earn", "Redeem", "Adjust"] },
-        "reference": { "type": "string" },
-        "timestamp": { "type": "string", "format": "date-time" }
-      }
-    },
-    "MarketingCampaign": {
-      "title": "MarketingCampaign",
-      "type": "object",
-      "properties": {
-        "id": { "type": "string" },
-        "title": { "type": "string" },
-        "channel": { "type": "string", "enum": ["SMS", "Email", "System"] },
-        "status": { "type": "string", "enum": ["Draft", "Active", "Completed"] },
-        "budget": { "type": "number" },
-        "reach": { "type": "number" }
+        "walletBalance": { "type": "number" }
       }
     }
   },
@@ -111,19 +71,27 @@
   "firestore": {
     "structure": [
       {
+        "path": "/institutions/{institutionId}/fiscal_periods/{periodId}",
+        "definition": {
+          "entityName": "FiscalPeriod",
+          "schema": { "$ref": "#/backend/entities/FiscalPeriod" },
+          "description": "Institutional auditing and budgeting cycles."
+        }
+      },
+      {
+        "path": "/institutions/{institutionId}/fiscal_periods/{periodId}/allocations/{accountId}",
+        "definition": {
+          "entityName": "BudgetAllocation",
+          "schema": { "$ref": "#/backend/entities/BudgetAllocation" },
+          "description": "Specific account spend targets per period."
+        }
+      },
+      {
         "path": "/institutions/{institutionId}/customers/{customerId}",
         "definition": {
           "entityName": "Customer",
           "schema": { "$ref": "#/backend/entities/Customer" },
-          "description": "Unified customer profiles and loyalty metadata."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/geo_locations/{id}",
-        "definition": {
-          "entityName": "GeoLocation",
-          "schema": { "$ref": "#/backend/entities/GeoLocation" },
-          "description": "Hierarchical logistics locations."
+          "description": "Master customer identity ledger."
         }
       }
     ]

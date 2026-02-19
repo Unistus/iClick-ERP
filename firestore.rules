@@ -10,8 +10,8 @@ service cloud.firestore {
 
     function isGlobalAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == "enquiry@unistus.co.ke" ||
         request.auth.uid == "zWbypB57xVSHFYe3GKf5epvnWLr2" ||
+        request.auth.token.email == "enquiry@unistus.co.ke" ||
         exists(/databases/$(database)/documents/system_admins/$(request.auth.uid))
       );
     }
@@ -46,7 +46,7 @@ service cloud.firestore {
         allow read, write: if isInstitutionMember(institutionId);
       }
 
-      // Explicit matches for specific query types if needed
+      // Explicit matches for specific query types if needed for list operations
       match /fiscal_periods { allow list: if isInstitutionMember(institutionId); }
       match /coa { allow list: if isInstitutionMember(institutionId); }
       match /journal_entries { allow list: if isInstitutionMember(institutionId); }

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { Firestore, collection, doc, serverTimestamp, increment, getDoc, runTransaction, addDoc, updateDoc } from 'firebase/firestore';
+import { Firestore, collection, doc, serverTimestamp, increment, getDoc, runTransaction, addDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { postJournalEntry } from '../accounting/journal.service';
 import { recordStockMovement } from '../inventory/inventory.service';
 import { getNextSequence } from '../sequence-service';
@@ -15,8 +15,32 @@ export interface PurchaseItem {
 }
 
 /**
- * Service to handle the full procurement lifecycle.
+ * Bootstraps the required Purchases financial nodes in the COA.
  */
+export async function bootstrapPurchasesFinancials(db: Firestore, institutionId: string) {
+  const nodes = [
+    { id: 'accounts_payable', code: '2100', name: 'Accounts Payable (Trade)', type: 'Liability', subtype: 'Accounts Payable' },
+    { id: 'input_vat', code: '1210', name: 'VAT (Input) Receivable', type: 'Asset', subtype: 'Current Assets' },
+    { id: 'inventory_asset', code: '1300', name: 'Inventory Stock Assets', type: 'Asset', subtype: 'Inventory' },
+  ];
+
+  for (const node of nodes) {
+    const coaRef = doc(db, 'institutions', institutionId, 'coa', node.id);
+    await setDoc(coaRef, {
+      ...node,
+      balance: 0,
+      isActive: true,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  }
+
+  const setupRef = doc(db, 'institutions', institutionId, 'settings', 'purchases');
+  await setDoc(setupRef, {
+    accountsPayableAccountId: 'accounts_payable',
+    purchaseTaxAccountId: 'input_vat',
+    inventoryAssetAccountId: 'inventory_asset'
+  }, { merge: true });
+}
 
 export async function createPurchaseOrder(db: Firestore, institutionId: string, payload: any, userId: string) {
   const poNumber = await getNextSequence(db, institutionId, 'purchase_order');
@@ -39,11 +63,9 @@ export async function receiveGRN(db: Firestore, institutionId: string, payload: 
   const grnNumber = await getNextSequence(db, institutionId, 'grn');
   
   return runTransaction(db, async (transaction) => {
-    // 1. Update PO Status
     const poRef = doc(db, 'institutions', institutionId, 'purchase_orders', payload.poId);
     transaction.update(poRef, { status: 'Received', updatedAt: serverTimestamp() });
 
-    // 2. Log Stock Movements (Inventory Addition)
     for (const item of payload.items) {
       await recordStockMovement(db, institutionId, {
         productId: item.productId,
@@ -55,7 +77,6 @@ export async function receiveGRN(db: Firestore, institutionId: string, payload: 
       });
     }
 
-    // 3. Save GRN Record
     const grnRef = doc(collection(db, 'institutions', institutionId, 'grns'));
     transaction.set(grnRef, {
       ...payload,
@@ -75,9 +96,6 @@ export async function createVendorInvoice(db: Firestore, institutionId: string, 
     if (!setupSnap.exists()) throw new Error("Accounting setup missing");
     const setup = setupSnap.data();
 
-    // Post to GL
-    // DR: Inventory/Expense Account
-    // CR: Accounts Payable
     await postJournalEntry(db, institutionId, {
       date: new Date(),
       description: `Vendor Invoice ${invoiceNumber} from ${payload.supplierName}`,
@@ -119,9 +137,6 @@ export async function processPurchaseReturn(db: Firestore, institutionId: string
       throw new Error("Ledger mappings for AP or Inventory Asset missing in setup.");
     }
 
-    // 1. Post to GL (Reverse Liability)
-    // DR: Accounts Payable (Liability -)
-    // CR: Inventory Asset (Asset -)
     await postJournalEntry(db, institutionId, {
       date: new Date(),
       description: `Purchase Return ${returnNumber} to ${payload.supplierName}`,
@@ -132,7 +147,6 @@ export async function processPurchaseReturn(db: Firestore, institutionId: string
       ]
     });
 
-    // 2. Adjust Stock (Physically remove items)
     for (const item of payload.items) {
       await recordStockMovement(db, institutionId, {
         productId: item.productId,
@@ -144,7 +158,6 @@ export async function processPurchaseReturn(db: Firestore, institutionId: string
       });
     }
 
-    // 3. Save Return Record
     const returnRef = doc(collection(db, 'institutions', institutionId, 'purchase_returns'));
     transaction.set(returnRef, {
       ...payload,

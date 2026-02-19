@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -10,15 +11,17 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, serverTimestamp, setDoc } from "firebase/firestore";
-import { Settings, Save, Loader2, Info, Truck, Zap, ShieldCheck, MapPin } from "lucide-react";
+import { Settings, Save, Loader2, Info, Truck, Zap, ShieldCheck, MapPin, Calculator } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
+import { bootstrapLogisticsFinancials } from '@/lib/delivery/delivery.service';
 
 export default function LogisticsSetupPage() {
   const db = useFirestore();
   const { user } = useUser();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(false);
 
   // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
@@ -66,6 +69,19 @@ export default function LogisticsSetupPage() {
     }
   };
 
+  const handleBootstrap = async () => {
+    if (!selectedInstId) return;
+    setIsBootstrapping(true);
+    try {
+      await bootstrapLogisticsFinancials(db, selectedInstId);
+      toast({ title: "Financial Nodes Synced", description: "Shipping revenue and fleet expense accounts created." });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Bootstrap Failed" });
+    } finally {
+      setIsBootstrapping(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-4">
@@ -80,16 +96,28 @@ export default function LogisticsSetupPage() {
             </div>
           </div>
           
-          <Select value={selectedInstId} onValueChange={setSelectedInstId}>
-            <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold">
-              <SelectValue placeholder="Select Institution" />
-            </SelectTrigger>
-            <SelectContent>
-              {institutions?.map(i => (
-                <SelectItem key={i.id} value={i.id} className="text-xs">{i.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Select value={selectedInstId} onValueChange={setSelectedInstId}>
+              <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
+                <SelectValue placeholder="Select Institution" />
+              </SelectTrigger>
+              <SelectContent>
+                {institutions?.map(i => (
+                  <SelectItem key={i.id} value={i.id} className="text-xs">{i.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="gap-2 h-9 text-[10px] font-black uppercase border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/5"
+              disabled={!selectedInstId || isBootstrapping}
+              onClick={handleBootstrap}
+            >
+              {isBootstrapping ? <Loader2 className="size-3 animate-spin" /> : <Calculator className="size-3" />} 
+              Sync Financial Nodes
+            </Button>
+          </div>
         </div>
 
         {!selectedInstId ? (
@@ -113,7 +141,7 @@ export default function LogisticsSetupPage() {
                       <Select name="defaultWarehouseId" defaultValue={setup?.defaultWarehouseId}>
                         <SelectTrigger className="h-10 text-xs"><SelectValue placeholder="Select Site..." /></SelectTrigger>
                         <SelectContent>
-                          {warehouses?.map(w => <SelectItem key={w.id} value={w.id} className="text-xs">{w.name}</SelectItem>)}
+                          {warehouses?.map(w => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
                       <p className="text-[9px] text-muted-foreground italic">Target warehouse for automatic stock deduction during dispatch.</p>
@@ -158,18 +186,18 @@ export default function LogisticsSetupPage() {
               </div>
 
               <div className="lg:col-span-4">
-                <Card className="border-none ring-1 ring-border shadow-xl bg-secondary/5 h-full">
+                <Card className="border-none ring-1 ring-border shadow-xl bg-secondary/5 h-full relative overflow-hidden">
+                  <div className="absolute -right-4 -bottom-4 opacity-5 rotate-12"><Truck className="size-24 text-primary" /></div>
                   <CardHeader>
                     <CardTitle className="text-xs font-black uppercase tracking-widest">Fulfillment Engine</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-4 relative z-10">
                     <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl relative overflow-hidden">
-                      <div className="absolute top-0 right-0 p-2 opacity-10 rotate-12"><Zap className="size-12 text-primary" /></div>
-                      <p className="text-[11px] leading-relaxed italic font-medium relative z-10">
+                      <p className="text-[11px] leading-relaxed italic font-medium">
                         "Institutional logistics parameters govern the physical transit of assets. Revenue recognition is tied directly to the Proof of Delivery event."
                       </p>
                     </div>
-                    <Button type="submit" disabled={isSaving} className="w-full h-11 font-bold uppercase text-[10px] gap-2 shadow-lg shadow-primary/20">
+                    <Button type="submit" disabled={isSaving} className="w-full h-11 font-bold uppercase text-[10px] gap-2 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90">
                       {isSaving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />} Commit Configuration
                     </Button>
                   </CardContent>

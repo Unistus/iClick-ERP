@@ -1,7 +1,7 @@
 
 'use client';
 
-import { Firestore, collection, doc, serverTimestamp, increment, getDoc, runTransaction, addDoc, updateDoc } from 'firebase/firestore';
+import { Firestore, collection, doc, serverTimestamp, increment, getDoc, runTransaction, addDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/non-blocking-updates';
 import { postJournalEntry } from '../accounting/journal.service';
 import { recordStockMovement } from '../inventory/inventory.service';
@@ -32,9 +32,34 @@ export interface SalesInvoicePayload {
 }
 
 /**
- * Enterprise engine for Sales Lifecycle management.
- * Orchestrates GL posting, Stock deduction, and Sequencing.
+ * Bootstraps the required Sales financial nodes in the COA.
  */
+export async function bootstrapSalesFinancials(db: Firestore, institutionId: string) {
+  const nodes = [
+    { id: 'sales_revenue', code: '4000', name: 'Product Sales Revenue', type: 'Income', subtype: 'Sales Revenue' },
+    { id: 'accounts_receivable', code: '1200', name: 'Accounts Receivable', type: 'Asset', subtype: 'Accounts Receivable' },
+    { id: 'vat_payable', code: '2200', name: 'VAT (Output) Payable', type: 'Liability', subtype: 'VAT Payable' },
+    { id: 'cash_on_hand', code: '1000', name: 'Main Branch Till', type: 'Asset', subtype: 'Cash & Bank' },
+  ];
+
+  for (const node of nodes) {
+    const coaRef = doc(db, 'institutions', institutionId, 'coa', node.id);
+    await setDoc(coaRef, {
+      ...node,
+      balance: 0,
+      isActive: true,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  }
+
+  const setupRef = doc(db, 'institutions', institutionId, 'settings', 'sales');
+  await setDoc(setupRef, {
+    salesRevenueAccountId: 'sales_revenue',
+    accountsReceivableAccountId: 'accounts_receivable',
+    vatPayableAccountId: 'vat_payable',
+    cashOnHandAccountId: 'cash_on_hand'
+  }, { merge: true });
+}
 
 export async function createSalesInvoice(db: Firestore, institutionId: string, payload: SalesInvoicePayload, userId: string) {
   if (!institutionId || !db) return;
@@ -77,9 +102,6 @@ export async function createSalesInvoice(db: Firestore, institutionId: string, p
   return newInvoice;
 }
 
-/**
- * Finalizes an invoice, transitioning it to 'Finalized' and posting to the GL.
- */
 export async function finalizeInvoice(db: Firestore, institutionId: string, invoiceId: string) {
   const invoiceRef = doc(db, 'institutions', institutionId, 'sales_invoices', invoiceId);
   const setupRef = doc(db, 'institutions', institutionId, 'settings', 'accounting');
@@ -98,7 +120,6 @@ export async function finalizeInvoice(db: Firestore, institutionId: string, invo
 
     if (inv.status !== 'Draft') throw new Error("Only draft invoices can be finalized.");
 
-    // Post to Ledger
     const debitAccountId = inv.paymentMethod === 'Credit' 
       ? setup.accountsReceivableAccountId 
       : setup.cashOnHandAccountId;
@@ -145,10 +166,8 @@ export async function updateQuotationStatus(db: Firestore, institutionId: string
       if (!snap.exists()) throw new Error("Quote not found");
       const data = snap.data();
 
-      // Update Quote
       transaction.update(quoteRef, { status: 'Confirmed', updatedAt: serverTimestamp() });
 
-      // Create Sales Order Automatically
       const orderNumber = await getNextSequence(db, institutionId, 'sales_order');
       const orderRef = doc(collection(db, 'institutions', institutionId, 'sales_orders'));
       transaction.set(orderRef, {
@@ -196,7 +215,6 @@ export async function createDeliveryNote(db: Firestore, institutionId: string, p
 }) {
   const dnNumber = await getNextSequence(db, institutionId, 'delivery_order');
   
-  // 1. Log Stock Movement for each item
   for (const item of payload.items) {
     await recordStockMovement(db, institutionId, {
       productId: item.productId,
@@ -208,7 +226,6 @@ export async function createDeliveryNote(db: Firestore, institutionId: string, p
     });
   }
 
-  // 2. Save DN record
   const dnRef = collection(db, 'institutions', institutionId, 'delivery_notes');
   return addDoc(dnRef, {
     ...payload,
@@ -228,9 +245,8 @@ export async function processSalesReturn(db: Firestore, institutionId: string, p
   const setupSnap = await getDoc(setupRef);
   const setup = setupSnap.data();
 
-  // Reverse Ledger
   const subtotal = payload.items.reduce((sum, i) => sum + i.total, 0);
-  const tax = subtotal * 0.16; // Simplified for MVP
+  const tax = subtotal * 0.16;
   const total = subtotal + tax;
 
   await postJournalEntry(db, institutionId, {

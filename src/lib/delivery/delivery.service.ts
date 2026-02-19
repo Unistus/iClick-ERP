@@ -1,9 +1,10 @@
 
 'use client';
 
-import { Firestore, collection, doc, serverTimestamp, runTransaction, addDoc, getDoc, updateDoc } from 'firebase/firestore';
+import { Firestore, collection, doc, serverTimestamp, runTransaction, addDoc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { recordStockMovement } from '../inventory/inventory.service';
 import { getNextSequence } from '../sequence-service';
+import { postJournalEntry } from '../accounting/journal.service';
 
 export interface DispatchPayload {
   invoiceId: string;
@@ -14,20 +15,42 @@ export interface DispatchPayload {
 }
 
 /**
- * Orchestrates the full Logistics lifecycle from dispatch to confirmation.
+ * Bootstraps the required Logistics financial nodes in the COA.
  */
+export async function bootstrapLogisticsFinancials(db: Firestore, institutionId: string) {
+  const nodes = [
+    { id: 'shipping_revenue', code: '4200', name: 'Delivery & Shipping Revenue', type: 'Income', subtype: 'Other Income' },
+    { id: 'fleet_expense', code: '6500', name: 'Fleet & Fuel Expenses', type: 'Expense', subtype: 'Utilities' },
+    { id: 'logistics_accrual', code: '2500', name: 'Accrued Delivery Costs', type: 'Liability', subtype: 'Accrued Liabilities' },
+  ];
+
+  for (const node of nodes) {
+    const coaRef = doc(db, 'institutions', institutionId, 'coa', node.id);
+    await setDoc(coaRef, {
+      ...node,
+      balance: 0,
+      isActive: true,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  }
+
+  const setupRef = doc(db, 'institutions', institutionId, 'settings', 'logistics');
+  await setDoc(setupRef, {
+    shippingRevenueAccountId: 'shipping_revenue',
+    fleetExpenseAccountId: 'fleet_expense',
+    logisticsAccrualAccountId: 'logistics_accrual'
+  }, { merge: true });
+}
 
 export async function dispatchDelivery(db: Firestore, institutionId: string, payload: DispatchPayload, userId: string) {
   const deliveryNumber = await getNextSequence(db, institutionId, 'delivery_order');
   
   return runTransaction(db, async (transaction) => {
-    // 1. Fetch Invoice to get items
     const invoiceRef = doc(db, 'institutions', institutionId, 'sales_invoices', payload.invoiceId);
     const invSnap = await transaction.get(invoiceRef);
     if (!invSnap.exists()) throw new Error("Invoice not found.");
     const invoice = invSnap.data();
 
-    // 2. Log Stock Deductions for every item in the invoice
     for (const item of invoice.items) {
       await recordStockMovement(db, institutionId, {
         productId: item.productId,
@@ -39,7 +62,6 @@ export async function dispatchDelivery(db: Firestore, institutionId: string, pay
       });
     }
 
-    // 3. Create Delivery Order record
     const deliveryRef = doc(collection(db, 'institutions', institutionId, 'delivery_orders'));
     transaction.set(deliveryRef, {
       ...payload,
@@ -51,14 +73,12 @@ export async function dispatchDelivery(db: Firestore, institutionId: string, pay
       updatedAt: serverTimestamp()
     });
 
-    // 4. Update Invoice Status
     transaction.update(invoiceRef, { 
       status: 'Dispatched', 
       deliveryOrderId: deliveryRef.id,
       updatedAt: serverTimestamp() 
     });
 
-    // 5. Mark Driver and Vehicle as Busy
     const driverRef = doc(db, 'institutions', institutionId, 'drivers', payload.driverId);
     const vehicleRef = doc(db, 'institutions', institutionId, 'vehicles', payload.vehicleId);
     transaction.update(driverRef, { status: 'Busy', updatedAt: serverTimestamp() });
@@ -79,21 +99,18 @@ export async function confirmDelivery(db: Firestore, institutionId: string, deli
     if (!delSnap.exists()) throw new Error("Delivery Order not found.");
     const delivery = delSnap.data();
 
-    // 1. Update Delivery Status
     transaction.update(deliveryRef, { 
       status: 'Delivered', 
       deliveredAt: serverTimestamp(),
       updatedAt: serverTimestamp() 
     });
 
-    // 2. Update Invoice to 'Settled' (Revenue Recognition)
     const invoiceRef = doc(db, 'institutions', institutionId, 'sales_invoices', delivery.invoiceId);
     transaction.update(invoiceRef, { 
       status: 'Settled', 
       updatedAt: serverTimestamp() 
     });
 
-    // 3. Free up resources
     const driverRef = doc(db, 'institutions', institutionId, 'drivers', delivery.driverId);
     const vehicleRef = doc(db, 'institutions', institutionId, 'vehicles', delivery.vehicleId);
     transaction.update(driverRef, { status: 'Available', updatedAt: serverTimestamp() });

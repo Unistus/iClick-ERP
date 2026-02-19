@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -9,15 +10,17 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, serverTimestamp, setDoc } from "firebase/firestore";
-import { Settings, Save, Loader2, Info, Factory, ShoppingCart, Banknote, ShieldCheck } from "lucide-react";
+import { Settings, Save, Loader2, Info, Factory, ShoppingCart, Banknote, ShieldCheck, Calculator } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
+import { bootstrapPurchasesFinancials } from '@/lib/purchases/purchases.service';
 
 export default function PurchasesSetupPage() {
   const db = useFirestore();
   const { user } = useUser();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(false);
 
   // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
@@ -65,6 +68,19 @@ export default function PurchasesSetupPage() {
     }
   };
 
+  const handleBootstrap = async () => {
+    if (!selectedInstId) return;
+    setIsBootstrapping(true);
+    try {
+      await bootstrapPurchasesFinancials(db, selectedInstId);
+      toast({ title: "Financial Nodes Synced", description: "Purchasing liability and tax accounts created." });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Bootstrap Failed" });
+    } finally {
+      setIsBootstrapping(false);
+    }
+  };
+
   const AccountSelect = ({ name, label, description, typeFilter }: { name: string, label: string, description: string, typeFilter?: string[] }) => (
     <div className="space-y-2">
       <Label className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
@@ -100,16 +116,28 @@ export default function PurchasesSetupPage() {
             </div>
           </div>
           
-          <Select value={selectedInstId} onValueChange={setSelectedInstId}>
-            <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs">
-              <SelectValue placeholder="Select Institution" />
-            </SelectTrigger>
-            <SelectContent>
-              {institutions?.map(i => (
-                <SelectItem key={i.id} value={i.id} className="text-xs">{i.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Select value={selectedInstId} onValueChange={setSelectedInstId}>
+              <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold">
+                <SelectValue placeholder="Select Institution" />
+              </SelectTrigger>
+              <SelectContent>
+                {institutions?.map(i => (
+                  <SelectItem key={i.id} value={i.id} className="text-xs">{i.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="gap-2 h-9 text-[10px] font-black uppercase border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/5"
+              disabled={!selectedInstId || isBootstrapping}
+              onClick={handleBootstrap}
+            >
+              {isBootstrapping ? <Loader2 className="size-3 animate-spin" /> : <Calculator className="size-3" />} 
+              Sync Financial Nodes
+            </Button>
+          </div>
         </div>
 
         {!selectedInstId ? (

@@ -26,7 +26,6 @@ import {
   Calendar, 
   MapPin, 
   Truck, 
-  Building2, 
   Contact, 
   Hash, 
   Globe, 
@@ -45,10 +44,10 @@ import {
   Edit2,
   Trash2,
   History,
-  Star,
   UserCheck,
   ShieldAlert,
-  Zap
+  Zap,
+  Star
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
@@ -79,17 +78,6 @@ export default function CustomerDirectoryPage() {
   const [selectedCountryId, setSelectedCountryId] = useState<string>("");
   const [selectedTownId, setSelectedTownId] = useState<string>("");
 
-  // UI CLEANUP HOOK
-  useEffect(() => {
-    if (!isCreateOpen) {
-      setEditingCustomer(null);
-      setActiveTab("basic");
-      setIsProcessing(false);
-      setSelectedCountryId("");
-      setSelectedTownId("");
-    }
-  }, [isCreateOpen]);
-
   // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instColRef);
@@ -106,7 +94,6 @@ export default function CustomerDirectoryPage() {
   }, [db, selectedInstId]);
   const { data: customerTypes } = useCollection(typesRef);
 
-  // GLOBAL SETTINGS FOR CURRENCY
   const settingsRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return doc(db, 'institutions', selectedInstId, 'settings', 'global');
@@ -142,6 +129,20 @@ export default function CustomerDirectoryPage() {
   const countries = geoNodes?.filter(n => n.level === 'Country') || [];
   const towns = geoNodes?.filter(n => n.level === 'Town' && n.parentId === selectedCountryId) || [];
   const areas = geoNodes?.filter(n => n.level === 'Area' && n.parentId === selectedTownId) || [];
+
+  const handleOpenChange = (open: boolean) => {
+    setIsCreateOpen(open);
+    if (!open) {
+      // Clean cleanup after closure to prevent freeze
+      setTimeout(() => {
+        setEditingCustomer(null);
+        setActiveTab("basic");
+        setIsProcessing(false);
+        setSelectedCountryId("");
+        setSelectedTownId("");
+      }, 100);
+    }
+  };
 
   const handleNext = () => {
     if (activeTab === "basic") setActiveTab("contact");
@@ -183,16 +184,18 @@ export default function CustomerDirectoryPage() {
       deliveryNotes: formData.get('deliveryNotes') as string,
     };
 
-    setIsCreateOpen(false);
-
     if (editingCustomer) {
-      updateCustomer(db, selectedInstId, editingCustomer.id, data);
-      logSystemEvent(db, selectedInstId, user, 'CRM', 'Update Customer', `Updated profile for ${data.name}`);
-      toast({ title: "Profile Updated" });
+      updateCustomer(db, selectedInstId, editingCustomer.id, data).then(() => {
+        logSystemEvent(db, selectedInstId, user, 'CRM', 'Update Customer', `Updated profile for ${data.name}`);
+        toast({ title: "Profile Updated" });
+        handleOpenChange(false);
+      });
     } else {
-      registerCustomer(db, selectedInstId, data);
-      logSystemEvent(db, selectedInstId, user, 'CRM', 'Register Customer', `Onboarded new customer: ${data.name}. Status: PENDING APPROVAL.`);
-      toast({ title: "Registration Received", description: "Customer awaiting administrative approval." });
+      registerCustomer(db, selectedInstId, data).then(() => {
+        logSystemEvent(db, selectedInstId, user, 'CRM', 'Register Customer', `Onboarded new customer: ${data.name}. Status: PENDING APPROVAL.`);
+        toast({ title: "Registration Received", description: "Customer awaiting administrative approval." });
+        handleOpenChange(false);
+      });
     }
   };
 
@@ -200,7 +203,7 @@ export default function CustomerDirectoryPage() {
     if (!selectedInstId) return;
     approveCustomer(db, selectedInstId, id).then(() => {
       logSystemEvent(db, selectedInstId, user, 'CRM', 'Approve Customer', `Approved ${name} for Sales operations.`);
-      toast({ title: "Customer Approved", description: `${name} can now be accessed in Sales module.` });
+      toast({ title: "Customer Approved", description: `${name} authorized for trading.` });
     });
   };
 
@@ -221,7 +224,7 @@ export default function CustomerDirectoryPage() {
   };
 
   const handleDelete = (id: string) => {
-    if (!selectedInstId || !confirm("Are you sure you want to archive this customer?")) return;
+    if (!selectedInstId || !confirm("Are you sure you want to archive this customer? This action is immutable.")) return;
     archiveCustomer(db, selectedInstId, id);
     logSystemEvent(db, selectedInstId, user, 'CRM', 'Archive Customer', `Archived customer ID: ${id}`);
     toast({ title: "Customer Archived" });
@@ -237,7 +240,7 @@ export default function CustomerDirectoryPage() {
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-1.5 rounded bg-primary/20 text-primary shadow-inner border border-primary/10">
+            <div className="p-1.5 rounded-lg bg-primary/20 text-primary shadow-inner border border-primary/10">
               <Users className="size-5" />
             </div>
             <div>
@@ -258,7 +261,7 @@ export default function CustomerDirectoryPage() {
               </SelectContent>
             </Select>
 
-            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase shadow-lg shadow-primary/20" disabled={!selectedInstId} onClick={() => setIsCreateOpen(true)}>
+            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase shadow-lg shadow-primary/20 bg-primary" disabled={!selectedInstId} onClick={() => setIsCreateOpen(true)}>
               <Plus className="size-4" /> New Profile
             </Button>
           </div>
@@ -365,11 +368,9 @@ export default function CustomerDirectoryPage() {
                               <DropdownMenuItem className="text-xs gap-2" onClick={() => openEdit(c)}>
                                 <Edit2 className="size-3.5 text-primary" /> Edit Identity Profile
                               </DropdownMenuItem>
-                              {!c.kycVerified && (
-                                <DropdownMenuItem className="text-xs gap-2" onClick={() => handleVerifyKYC(c.id, c.name)}>
-                                  <UserCheck className="size-3.5 text-emerald-500" /> Verify KYC Documents
-                                </DropdownMenuItem>
-                              )}
+                              <DropdownMenuItem className="text-xs gap-2" onClick={() => handleVerifyKYC(c.id, c.name)}>
+                                <UserCheck className="size-3.5 text-emerald-500" /> Verify KYC Documents
+                              </DropdownMenuItem>
                               <DropdownMenuItem className="text-xs gap-2">
                                 <Coins className="size-3.5 text-amber-500" /> Adjust Credit Trust
                               </DropdownMenuItem>
@@ -381,7 +382,7 @@ export default function CustomerDirectoryPage() {
                                 <History className="size-3.5" /> View Activity Stream
                               </DropdownMenuItem>
                               <DropdownMenuItem className="text-xs gap-2">
-                                <FileText className="size-3.5" /> Export Statements
+                                <FileText className="size-3.5" /> Export Statement
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem className="text-xs gap-2 text-destructive" onClick={() => handleDelete(c.id)}>
@@ -399,13 +400,13 @@ export default function CustomerDirectoryPage() {
           </Card>
         )}
 
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <Dialog open={isCreateOpen} onOpenChange={handleOpenChange}>
           <DialogContent className="max-w-4xl overflow-y-auto max-h-[90vh] ring-1 ring-border shadow-2xl">
             <form onSubmit={handleCreateCustomer}>
               <DialogHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-1.5 rounded-lg bg-primary/10 text-primary"><UserCircle className="size-5" /></div>
-                  <DialogTitle>{editingCustomer ? 'Refine' : 'Register'} Customer Profile</DialogTitle>
+                  <DialogTitle className="font-headline font-bold text-lg">{editingCustomer ? 'Refine' : 'Register'} Customer Profile</DialogTitle>
                 </div>
                 <CardDescription className="text-xs uppercase font-black tracking-tight text-primary">Onboarding Status: {editingCustomer ? editingCustomer.status : 'PENDING APPROVAL'}</CardDescription>
               </DialogHeader>
@@ -609,9 +610,9 @@ export default function CustomerDirectoryPage() {
 
               <DialogFooter className="bg-secondary/10 p-6 -mx-6 -mb-6 rounded-b-lg border-t border-border/50 gap-2">
                 <div className="flex-1 flex items-center gap-2 text-[10px] text-muted-foreground opacity-50 uppercase font-black tracking-widest">
-                  <Zap className="size-3 text-primary animate-pulse" /> Final verification phase
+                  <Zap className="size-3 text-primary animate-pulse" /> Global verification phase active
                 </div>
-                <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs h-10 font-bold uppercase tracking-widest">Discard</Button>
+                <Button type="button" variant="ghost" onClick={() => handleOpenChange(false)} className="text-xs h-10 font-bold uppercase tracking-widest">Discard</Button>
                 <Button type="submit" disabled={isProcessing} className="h-10 px-10 font-bold uppercase text-xs shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-2">
                   {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-4" />} {editingCustomer ? 'Update Profile' : 'Finalize Registration'}
                 </Button>

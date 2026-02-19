@@ -172,3 +172,31 @@ export function updatePromoStatus(db: Firestore, institutionId: string, promoId:
     } satisfies SecurityRuleContext));
   });
 }
+
+export function createGiftCard(db: Firestore, institutionId: string, payload: any) {
+  const colRef = collection(db, 'institutions', institutionId, 'gift_cards');
+  const data = {
+    ...payload,
+    redemptionCount: 0,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  };
+
+  return addDoc(colRef, data).catch(err => {
+    errorEmitter.emit('permission-error', new FirestorePermissionError({
+      path: colRef.path,
+      operation: 'create',
+      requestResourceData: data
+    } satisfies SecurityRuleContext));
+  });
+}
+
+export function updateGiftCardStatus(db: Firestore, institutionId: string, cardId: string, status: 'Active' | 'Paused' | 'Redeemed') {
+  const ref = doc(db, 'institutions', institutionId, 'gift_cards', cardId);
+  return updateDoc(ref, { status, updatedAt: serverTimestamp() }).catch(err => {
+    errorEmitter.emit('permission-error', new FirestorePermissionError({
+      path: ref.path,
+      operation: 'update'
+    } satisfies SecurityRuleContext));
+  });
+}

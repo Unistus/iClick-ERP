@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -46,6 +46,14 @@ export default function CustomerWalletPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
 
+  // UI CLEANUP HOOK: Prevents system freeze by deferring resets until after dialog closure
+  useEffect(() => {
+    if (!isTopupOpen) {
+      setSelectedCustomerId("");
+      setIsProcessing(false);
+    }
+  }, [isTopupOpen]);
+
   // 1. Data Fetching: Permitted Institutions
   const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
@@ -71,7 +79,7 @@ export default function CustomerWalletPage() {
   }, [db, selectedInstId]);
   const { data: walletLogs, isLoading: logsLoading } = useCollection(walletLogsQuery);
 
-  const handleTopup = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleTopup = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || !selectedCustomerId || isProcessing) return;
     setIsProcessing(true);
@@ -80,20 +88,15 @@ export default function CustomerWalletPage() {
     const amount = parseFloat(formData.get('amount') as string);
     const reference = formData.get('reference') as string;
 
-    try {
-      await updateCustomerWallet(db, selectedInstId, selectedCustomerId, amount, reference);
-      toast({ title: "Funds Credited", description: "Customer wallet balance updated successfully." });
-      setIsTopupOpen(false);
-      setSelectedCustomerId("");
-    } catch (err) {
-      toast({ variant: "destructive", title: "Transaction Failed", description: "Could not finalize wallet credit." });
-    } finally {
-      setIsProcessing(false);
-    }
+    // SNAP CLOSE to avoid freeze
+    setIsTopupOpen(false);
+
+    updateCustomerWallet(db, selectedInstId, selectedCustomerId, amount, reference);
+    toast({ title: "Top-up Initiated", description: "Institutional sub-ledger is being updated." });
   };
 
   const filteredCustomers = customers?.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase())
+    (c.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
   // Aggregates
@@ -204,7 +207,7 @@ export default function CustomerWalletPage() {
                 <CardContent className="p-0 overflow-x-auto">
                   <Table>
                     <TableHeader className="bg-secondary/20">
-                      <TableRow className="hover:bg-transparent">
+                      <TableRow>
                         <TableHead className="h-10 text-[9px] font-black uppercase pl-6">Reward Member</TableHead>
                         <TableHead className="h-10 text-[9px] font-black uppercase text-center">Status</TableHead>
                         <TableHead className="h-10 text-[9px] font-black uppercase text-right">Available Credit</TableHead>

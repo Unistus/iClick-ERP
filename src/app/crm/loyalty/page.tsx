@@ -30,6 +30,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from 'next/link';
 import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
+import { cn } from "@/lib/utils";
 
 export default function LoyaltyManagementPage() {
   const db = useFirestore();
@@ -59,9 +60,9 @@ export default function LoyaltyManagementPage() {
 
   const pointsEarnRate = crmSetup?.pointsEarnRate || 1;
 
-  // Filter leaders based on search
+  // Filter leaders based on search with safe null checks
   const filteredLeaders = leaderboards?.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase())
+    (c.name || '').toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
   return (

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -31,6 +30,7 @@ import { collection, doc, query, serverTimestamp, deleteDoc, addDoc } from "fire
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
+import { cn } from "@/lib/utils";
 
 export default function IPRestrictionsPage() {
   const db = useFirestore();

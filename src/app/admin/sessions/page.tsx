@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -7,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Clock, 
   Search, 
@@ -81,7 +81,7 @@ export default function SessionManagerPage() {
           
           <div className="flex gap-2 w-full md:w-auto">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
-              <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold">
+              <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
                 <SelectValue placeholder="Select Institution" />
               </SelectTrigger>
               <SelectContent>
@@ -122,7 +122,6 @@ export default function SessionManagerPage() {
                 <CardContent className="pb-3">
                   <div className="text-xl font-bold">{sessions?.filter(s => s.deviceType === 'Mobile').length || 0} DEVICES</div>
                 </CardContent>
-              </Card>
               <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm">
                 <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
                   <span className="text-[9px] font-black uppercase text-primary tracking-widest">Auth Integrity</span>

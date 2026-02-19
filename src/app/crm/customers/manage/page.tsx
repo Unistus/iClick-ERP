@@ -38,10 +38,13 @@ import {
   Sparkles, 
   Loader2,
   CheckCircle2,
-  Contact
+  Contact,
+  ChevronLeft
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
+
+const TABS = ["basic", "contact", "logistics", "financial"];
 
 function ManagementForm() {
   const router = useRouter();
@@ -106,9 +109,17 @@ function ManagementForm() {
   const areas = geoNodes?.filter(n => n.level === 'Area' && n.parentId === selectedTownId) || [];
 
   const handleNext = () => {
-    if (activeTab === "basic") setActiveTab("contact");
-    else if (activeTab === "contact") setActiveTab("logistics");
-    else if (activeTab === "logistics") setActiveTab("financial");
+    const currentIndex = TABS.indexOf(activeTab);
+    if (currentIndex < TABS.length - 1) {
+      setActiveTab(TABS[currentIndex + 1]);
+    }
+  };
+
+  const handlePrevious = () => {
+    const currentIndex = TABS.indexOf(activeTab);
+    if (currentIndex > 0) {
+      setActiveTab(TABS[currentIndex - 1]);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -163,6 +174,9 @@ function ManagementForm() {
     }
   };
 
+  const isLastTab = activeTab === "financial";
+  const isFirstTab = activeTab === "basic";
+
   if (customerLoading) {
     return (
       <div className="h-96 flex items-center justify-center">
@@ -208,7 +222,7 @@ function ManagementForm() {
               </TabsTrigger>
             </TabsList>
 
-            <div className="p-8">
+            <div className="p-8 min-h-[450px]">
               <TabsContent value="basic" className="space-y-6 mt-0 animate-in fade-in slide-in-from-left-2 duration-300">
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
@@ -249,11 +263,6 @@ function ManagementForm() {
                     <Input name="phone" defaultValue={editingCustomer?.phone} required className="h-11" />
                   </div>
                 </div>
-                <div className="flex justify-end pt-6">
-                  <Button type="button" onClick={handleNext} className="h-12 px-10 font-black uppercase text-xs shadow-xl bg-primary">
-                    Continue to Contacts <ArrowRight className="size-4 ml-2" />
-                  </Button>
-                </div>
               </TabsContent>
 
               <TabsContent value="contact" className="space-y-6 mt-0 animate-in fade-in slide-in-from-left-2 duration-300">
@@ -279,12 +288,6 @@ function ManagementForm() {
                       </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex justify-between pt-6">
-                  <Button type="button" variant="ghost" onClick={() => setActiveTab("basic")} className="font-black uppercase text-[10px]">Previous Step</Button>
-                  <Button type="button" onClick={handleNext} className="h-12 px-10 font-black uppercase text-xs shadow-xl bg-primary">
-                    Configure Logistics <ArrowRight className="size-4 ml-2" />
-                  </Button>
                 </div>
               </TabsContent>
 
@@ -329,12 +332,6 @@ function ManagementForm() {
                     <Label className="flex items-center gap-2 text-muted-foreground font-black uppercase text-[10px] tracking-widest opacity-60"><Clock className="size-3" /> Logistics Memo</Label>
                     <Textarea name="deliveryNotes" defaultValue={editingCustomer?.deliveryNotes} placeholder="Access requirements, gate instructions..." className="min-h-[120px] bg-secondary/5" />
                   </div>
-                </div>
-                <div className="flex justify-between pt-6">
-                  <Button type="button" variant="ghost" onClick={() => setActiveTab("contact")} className="font-black uppercase text-[10px]">Previous Step</Button>
-                  <Button type="button" onClick={handleNext} className="h-12 px-10 font-black uppercase text-xs shadow-xl bg-primary">
-                    Financial Strategy <ArrowRight className="size-4 ml-2" />
-                  </Button>
                 </div>
               </TabsContent>
 
@@ -405,27 +402,46 @@ function ManagementForm() {
           </Tabs>
 
           <CardFooter className="p-8 bg-secondary/10 border-t border-border/50 flex flex-col md:flex-row justify-between gap-6">
-            <div className="flex items-center gap-3 text-muted-foreground opacity-40">
-              <Sparkles className="size-5" />
-              <span className="text-[10px] font-black uppercase tracking-widest">Global Identity Synchronization active</span>
-            </div>
-            <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="flex items-center gap-3">
+              {!isFirstTab && (
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={handlePrevious}
+                  className="h-12 px-8 font-black uppercase text-xs tracking-widest"
+                >
+                  <ChevronLeft className="size-4 mr-2" /> Back
+                </Button>
+              )}
               <Button 
                 type="button" 
                 variant="ghost" 
                 onClick={() => router.push('/crm/customers')}
-                className="flex-1 md:flex-none h-12 px-8 font-black uppercase text-xs tracking-widest"
+                className="h-12 px-8 font-black uppercase text-xs tracking-widest opacity-40 hover:opacity-100"
               >
-                Cancel & Discard
+                Discard
               </Button>
-              <Button 
-                type="submit" 
-                disabled={isProcessing} 
-                className="flex-1 md:flex-none h-12 px-12 font-black uppercase text-xs shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-3"
-              >
-                {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} 
-                {editingId ? 'Update Global Profile' : 'Commit Registration'}
-              </Button>
+            </div>
+
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              {!isLastTab ? (
+                <Button 
+                  type="button" 
+                  onClick={handleNext}
+                  className="w-full md:w-auto h-12 px-12 font-black uppercase text-xs shadow-2xl bg-primary hover:bg-primary/90 gap-3"
+                >
+                  Next Stage <ArrowRight className="size-4" />
+                </Button>
+              ) : (
+                <Button 
+                  type="submit" 
+                  disabled={isProcessing} 
+                  className="w-full md:w-auto h-12 px-12 font-black uppercase text-xs shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-3 border-none ring-2 ring-primary/20"
+                >
+                  {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} 
+                  {editingId ? 'Update Global Profile' : 'Commit Registration'}
+                </Button>
+              )}
             </div>
           </CardFooter>
         </Card>

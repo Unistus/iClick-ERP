@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -37,8 +36,7 @@ import {
   Mars,
   ShieldAlert,
   Calendar,
-  Flame,
-  UserCheck
+  Flame
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
@@ -427,7 +425,7 @@ export default function HRSetupPage() {
                     <p className="text-[11px] leading-relaxed text-muted-foreground italic font-medium">
                       "Holiday blocks prevent accidental labor cost accrual. Overtime must be explicitly allocated by a Reporting Manager before the shift starts to allow network entry."
                     </p>
-                  </div>
+                  </Card>
                 </div>
               </div>
             </TabsContent>

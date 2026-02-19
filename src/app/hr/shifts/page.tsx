@@ -24,13 +24,15 @@ import {
   RefreshCw,
   MoreVertical,
   CalendarDays,
-  Timer
+  Timer,
+  Hash
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { createShiftAssignment } from "@/lib/hr/hr.service";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
+import { cn } from "@/lib/utils";
 
 export default function ShiftManagementPage() {
   const db = useFirestore();
@@ -41,12 +43,21 @@ export default function ShiftManagementPage() {
 
   const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
+  // Data Fetching: Roster
   const shiftsQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return query(collection(db, 'institutions', selectedInstId, 'shifts'), orderBy('date', 'desc'));
   }, [db, selectedInstId]);
   const { data: shifts, isLoading } = useCollection(shiftsQuery);
 
+  // Data Fetching: Shift Templates (from Setup)
+  const shiftTypesQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'shift_types');
+  }, [db, selectedInstId]);
+  const { data: shiftTemplates } = useCollection(shiftTypesQuery);
+
+  // Data Fetching: Employees
   const employeesRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return collection(db, 'institutions', selectedInstId, 'employees');
@@ -59,12 +70,18 @@ export default function ShiftManagementPage() {
     setIsProcessing(true);
 
     const formData = new FormData(e.currentTarget);
+    const templateId = formData.get('shiftTypeId') as string;
+    const template = shiftTemplates?.find(t => t.id === templateId);
+
     const data = {
       employeeId: formData.get('employeeId') as string,
       date: formData.get('date') as string,
-      startTime: formData.get('startTime') as string,
-      endTime: formData.get('endTime') as string,
+      shiftTypeId: templateId,
+      shiftTypeName: template?.name || 'Manual Shift',
+      startTime: template?.startTime || formData.get('startTime'),
+      endTime: template?.endTime || formData.get('endTime'),
       role: formData.get('role') as string,
+      status: 'Scheduled',
       institutionId: selectedInstId,
     };
 
@@ -129,21 +146,21 @@ export default function ShiftManagementPage() {
               </Card>
               <Card className="bg-card border-none ring-1 ring-border shadow-sm">
                 <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
-                  <span className="text-[9px] font-black uppercase text-accent tracking-widest">Open Positions</span>
-                  <Users className="size-3.5 text-accent" />
+                  <span className="text-[9px] font-black uppercase text-accent tracking-widest">Shift Templates</span>
+                  <Timer className="size-3.5 text-accent" />
                 </CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-xl font-bold">4 VACANT</div>
+                  <div className="text-xl font-bold">{shiftTemplates?.length || 0} CONFIGURED</div>
                 </CardContent>
               </Card>
               <Card className="bg-emerald-500/5 border-none ring-1 ring-emerald-500/20 shadow-sm relative overflow-hidden">
                 <div className="absolute -right-4 -bottom-4 opacity-10"><Zap className="size-24 text-emerald-500" /></div>
                 <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between relative z-10">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500">Efficiency Pulse</span>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-emerald-500">Labor Balance</span>
                   <div className="size-2.5 rounded-full bg-emerald-500 animate-pulse" />
                 </CardHeader>
                 <CardContent className="pb-4 relative z-10">
-                  <div className="text-xl font-bold">OPTIMAL</div>
+                  <div className="text-xl font-bold">STABLE</div>
                 </CardContent>
               </Card>
             </div>
@@ -153,7 +170,7 @@ export default function ShiftManagementPage() {
                 <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em]">Institutional Shift Schedule</CardTitle>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="text-[8px] bg-primary/10 text-primary font-black uppercase">Planning v1.2</Badge>
-                  <Button variant="ghost" size="icon" className="size-8"><RefreshCw className="size-3.5" /></Button>
+                  <Button variant="ghost" size="icon" className="size-8" onClick={() => toast({ title: "Refreshing Roster" })}><RefreshCw className="size-3.5" /></Button>
                 </div>
               </CardHeader>
               <CardContent className="p-0 overflow-x-auto">
@@ -161,6 +178,7 @@ export default function ShiftManagementPage() {
                   <TableHeader className="bg-secondary/20">
                     <TableRow>
                       <TableHead className="h-10 text-[9px] font-black uppercase pl-6">Operator</TableHead>
+                      <TableHead className="h-10 text-[9px] font-black uppercase">Shift Template</TableHead>
                       <TableHead className="h-10 text-[9px] font-black uppercase">Shift Date</TableHead>
                       <TableHead className="h-10 text-[9px] font-black uppercase">Time Window</TableHead>
                       <TableHead className="h-10 text-[9px] font-black uppercase text-center">Status</TableHead>
@@ -169,19 +187,26 @@ export default function ShiftManagementPage() {
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse uppercase">Syncing Roster...</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={6} className="text-center py-12 text-xs animate-pulse uppercase font-black">Syncing Roster...</TableCell></TableRow>
                     ) : shifts?.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-20 text-xs text-muted-foreground uppercase font-bold">Roster is empty.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={6} className="text-center py-20 text-xs text-muted-foreground uppercase font-bold">Roster is empty.</TableCell></TableRow>
                     ) : shifts?.map((s) => (
                       <TableRow key={s.id} className="h-14 hover:bg-secondary/5 transition-colors border-b-border/30 group">
                         <TableCell className="pl-6">
                           <div className="flex items-center gap-3">
-                            <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-primary"><UserCircle className="size-4" /></div>
+                            <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-black text-[10px] uppercase">
+                              {employees?.find(e => e.id === s.employeeId)?.firstName?.[0] || '?'}{employees?.find(e => e.id === s.employeeId)?.lastName?.[0] || '?'}
+                            </div>
                             <div className="flex flex-col">
-                              <span className="text-xs font-bold uppercase">{employees?.find(e => e.id === s.employeeId)?.firstName || '...'}</span>
+                              <span className="text-xs font-bold uppercase">{employees?.find(e => e.id === s.employeeId)?.firstName || '...'} {employees?.find(e => e.id === s.employeeId)?.lastName || ''}</span>
                               <span className="text-[8px] text-muted-foreground font-bold">{s.role || 'General Staff'}</span>
                             </div>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="text-[8px] h-4 uppercase font-black border-primary/20 text-primary bg-primary/5">
+                            {s.shiftTypeName || 'Manual'}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-[10px] font-mono font-bold uppercase opacity-60">
                           {format(new Date(s.date), 'dd MMM yyyy')}
@@ -193,12 +218,24 @@ export default function ShiftManagementPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge variant="outline" className="text-[8px] h-4 font-black bg-emerald-500/10 text-emerald-500 border-none uppercase">
+                          <Badge variant="outline" className={cn(
+                            "text-[8px] h-4 uppercase font-black border-none",
+                            s.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-primary/10 text-primary'
+                          )}>
                             {s.status}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right pr-6">
-                          <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100 transition-opacity"><MoreVertical className="size-4" /></Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100 transition-all"><MoreVertical className="size-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem className="text-xs gap-2"><CheckCircle2 className="size-3.5 text-emerald-500" /> Mark Completed</DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-xs gap-2 text-destructive"><Trash2 className="size-3.5" /> Remove from Roster</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -231,25 +268,28 @@ export default function ShiftManagementPage() {
                   </Select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="uppercase font-bold tracking-widest opacity-60">Shift Date</Label>
-                    <Input name="date" type="date" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="uppercase font-bold tracking-widest opacity-60">Position / Role</Label>
-                    <Input name="role" placeholder="e.g. Lead Pharmacist" />
-                  </div>
+                <div className="space-y-2">
+                  <Label className="uppercase font-bold tracking-widest opacity-60">Shift Template (from Setup)</Label>
+                  <Select name="shiftTypeId" required>
+                    <SelectTrigger className="h-10 font-bold uppercase"><SelectValue placeholder="Select Template..." /></SelectTrigger>
+                    <SelectContent>
+                      {shiftTemplates?.map(t => (
+                        <SelectItem key={t.id} value={t.id} className="text-xs font-bold uppercase">
+                          {t.name} ({t.startTime}-{t.endTime})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="uppercase font-bold tracking-widest opacity-60">Start Time</Label>
-                    <Input name="startTime" type="time" defaultValue="08:00" required />
+                    <Label className="uppercase font-bold tracking-widest opacity-60">Shift Date</Label>
+                    <Input name="date" type="date" required className="h-10 bg-secondary/5" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="uppercase font-bold tracking-widest opacity-60">End Time</Label>
-                    <Input name="endTime" type="time" defaultValue="17:00" required />
+                    <Label className="uppercase font-bold tracking-widest opacity-60">Position / Role</Label>
+                    <Input name="role" placeholder="e.g. Lead Pharmacist" className="h-10 bg-secondary/5" />
                   </div>
                 </div>
 
@@ -258,7 +298,7 @@ export default function ShiftManagementPage() {
                   <div className="space-y-1">
                     <p className="text-[10px] font-black uppercase tracking-widest">Labor Logic</p>
                     <p className="text-[11px] leading-relaxed italic font-medium">
-                      Finalizing this assignment will instantly sync the shift to the employee's dashboard and the **Attendance Command Hub**.
+                      Templates ensure consistency with your institutional shift policy. Manual time overrides are disabled to maintain roster integrity.
                     </p>
                   </div>
                 </div>

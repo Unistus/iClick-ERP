@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -5,6 +6,7 @@ import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, query, orderBy, limit, where, doc, getDoc } from "firebase/firestore";
 import { format } from "date-fns";
@@ -86,7 +88,7 @@ export default function AttendanceHubPage() {
           
           <Select value={selectedInstId} onValueChange={setSelectedInstId}>
             <SelectTrigger className="w-[220px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
-              <SelectValue placeholder="Select Institution" />
+              <SelectValue placeholder={instLoading ? "Authorizing..." : "Select Institution"} />
             </SelectTrigger>
             <SelectContent>
               {institutions?.map(i => (

@@ -36,7 +36,8 @@ import {
   Mars,
   ShieldAlert,
   Calendar,
-  Flame
+  Flame,
+  FileText
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
@@ -78,6 +79,12 @@ export default function HRSetupPage() {
     return query(collection(db, 'institutions', selectedInstId, 'pay_grades'), orderBy('createdAt', 'desc'));
   }, [db, selectedInstId]);
   const { data: payGrades } = useCollection(payGradesRef);
+
+  const empTypesRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return query(collection(db, 'institutions', selectedInstId, 'employment_types'), orderBy('createdAt', 'desc'));
+  }, [db, selectedInstId]);
+  const { data: empTypes } = useCollection(empTypesRef);
 
   const shiftTypesRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -570,6 +577,36 @@ export default function HRSetupPage() {
                             <TableCell className="text-xs font-bold pl-6 uppercase tracking-tight">{l.name}</TableCell>
                             <TableCell className="text-right pr-6">
                               <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'job_levels', l.id))}>
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
+                  <CardHeader className="bg-secondary/10 border-b">
+                    <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                      <FileText className="size-4 text-accent" /> Employment Types
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="p-4 border-b bg-secondary/5">
+                      <form onSubmit={(e) => handleAddSubItem('employment_types', e)} className="flex gap-2">
+                        <Input name="name" placeholder="Basis (e.g. Permanent)" required className="h-9 text-xs" />
+                        <Button type="submit" size="sm" className="h-9 px-4 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
+                      </form>
+                    </div>
+                    <Table>
+                      <TableBody>
+                        {empTypes?.map(t => (
+                          <TableRow key={t.id} className="h-10 hover:bg-secondary/5 group">
+                            <TableCell className="text-xs font-bold pl-6 uppercase tracking-tight">{t.name}</TableCell>
+                            <TableCell className="text-right pr-6">
+                              <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'employment_types', t.id))}>
                                 <Trash2 className="size-3.5" />
                               </Button>
                             </TableCell>

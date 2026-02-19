@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
@@ -38,7 +37,8 @@ import {
   Fingerprint,
   MapPin,
   Clock,
-  HandHelping
+  HandHelping,
+  Hash
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
@@ -81,6 +81,12 @@ function EmployeeManagementForm() {
     return collection(db, 'institutions', selectedInstId, 'pay_grades');
   }, [db, selectedInstId]);
   const { data: payGrades } = useCollection(payGradesRef);
+
+  const empTypesRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'employment_types');
+  }, [db, selectedInstId]);
+  const { data: empTypes } = useCollection(empTypesRef);
 
   const shiftTypesRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -376,13 +382,16 @@ function EmployeeManagementForm() {
                       </div>
                       <div className="space-y-2">
                         <Label className="text-[9px] font-bold uppercase">Employment Basis</Label>
-                        <Select name="employmentType" defaultValue={editingEmp?.employmentType || "Permanent"}>
-                          <SelectTrigger className="h-11 font-bold"><SelectValue /></SelectTrigger>
+                        <Select name="employmentType" defaultValue={editingEmp?.employmentType}>
+                          <SelectTrigger className="h-11 font-bold"><SelectValue placeholder="Select Basis..." /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Permanent">Permanent</SelectItem>
-                            <SelectItem value="Contract">Fixed-Term Contract</SelectItem>
-                            <SelectItem value="Casual">Casual / Temporary</SelectItem>
-                            <SelectItem value="Intern">Intern / Student</SelectItem>
+                            {empTypes?.map(t => <SelectItem key={t.id} value={t.name}>{t.name}</SelectItem>)}
+                            {!empTypes?.length && (
+                              <>
+                                <SelectItem value="Permanent">Permanent</SelectItem>
+                                <SelectItem value="Contract">Contract</SelectItem>
+                              </>
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
@@ -429,7 +438,7 @@ function EmployeeManagementForm() {
                         <Select name="payGradeId" defaultValue={editingEmp?.payGradeId}>
                           <SelectTrigger className="h-11 bg-background font-bold"><SelectValue placeholder="Standard Scale" /></SelectTrigger>
                           <SelectContent>
-                            {payGrades?.map(g => <SelectItem key={g.id} value={g.id}>{g.name} ({g.minSalary}-{g.maxSalary})</SelectItem>)}
+                            {payGrades?.map(g => <SelectItem key={g.id} value={g.id}>{g.name} ({g.minSalary?.toLocaleString()}-{g.maxSalary?.toLocaleString()})</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>

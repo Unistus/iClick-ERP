@@ -414,7 +414,7 @@ export default function PromoManagerPage() {
                   <div className="space-y-1">
                     <p className="text-[10px] font-black uppercase tracking-widest">Revenue Integrity</p>
                     <p className="text-[11px] leading-relaxed italic font-medium">
-                      Automated yield protection will fetch from <strong>Admin > Doc Numbering</strong> if code is left empty.
+                      Automated yield protection will fetch from <strong>Admin &gt; Doc Numbering</strong> if code is left empty.
                     </p>
                   </div>
                 </div>

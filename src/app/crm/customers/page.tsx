@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -60,9 +59,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { logSystemEvent } from "@/lib/audit-service";
+import { useUser } from "@/firebase";
 
 export default function CustomerDirectoryPage() {
   const db = useFirestore();
+  const { user } = useUser();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<any>(null);
@@ -124,7 +126,7 @@ export default function CustomerDirectoryPage() {
     else if (activeTab === "logistics") setActiveTab("financial");
   };
 
-  const handleCreateCustomer = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCreateCustomer = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || isProcessing) return;
     setIsProcessing(true);
@@ -137,7 +139,7 @@ export default function CustomerDirectoryPage() {
       registrationDate: formData.get('regDate') as string,
       email: formData.get('email') as string,
       phone: formData.get('phone') as string,
-      status: formData.get('status') as any || 'Lead',
+      status: (formData.get('status') as any) || 'Lead',
       typeId: formData.get('typeId') as string,
       segmentId: formData.get('segmentId') as string,
       currencyId: formData.get('currencyId') as string,
@@ -154,25 +156,24 @@ export default function CustomerDirectoryPage() {
       geoCountryId: formData.get('geoCountryId') as string,
       geoTownId: formData.get('geoTownId') as string,
       geoAreaId: formData.get('geoAreaId') as string,
-      preferredDeliveryTime: formData.get('preferredDeliveryTime') as any,
+      preferredDeliveryTime: (formData.get('preferredDeliveryTime') as any),
       deliveryNotes: formData.get('deliveryNotes') as string,
     };
 
-    try {
-      if (editingCustomer) {
-        await updateCustomer(db, selectedInstId, editingCustomer.id, data);
-        toast({ title: "Profile Updated" });
-      } else {
-        await registerCustomer(db, selectedInstId, data);
-        toast({ title: "Customer Registered" });
-      }
-      setIsCreateOpen(false);
-      setEditingCustomer(null);
-      setActiveTab("basic");
-    } catch (err) {
-      toast({ variant: "destructive", title: "Operation Failed" });
-    } finally {
-      setIsProcessing(false);
+    // Close and reset state immediately for snappy UI (non-blocking)
+    setIsCreateOpen(false);
+    setIsProcessing(false);
+    setEditingCustomer(null);
+    setActiveTab("basic");
+
+    if (editingCustomer) {
+      updateCustomer(db, selectedInstId, editingCustomer.id, data);
+      logSystemEvent(db, selectedInstId, user, 'CRM', 'Update Customer', `Updated profile for ${data.name}`);
+      toast({ title: "Profile Updated" });
+    } else {
+      registerCustomer(db, selectedInstId, data);
+      logSystemEvent(db, selectedInstId, user, 'CRM', 'Register Customer', `Onboarded new customer: ${data.name}`);
+      toast({ title: "Customer Registered" });
     }
   };
 
@@ -184,19 +185,16 @@ export default function CustomerDirectoryPage() {
     setActiveTab("basic");
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!selectedInstId || !confirm("Are you sure you want to archive this customer?")) return;
-    try {
-      await archiveCustomer(db, selectedInstId, id);
-      toast({ title: "Customer Archived" });
-    } catch (err) {
-      toast({ variant: "destructive", title: "Archive Failed" });
-    }
+    archiveCustomer(db, selectedInstId, id);
+    logSystemEvent(db, selectedInstId, user, 'CRM', 'Archive Customer', `Archived customer ID: ${id}`);
+    toast({ title: "Customer Archived" });
   };
 
   const filteredCustomers = customers?.filter(c => 
-    c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    (c.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (c.email || '').toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
   return (

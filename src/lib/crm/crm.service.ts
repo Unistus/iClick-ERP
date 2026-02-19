@@ -1,7 +1,8 @@
 'use client';
 
 import { Firestore, collection, doc, serverTimestamp, addDoc, updateDoc, increment, runTransaction, deleteDoc } from 'firebase/firestore';
-import { logSystemEvent } from '../audit-service';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
 
 export interface CustomerPayload {
   name: string;
@@ -34,42 +35,63 @@ export interface CustomerPayload {
  * Service to manage customer lifecycle and loyalty logic.
  */
 
-export async function registerCustomer(db: Firestore, institutionId: string, payload: CustomerPayload) {
+export function registerCustomer(db: Firestore, institutionId: string, payload: CustomerPayload) {
   const colRef = collection(db, 'institutions', institutionId, 'customers');
-  return addDoc(colRef, {
+  const data = {
     ...payload,
     loyaltyPoints: 0,
     walletBalance: 0,
     tier: payload.tier || 'Silver',
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
+  };
+
+  addDoc(colRef, data).catch(err => {
+    errorEmitter.emit('permission-error', new FirestorePermissionError({
+      path: colRef.path,
+      operation: 'create',
+      requestResourceData: data
+    } satisfies SecurityRuleContext));
   });
 }
 
 /**
  * Updates an existing customer profile.
  */
-export async function updateCustomer(db: Firestore, institutionId: string, customerId: string, payload: Partial<CustomerPayload>) {
+export function updateCustomer(db: Firestore, institutionId: string, customerId: string, payload: Partial<CustomerPayload>) {
   const customerRef = doc(db, 'institutions', institutionId, 'customers', customerId);
-  return updateDoc(customerRef, {
+  const data = {
     ...payload,
     updatedAt: serverTimestamp()
+  };
+
+  updateDoc(customerRef, data).catch(err => {
+    errorEmitter.emit('permission-error', new FirestorePermissionError({
+      path: customerRef.path,
+      operation: 'update',
+      requestResourceData: data
+    } satisfies SecurityRuleContext));
   });
 }
 
 /**
  * Removes a customer profile from the active directory.
  */
-export async function archiveCustomer(db: Firestore, institutionId: string, customerId: string) {
+export function archiveCustomer(db: Firestore, institutionId: string, customerId: string) {
   const customerRef = doc(db, 'institutions', institutionId, 'customers', customerId);
-  return deleteDoc(customerRef);
+  deleteDoc(customerRef).catch(err => {
+    errorEmitter.emit('permission-error', new FirestorePermissionError({
+      path: customerRef.path,
+      operation: 'delete'
+    } satisfies SecurityRuleContext));
+  });
 }
 
-export async function updateCustomerWallet(db: Firestore, institutionId: string, customerId: string, amount: number, reference: string) {
+export function updateCustomerWallet(db: Firestore, institutionId: string, customerId: string, amount: number, reference: string) {
   const customerRef = doc(db, 'institutions', institutionId, 'customers', customerId);
   const walletLogRef = collection(db, 'institutions', institutionId, 'wallets');
 
-  return runTransaction(db, async (transaction) => {
+  runTransaction(db, async (transaction) => {
     transaction.update(customerRef, {
       walletBalance: increment(amount),
       updatedAt: serverTimestamp()
@@ -82,25 +104,43 @@ export async function updateCustomerWallet(db: Firestore, institutionId: string,
       type: amount > 0 ? 'Top-up' : 'Debit',
       timestamp: serverTimestamp()
     });
+  }).catch(err => {
+    errorEmitter.emit('permission-error', new FirestorePermissionError({
+      path: walletLogRef.path,
+      operation: 'write'
+    } satisfies SecurityRuleContext));
   });
 }
 
-export async function awardLoyaltyPoints(db: Firestore, institutionId: string, customerId: string, points: number, reference: string) {
+export function awardLoyaltyPoints(db: Firestore, institutionId: string, customerId: string, points: number, reference: string) {
   const customerRef = doc(db, 'institutions', institutionId, 'customers', customerId);
   
-  return updateDoc(customerRef, {
+  updateDoc(customerRef, {
     loyaltyPoints: increment(points),
     updatedAt: serverTimestamp()
+  }).catch(err => {
+    errorEmitter.emit('permission-error', new FirestorePermissionError({
+      path: customerRef.path,
+      operation: 'update'
+    } satisfies SecurityRuleContext));
   });
 }
 
-export async function createMarketingCampaign(db: Firestore, institutionId: string, payload: any) {
+export function createMarketingCampaign(db: Firestore, institutionId: string, payload: any) {
   const colRef = collection(db, 'institutions', institutionId, 'campaigns');
-  return addDoc(colRef, {
+  const data = {
     ...payload,
     status: 'Draft',
     reach: 0,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
+  };
+
+  addDoc(colRef, data).catch(err => {
+    errorEmitter.emit('permission-error', new FirestorePermissionError({
+      path: colRef.path,
+      operation: 'create',
+      requestResourceData: data
+    } satisfies SecurityRuleContext));
   });
 }

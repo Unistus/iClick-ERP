@@ -10,10 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useCollection, useFirestore, useMemoFirebase, useDoc, useUser } from "@/firebase";
-import { collection, query, orderBy, doc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, serverTimestamp } from "firebase/firestore";
 import { registerCustomer, updateCustomer } from "@/lib/crm/crm.service";
 import { 
   ArrowLeft, 
@@ -31,7 +30,6 @@ import {
   Clock, 
   ShieldCheck, 
   BadgeCent, 
-  Coins, 
   Tag, 
   TrendingUp, 
   Zap, 
@@ -84,9 +82,6 @@ function ManagementForm() {
     return collection(db, 'institutions', selectedInstId, 'geo_locations');
   }, [db, selectedInstId]);
   const { data: geoNodes } = useCollection(geoQuery);
-
-  const curRef = useMemoFirebase(() => collection(db, 'currencies'), [db]);
-  const { data: currencies } = useCollection(curRef);
 
   const staffRef = useMemoFirebase(() => collection(db, 'users'), [db]);
   const { data: staffMembers } = useCollection(staffRef);
@@ -189,7 +184,7 @@ function ManagementForm() {
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.push('/crm/customers')}>
+          <Button variant="ghost" size="icon" type="button" onClick={() => router.push('/crm/customers')}>
             <ArrowLeft className="size-5" />
           </Button>
           <div>

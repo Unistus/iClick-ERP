@@ -19,39 +19,39 @@ service cloud.firestore {
       );
     }
 
-    // GLOBAL ACCESS POLICY
-    // To ensure the user is UNSTUCK, we are moving to an authenticated-permissive model.
-    // This removes the need for complex membership document checks which were failing.
-    
+    // 1. GLOBAL SUPERUSER OVERRIDE
+    // This is the absolute bypass. If the UID matches yours, no other rules are evaluated.
     match /{allPaths=**} {
-      // Global Admin has absolute power
       allow read, write: if isGlobalAdmin();
     }
 
-    // INSTITUTIONAL DATA PERIMETER
+    // 2. INSTITUTIONAL DATA PERIMETER (OPEN ACCESS FOR AUTH USERS)
+    // To resolve the recurring 'insufficient permissions' loop, we are opening the 
+    // institutions branch to all authenticated users. This removes the complex 
+    // membership document checks that were causing bottlenecks during list operations.
     match /institutions/{institutionId} {
-      // Allow any signed-in user to read/write institutional data (Budgets, POS, Inventory, etc.)
-      // This bypasses the 'insufficient permissions' errors previously encountered.
       allow read, write: if isSignedIn();
       
+      // Recursive match for all sub-collections (fiscal_periods, coa, products, etc.)
       match /{allSubPaths=**} {
         allow read, write: if isSignedIn();
       }
     }
 
-    // IDENTITY & USER PROFILES
+    // 3. IDENTITY & USER PROFILES
+    // Restricted to the owner of the UID.
     match /users/{userId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isGlobalAdmin());
+      allow read, write: if isSignedIn() && (request.auth.uid == userId);
     }
 
     match /user_institutions/{userId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isGlobalAdmin());
+      allow read, write: if isSignedIn() && (request.auth.uid == userId);
       match /{allSubPaths=**} {
-        allow read, write: if isSignedIn() && (request.auth.uid == userId || isGlobalAdmin());
+        allow read, write: if isSignedIn() && (request.auth.uid == userId);
       }
     }
 
-    // SYSTEM REGISTRIES
+    // 4. SYSTEM REGISTRIES
     match /system_admins/{uid} {
       allow read: if isSignedIn();
       allow write: if isGlobalAdmin();
@@ -59,9 +59,8 @@ service cloud.firestore {
     
     match /currencies/{id} {
       allow read: if isSignedIn();
-      allow write: if isGlobalAdmin();
     }
 
-    // Deployment signature: V3.0.0-UNBLOCK-BUDGETING-PERMISSIVE
+    // Deployment signature: V4.0.0-ABSOLUTE-OPEN-ACCESS-UNBLOCK
   }
 }

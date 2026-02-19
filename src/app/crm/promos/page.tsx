@@ -30,7 +30,8 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  LayoutGrid
+  LayoutGrid,
+  Sparkles
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { createPromoCode, updatePromoStatus } from "@/lib/crm/crm.service";
@@ -228,7 +229,7 @@ export default function PromoManagerPage() {
               <CardContent className="p-0 overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-secondary/20">
-                    <TableRow className="hover:bg-transparent">
+                    <TableRow>
                       <TableHead className="h-10 text-[10px] uppercase font-black pl-6">Promo Code</TableHead>
                       <TableHead className="h-10 text-[10px] uppercase font-black">Offer Logic</TableHead>
                       <TableHead className="h-10 text-[10px] uppercase font-black text-center">Lifecycle</TableHead>

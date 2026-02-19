@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase, useDoc, useUser } from "@/firebase";
 import { collection, query, orderBy, doc } from "firebase/firestore";
 import { registerCustomer, updateCustomer, archiveCustomer } from "@/lib/crm/crm.service";
 import { 
@@ -60,7 +60,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { logSystemEvent } from "@/lib/audit-service";
-import { useUser } from "@/firebase";
 
 export default function CustomerDirectoryPage() {
   const db = useFirestore();
@@ -72,9 +71,20 @@ export default function CustomerDirectoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("basic");
 
-  // Chained Select States for Logistics
+  // Logistics chaining
   const [selectedCountryId, setSelectedCountryId] = useState<string>("");
   const [selectedTownId, setSelectedTownId] = useState<string>("");
+
+  // UI CLEANUP HOOK: Prevents system freeze by deferring resets until after dialog closure
+  useEffect(() => {
+    if (!isCreateOpen) {
+      setEditingCustomer(null);
+      setActiveTab("basic");
+      setIsProcessing(false);
+      setSelectedCountryId("");
+      setSelectedTownId("");
+    }
+  }, [isCreateOpen]);
 
   // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
@@ -160,11 +170,8 @@ export default function CustomerDirectoryPage() {
       deliveryNotes: formData.get('deliveryNotes') as string,
     };
 
-    // Close and reset state immediately for snappy UI (non-blocking)
+    // Close Dialog IMMEDIATELY to prevent system freeze
     setIsCreateOpen(false);
-    setIsProcessing(false);
-    setEditingCustomer(null);
-    setActiveTab("basic");
 
     if (editingCustomer) {
       updateCustomer(db, selectedInstId, editingCustomer.id, data);
@@ -223,11 +230,7 @@ export default function CustomerDirectoryPage() {
               </SelectContent>
             </Select>
 
-            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase shadow-lg shadow-primary/20" disabled={!selectedInstId} onClick={() => {
-              setEditingCustomer(null);
-              setIsCreateOpen(true);
-              setActiveTab("basic");
-            }}>
+            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase shadow-lg shadow-primary/20" disabled={!selectedInstId} onClick={() => setIsCreateOpen(true)}>
               <Plus className="size-4" /> New Profile
             </Button>
           </div>
@@ -571,7 +574,7 @@ export default function CustomerDirectoryPage() {
                 <div className="flex-1 flex items-center gap-2 text-[10px] text-muted-foreground opacity-50 uppercase font-bold">
                   <Sparkles className="size-3" /> System indexed onboarding
                 </div>
-                <Button type="button" variant="ghost" onClick={() => { setIsCreateOpen(false); setEditingCustomer(null); setActiveTab("basic"); }} className="text-xs h-10 font-bold uppercase">Discard</Button>
+                <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs h-10 font-bold uppercase">Discard</Button>
                 <Button type="submit" disabled={isProcessing} className="h-10 px-10 font-bold uppercase text-xs shadow-xl shadow-primary/20 gap-2">
                   {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-4" />} {editingCustomer ? 'Update Profile' : 'Finalize Customer Profile'}
                 </Button>

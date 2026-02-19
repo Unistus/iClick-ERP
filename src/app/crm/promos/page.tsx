@@ -1,16 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
-import { collection, query, orderBy, limit, doc } from "firebase/firestore";
+import { collection, query, orderBy, doc } from "firebase/firestore";
 import { 
   Percent, 
   Plus, 
@@ -47,6 +47,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { getNextSequence } from "@/lib/sequence-service";
+import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 
 export default function PromoManagerPage() {
   const db = useFirestore();
@@ -55,16 +56,17 @@ export default function PromoManagerPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Data Fetching
-  const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
-  const { data: institutions } = useCollection(instColRef);
+  // 1. Data Fetching: Permitted Institutions
+  const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
+  // 2. Data Fetching: Promo Codes Registry
   const promosQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return query(collection(db, 'institutions', selectedInstId, 'promo_codes'), orderBy('createdAt', 'desc'));
   }, [db, selectedInstId]);
   const { data: promos, isLoading } = useCollection(promosQuery);
 
+  // 3. Data Fetching: Institutional Settings (Currency)
   const settingsRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return doc(db, 'institutions', selectedInstId, 'settings', 'global');
@@ -143,10 +145,10 @@ export default function PromoManagerPage() {
             </div>
           </div>
           
-          <div className="flex gap-2 w-full md:w-auto">
+          <div className="flex flex-wrap gap-2 w-full md:w-auto">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
               <SelectTrigger className="w-[240px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
-                <SelectValue placeholder="Select Institution" />
+                <SelectValue placeholder={instLoading ? "Authorizing..." : "Select Institution"} />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (
@@ -203,6 +205,7 @@ export default function PromoManagerPage() {
                   <div className="text-xl font-black font-headline text-emerald-500">{avgDiscount.toFixed(1)}% AVG</div>
                   <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Margin Contribution</p>
                 </CardContent>
+              </Card>
 
               <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm relative overflow-hidden">
                 <div className="absolute -right-4 -bottom-4 opacity-10"><Clock className="size-24 text-primary" /></div>
@@ -241,7 +244,7 @@ export default function PromoManagerPage() {
               <CardContent className="p-0 overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-secondary/20">
-                    <TableRow>
+                    <TableRow className="hover:bg-transparent">
                       <TableHead className="h-10 text-[10px] uppercase font-black pl-6">Promo Code</TableHead>
                       <TableHead className="h-10 text-[10px] uppercase font-black">Offer Logic</TableHead>
                       <TableHead className="h-10 text-[10px] uppercase font-black text-center">Lifecycle</TableHead>

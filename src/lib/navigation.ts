@@ -1,4 +1,3 @@
-
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -81,7 +80,13 @@ import {
   Lock,
   Clock,
   ShieldCheck,
-  Globe2
+  Globe2,
+  UserCog,
+  Stethoscope,
+  Timer as ClockIcon,
+  CalendarCheck,
+  ShieldAlert,
+  Flame
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -121,6 +126,22 @@ export const navConfig: NavItem[] = [
     url: "/pos", 
     pattern: /^\/pos/,
     id: "pos"
+  },
+  {
+    title: "Human Resource",
+    icon: Users,
+    url: "/hr",
+    pattern: /^\/hr/,
+    id: "hr",
+    submenus: [
+      { title: "Employee Hub", icon: UserCog, url: "/hr/employees", id: "employees" },
+      { title: "Time & Attendance", icon: ClockIcon, url: "/hr/attendance", id: "attendance" },
+      { title: "Roster & Shifts", icon: CalendarCheck, url: "/hr/shifts", id: "shifts" },
+      { title: "Leave & Absence", icon: CalendarDays, url: "/hr/leave", id: "leave" },
+      { title: "Performance", icon: Star, url: "/hr/performance", id: "performance" },
+      { title: "Conduct & Discipline", icon: ShieldAlert, url: "/hr/disciplinary", id: "disciplinary" },
+      { title: "HR Setup", icon: Settings2, url: "/hr/setup", id: "setup" },
+    ]
   },
   {
     title: "Client Care", 
@@ -245,19 +266,6 @@ export const navConfig: NavItem[] = [
       { title: "Tax Returns", icon: FileText, url: "/accounting/tax", id: "tax_returns" },
       { title: "Financial Setup", icon: Settings, url: "/accounting/setup", id: "setup" },
       { title: "Financial Reports", icon: ClipboardCheck, url: "/accounting/reports", id: "reports" },
-    ]
-  },
-  { 
-    title: "People Hub", 
-    icon: Users, 
-    url: "/hr", 
-    pattern: /^\/hr/,
-    id: "hr",
-    submenus: [
-      { title: "Employee List", icon: Users, url: "/hr", id: "employees" },
-      { title: "Payroll Runs", icon: CreditCard, url: "/hr/payroll", id: "payroll" },
-      { title: "Leave Requests", icon: CalendarDays, url: "/hr/leave", id: "leave" },
-      { title: "Recruitment", icon: UserPlus, url: "/hr/recruitment", id: "reruitment" },
     ]
   },
   { 

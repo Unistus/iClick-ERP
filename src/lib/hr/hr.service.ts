@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Firestore, collection, doc, serverTimestamp, addDoc, updateDoc, getDoc, runTransaction, setDoc } from 'firebase/firestore';
@@ -125,6 +124,14 @@ export async function submitLeaveRequest(db: Firestore, institutionId: string, p
     ...payload,
     status: 'Pending',
     createdAt: serverTimestamp(),
+  });
+}
+
+export async function updateLeaveRequestStatus(db: Firestore, institutionId: string, requestId: string, status: 'Approved' | 'Declined') {
+  const ref = doc(db, 'institutions', institutionId, 'leave_requests', requestId);
+  return updateDoc(ref, {
+    status,
+    updatedAt: serverTimestamp()
   });
 }
 

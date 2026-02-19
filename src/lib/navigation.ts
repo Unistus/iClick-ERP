@@ -86,7 +86,8 @@ import {
   Timer as ClockIcon,
   CalendarCheck,
   ShieldAlert,
-  Flame
+  Flame,
+  FileCheck
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -138,7 +139,10 @@ export const navConfig: NavItem[] = [
       { title: "Time & Attendance", icon: ClockIcon, url: "/hr/attendance", id: "attendance" },
       { title: "Roster & Shifts", icon: CalendarCheck, url: "/hr/shifts", id: "shifts" },
       { title: "Leave & Absence", icon: CalendarDays, url: "/hr/leave", id: "leave" },
+      { title: "My Leaves", icon: History, url: "/hr/my-leaves", id: "my_leaves" },
+      { title: "Leave Approvals", icon: FileCheck, url: "/hr/leave-approvals", id: "leave_approvals" },
       { title: "Performance", icon: Star, url: "/hr/performance", id: "performance" },
+      { title: "My Performance", icon: TrendingUp, url: "/hr/my-performance", id: "my_performance" },
       { title: "Conduct & Discipline", icon: ShieldAlert, url: "/hr/disciplinary", id: "disciplinary" },
       { title: "HR Setup", icon: Settings2, url: "/hr/setup", id: "setup" },
     ]

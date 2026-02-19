@@ -24,7 +24,7 @@ service cloud.firestore {
     }
 
     // GLOBAL SUPERUSER OVERRIDE
-    // Allows absolute read/write access to everything if the user is a verified global admin.
+    // This allows the superadmin absolute read/write access to every document in the database.
     match /{allPaths=**} {
       allow read, write: if isGlobalAdmin();
     }
@@ -40,34 +40,33 @@ service cloud.firestore {
       allow update: if isInstitutionMember(institutionId);
       
       // RECURSIVE SUB-COLLECTION ACCESS
-      // Standardize access for all sub-collections based on membership.
+      // This ensures all sub-collections (budgeting, sales, inventory, etc.)
+      // inherit the same membership-based access logic.
       match /{allSubPaths=**} {
         allow read, write: if isInstitutionMember(institutionId);
       }
 
-      // Explicit matches for clarity and specific list operations if needed
-      match /geo_locations { allow list: if isInstitutionMember(institutionId); }
+      // Explicit matches for specific query types if needed
+      match /fiscal_periods { allow list: if isInstitutionMember(institutionId); }
+      match /coa { allow list: if isInstitutionMember(institutionId); }
+      match /journal_entries { allow list: if isInstitutionMember(institutionId); }
+      match /products { allow list: if isInstitutionMember(institutionId); }
       match /customers { allow list: if isInstitutionMember(institutionId); }
       match /campaigns { allow list: if isInstitutionMember(institutionId); }
       match /gift_cards { allow list: if isInstitutionMember(institutionId); }
       match /wallets { allow list: if isInstitutionMember(institutionId); }
       match /promo_codes { allow list: if isInstitutionMember(institutionId); }
-      match /fiscal_periods { allow list: if isInstitutionMember(institutionId); }
-      match /coa { allow list: if isInstitutionMember(institutionId); }
-      match /journal_entries { allow list: if isInstitutionMember(institutionId); }
-      match /products { allow list: if isInstitutionMember(institutionId); }
-      match /warehouses { allow list: if isInstitutionMember(institutionId); }
-      match /batches { allow list: if isInstitutionMember(institutionId); }
-      match /movements { allow list: if isInstitutionMember(institutionId); }
-      match /categories { allow list: if isInstitutionMember(institutionId); }
-      match /uoms { allow list: if isInstitutionMember(institutionId); }
       match /branches { allow list: if isInstitutionMember(institutionId); }
       match /roles { allow list: if isInstitutionMember(institutionId); }
       match /sales_orders { allow list: if isInstitutionMember(institutionId); }
+      match /sales_invoices { allow list: if isInstitutionMember(institutionId); }
       match /purchase_orders { allow list: if isInstitutionMember(institutionId); }
-      match /invoices { allow list: if isInstitutionMember(institutionId); }
+      match /payables { allow list: if isInstitutionMember(institutionId); }
+      match /grns { allow list: if isInstitutionMember(institutionId); }
+      match /assets { allow list: if isInstitutionMember(institutionId); }
       match /expenses { allow list: if isInstitutionMember(institutionId); }
       match /tax_returns { allow list: if isInstitutionMember(institutionId); }
+      match /geo_locations { allow list: if isInstitutionMember(institutionId); }
     }
 
     // USER PROFILES & MEMBERSHIPS

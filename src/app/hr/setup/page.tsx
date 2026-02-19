@@ -63,31 +63,31 @@ export default function HRSetupPage() {
 
   const leaveTypesRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
-    return collection(db, 'institutions', selectedInstId, 'leave_types');
+    return query(collection(db, 'institutions', selectedInstId, 'leave_types'), orderBy('createdAt', 'desc'));
   }, [db, selectedInstId]);
   const { data: leaveTypes } = useCollection(leaveTypesRef);
 
   const jobLevelsRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
-    return collection(db, 'institutions', selectedInstId, 'job_levels');
+    return query(collection(db, 'institutions', selectedInstId, 'job_levels'), orderBy('createdAt', 'desc'));
   }, [db, selectedInstId]);
   const { data: jobLevels } = useCollection(jobLevelsRef);
 
   const payGradesRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
-    return collection(db, 'institutions', selectedInstId, 'pay_grades');
+    return query(collection(db, 'institutions', selectedInstId, 'pay_grades'), orderBy('createdAt', 'desc'));
   }, [db, selectedInstId]);
   const { data: payGrades } = useCollection(payGradesRef);
 
   const shiftTypesRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
-    return collection(db, 'institutions', selectedInstId, 'shift_types');
+    return query(collection(db, 'institutions', selectedInstId, 'shift_types'), orderBy('createdAt', 'desc'));
   }, [db, selectedInstId]);
   const { data: shiftTypes } = useCollection(shiftTypesRef);
 
   const holidaysRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
-    return collection(db, 'institutions', selectedInstId, 'holidays');
+    return query(collection(db, 'institutions', selectedInstId, 'holidays'), orderBy('date', 'desc'));
   }, [db, selectedInstId]);
   const { data: holidays } = useCollection(holidaysRef);
 
@@ -246,9 +246,9 @@ export default function HRSetupPage() {
             </TabsList>
 
             <TabsContent value="policy">
-              <form onSubmit={handleSavePolicy}>
-                <div className="grid gap-6 lg:grid-cols-12">
-                  <div className="lg:col-span-8 space-y-6">
+              <div className="grid gap-6 lg:grid-cols-12">
+                <div className="lg:col-span-8 space-y-6">
+                  <form onSubmit={handleSavePolicy} className="space-y-6">
                     <Card className="border-none ring-1 ring-border shadow-2xl bg-card">
                       <CardHeader className="border-b border-border/50 bg-secondary/10">
                         <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
@@ -287,62 +287,65 @@ export default function HRSetupPage() {
                         </div>
                       </CardContent>
                     </Card>
+                  </form>
 
-                    <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
-                      <CardHeader className="bg-secondary/10 border-b flex flex-row items-center justify-between">
-                        <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                          <Timer className="size-4 text-primary" /> Shift Type Registry
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        <div className="p-4 border-b bg-secondary/5">
-                          <form onSubmit={(e) => handleAddSubItem('shift_types', e)} className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                            <Input name="name" placeholder="Shift Name" required className="h-9 text-xs col-span-2" />
-                            <Input name="start" type="time" required className="h-9 text-xs" />
-                            <Input name="end" type="time" required className="h-9 text-xs" />
-                            <Button type="submit" size="sm" className="h-9 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
-                          </form>
-                        </div>
-                        <Table>
-                          <TableBody>
-                            {shiftTypes?.map(s => (
-                              <TableRow key={s.id} className="h-12 hover:bg-secondary/5 group">
-                                <TableCell className="text-xs font-bold pl-6 uppercase">{s.name}</TableCell>
-                                <TableCell className="text-center text-[10px] font-mono text-primary font-bold">{s.startTime} — {s.endTime}</TableCell>
-                                <TableCell className="text-right pr-6">
-                                  <Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'shift_types', s.id))}>
-                                    <Trash2 className="size-3.5" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </CardContent>
-                    </Card>
-                  </div>
-                  <div className="lg:col-span-4">
-                    <Card className="border-none ring-1 ring-border shadow bg-primary/5 h-full relative overflow-hidden">
-                      <div className="absolute -right-4 -bottom-4 opacity-5 rotate-12"><Zap className="size-24" /></div>
-                      <CardHeader><CardTitle className="text-xs font-black uppercase tracking-widest">Shift Authority</CardTitle></CardHeader>
-                      <CardContent className="space-y-4 relative z-10">
-                        <p className="text-[11px] leading-relaxed text-muted-foreground italic">
-                          "Enabling **POS Shift Restriction** prevents unauthorized users from performing sales outside their assigned roster hours."
-                        </p>
-                        <Button type="submit" disabled={isSaving} className="w-full h-10 font-black uppercase text-[10px] gap-2 px-10 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90">
-                          {isSaving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />} Commit Labor Rules
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  </div>
+                  <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
+                    <CardHeader className="bg-secondary/10 border-b flex flex-row items-center justify-between">
+                      <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                        <Timer className="size-4 text-primary" /> Shift Type Registry
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="p-4 border-b bg-secondary/5">
+                        <form onSubmit={(e) => handleAddSubItem('shift_types', e)} className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                          <Input name="name" placeholder="Shift Name" required className="h-9 text-xs col-span-2" />
+                          <Input name="start" type="time" required className="h-9 text-xs" />
+                          <Input name="end" type="time" required className="h-9 text-xs" />
+                          <Button type="submit" size="sm" className="h-9 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
+                        </form>
+                      </div>
+                      <Table>
+                        <TableBody>
+                          {shiftTypes?.map(s => (
+                            <TableRow key={s.id} className="h-12 hover:bg-secondary/5 group">
+                              <TableCell className="text-xs font-bold pl-6 uppercase">{s.name}</TableCell>
+                              <TableCell className="text-center text-[10px] font-mono text-primary font-bold">{s.startTime} — {s.endTime}</TableCell>
+                              <TableCell className="text-right pr-6">
+                                <Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'shift_types', s.id))}>
+                                  <Trash2 className="size-3.5" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
                 </div>
-              </form>
+                <div className="lg:col-span-4">
+                  <Card className="border-none ring-1 ring-border shadow bg-primary/5 h-full relative overflow-hidden">
+                    <div className="absolute -right-4 -bottom-4 opacity-5 rotate-12"><Zap className="size-24" /></div>
+                    <CardHeader><CardTitle className="text-xs font-black uppercase tracking-widest">Shift Authority</CardTitle></CardHeader>
+                    <CardContent className="space-y-4 relative z-10">
+                      <p className="text-[11px] leading-relaxed text-muted-foreground italic">
+                        "Enabling **POS Shift Restriction** prevents unauthorized users from performing sales outside their assigned roster hours."
+                      </p>
+                      <Button onClick={() => document.getElementById('policy-form-submit')?.click()} disabled={isSaving} className="w-full h-10 font-black uppercase text-[10px] gap-2 px-10 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90">
+                        {isSaving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />} Commit Labor Rules
+                      </Button>
+                      <form onSubmit={handleSavePolicy} className="hidden">
+                        <button type="submit" id="policy-form-submit" />
+                      </form>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="holidays">
               <div className="grid gap-6 lg:grid-cols-12">
                 <div className="lg:col-span-8 space-y-6">
-                  <form onSubmit={handleSavePolicy}>
+                  <form onSubmit={handleSavePolicy} className="space-y-6">
                     <Card className="border-none ring-1 ring-border shadow-xl bg-card">
                       <CardHeader className="bg-secondary/10 border-b">
                         <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
@@ -533,7 +536,7 @@ export default function HRSetupPage() {
                           <TableRow key={g.id} className="h-12 hover:bg-secondary/5 group">
                             <TableCell className="text-xs font-black pl-6 uppercase text-primary">{g.name}</TableCell>
                             <TableCell className="text-[10px] font-mono text-muted-foreground">
-                              {currency} {g.minSalary.toLocaleString()} — {g.maxSalary.toLocaleString()}
+                              {currency} {g.minSalary?.toLocaleString()} — {g.maxSalary?.toLocaleString()}
                             </TableCell>
                             <TableCell className="text-right pr-6">
                               <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'pay_grades', g.id))}>

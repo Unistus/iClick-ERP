@@ -1,10 +1,9 @@
-
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { useCollection, useFirestore, useMemoFirebase, useDoc, useUser } from "@/firebase";
 import { collection, query, orderBy, doc, serverTimestamp } from "firebase/firestore";
 import { registerCustomer, updateCustomer } from "@/lib/crm/crm.service";
@@ -349,7 +349,7 @@ function ManagementForm() {
                     <div className="space-y-2">
                       <Label className="flex items-center gap-2 text-emerald-500 font-black uppercase text-[10px] tracking-widest mb-2"><BadgeCent className="size-4" /> Institutional Credit Trust</Label>
                       <Input name="creditLimit" type="number" step="0.01" defaultValue={editingCustomer?.creditLimit} className="h-14 font-black text-2xl bg-secondary/5" />
-                      <p className="text-[9px] text-muted-foreground italic">Defines the maximum unsecured receivable balance for this identity.</p>
+                      <p className="text-[9px] text-muted-foreground italic font-medium">Defines the maximum unsecured receivable balance for this identity.</p>
                     </div>
                   </div>
 

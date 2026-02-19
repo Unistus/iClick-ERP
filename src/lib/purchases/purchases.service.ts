@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Firestore, collection, doc, serverTimestamp, increment, getDoc, runTransaction, addDoc, updateDoc, setDoc } from 'firebase/firestore';
@@ -45,6 +44,13 @@ export async function bootstrapPurchasesFinancials(db: Firestore, institutionId:
 export async function createPurchaseOrder(db: Firestore, institutionId: string, payload: any, userId: string) {
   const poNumber = await getNextSequence(db, institutionId, 'purchase_order');
   const ref = collection(db, 'institutions', institutionId, 'purchase_orders');
+  
+  // Mark the expense account for budgeting tracking if it isn't already
+  if (payload.expenseAccountId) {
+    const coaRef = doc(db, 'institutions', institutionId, 'coa', payload.expenseAccountId);
+    updateDoc(coaRef, { isTrackedForBudget: true, updatedAt: serverTimestamp() });
+  }
+
   return addDoc(ref, {
     ...payload,
     poNumber,

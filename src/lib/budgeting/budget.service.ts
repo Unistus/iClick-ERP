@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Firestore, collection, doc, serverTimestamp, getDocs, query, where, writeBatch, getDoc } from 'firebase/firestore';
@@ -45,6 +44,61 @@ export async function saveBudgetAllocations(
     errorEmitter.emit('permission-error', permissionError);
     throw err;
   });
+}
+
+/**
+ * Verifies if a transaction amount breaches the budget for a specific account.
+ */
+export async function checkTransactionAgainstBudget(
+  db: Firestore,
+  institutionId: string,
+  accountId: string,
+  amount: number
+): Promise<{ allowed: boolean; message?: string; utilization?: number }> {
+  // 1. Check if Strict Enforcement is active
+  const setupRef = doc(db, 'institutions', institutionId, 'settings', 'budgeting');
+  const setupSnap = await getDoc(setupRef);
+  const setup = setupSnap.data();
+
+  if (!setup?.strictPoEnforcement) return { allowed: true };
+
+  // 2. Find Active Fiscal Period
+  const periodsSnap = await getDocs(query(
+    collection(db, 'institutions', institutionId, 'fiscal_periods'),
+    where('status', '==', 'Open'),
+    limit(1)
+  ));
+  
+  if (periodsSnap.empty) return { allowed: true };
+  const periodId = periodsSnap.docs[0].id;
+
+  // 3. Fetch Allocation Limit
+  const allocRef = doc(db, 'institutions', institutionId, 'fiscal_periods', periodId, 'allocations', accountId);
+  const allocSnap = await getDoc(allocRef);
+  if (!allocSnap.exists()) return { allowed: true };
+  
+  const limit = allocSnap.data().limit || 0;
+  if (limit <= 0) return { allowed: true };
+
+  // 4. Fetch Current Actuals (From COA Balance for speed, or detailed aggregation)
+  const coaRef = doc(db, 'institutions', institutionId, 'coa', accountId);
+  const coaSnap = await getDoc(coaRef);
+  const currentActual = coaSnap.exists() ? coaSnap.data().balance || 0 : 0;
+
+  const projectedTotal = currentActual + amount;
+  const toleranceMultiplier = 1 + (setup.varianceTolerance || 0) / 100;
+  const allowedCeiling = limit * toleranceMultiplier;
+
+  if (projectedTotal > allowedCeiling) {
+    const breachAmount = projectedTotal - limit;
+    return {
+      allowed: false,
+      utilization: (projectedTotal / limit) * 100,
+      message: `Budget Breach: This transaction exceeds the limit for this account by ${breachAmount.toLocaleString()}. Current Limit: ${limit.toLocaleString()}.`
+    };
+  }
+
+  return { allowed: true, utilization: (projectedTotal / limit) * 100 };
 }
 
 /**

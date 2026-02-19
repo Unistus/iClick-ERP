@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -14,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, serverTimestamp, query, orderBy } from "firebase/firestore";
 import { addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { Layers, Plus, Edit2, Search, Filter, BookOpen, Target } from "lucide-react";
+import { Layers, Plus, Edit2, Search, Filter, BookOpen, Target, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ACCOUNT_TYPES, type AccountType } from "@/lib/accounting/coa.model";
 
@@ -45,8 +44,11 @@ export default function COAManagement() {
     if (!selectedInstId) return;
 
     const formData = new FormData(e.currentTarget);
-    const type = formData.get('type');
+    const type = formData.get('type') as AccountType;
     const limit = parseFloat(formData.get('monthlyLimit') as string) || 0;
+
+    // RULE: All Expense accounts are auto-tracked for budgeting
+    const shouldTrack = type === 'Expense' ? true : isTrackedForBudget;
 
     const data = {
       code: formData.get('code'),
@@ -55,8 +57,8 @@ export default function COAManagement() {
       subtype: formData.get('subtype'),
       isActive: true,
       balance: editingAcc ? editingAcc.balance : 0,
-      isTrackedForBudget: type === 'Expense' ? isTrackedForBudget : false,
-      monthlyLimit: type === 'Expense' ? limit : 0,
+      isTrackedForBudget: shouldTrack,
+      monthlyLimit: limit,
       updatedAt: serverTimestamp(),
     };
 
@@ -122,57 +124,63 @@ export default function COAManagement() {
                       </div>
                       <div className="grid gap-2 col-span-2">
                         <Label>Account Name</Label>
-                        <Input name="name" defaultValue={editingAcc?.name} placeholder="Petty Cash" required className="h-9" />
+                        <Input name="name" defaultValue={editingAcc?.name} placeholder="Office Supplies" required className="h-9 font-bold" />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="grid gap-2">
                         <Label>Account Type</Label>
                         <Select name="type" defaultValue={editingAcc?.type || "Asset"}>
-                          <SelectTrigger className="h-9 text-xs">
+                          <SelectTrigger className="h-9 text-xs font-bold">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {ACCOUNT_TYPES.map(t => <SelectItem key={t} value={t} className="text-xs">{t}</SelectItem>)}
+                            {ACCOUNT_TYPES.map(t => <SelectItem key={t} value={t} className="text-xs font-bold">{t}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="grid gap-2">
                         <Label>Subtype</Label>
-                        <Input name="subtype" defaultValue={editingAcc?.subtype} placeholder="Current Asset" className="h-9" />
+                        <Input name="subtype" defaultValue={editingAcc?.subtype} placeholder="Operating Expense" className="h-9" />
                       </div>
                     </div>
 
-                    <div className="p-4 bg-primary/5 rounded-lg border border-primary/10 space-y-4">
+                    <div className="p-4 bg-primary/5 rounded-xl border border-primary/10 space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
-                          <Label className="flex items-center gap-2">
-                            <Target className="size-3 text-primary" /> Budget Tracking
+                          <Label className="flex items-center gap-2 uppercase font-black tracking-tighter">
+                            <Target className="size-3.5 text-primary" /> Budget Lifecycle
                           </Label>
-                          <p className="text-[10px] text-muted-foreground">Monitor spend in the Budgeting Module</p>
+                          <p className="text-[10px] text-muted-foreground">Enroll this node in fiscal variance tracking.</p>
                         </div>
                         <Switch 
                           checked={isTrackedForBudget} 
                           onCheckedChange={setIsTrackedForBudget}
                         />
                       </div>
+                      
+                      <div className="p-3 bg-background/50 rounded-lg border border-dashed text-[10px] text-muted-foreground flex gap-2 items-start">
+                        <Sparkles className="size-3 text-primary shrink-0 mt-0.5" />
+                        <p><strong>Note:</strong> Expense accounts are automatically enrolled in budget tracking to enforce procurement ceilings.</p>
+                      </div>
+
                       {isTrackedForBudget && (
                         <div className="grid gap-2 animate-in slide-in-from-top-1 duration-200">
-                          <Label>Monthly Spend Limit</Label>
+                          <Label className="text-[10px] uppercase font-bold opacity-60">Base Monthly Ceiling</Label>
                           <Input 
                             name="monthlyLimit" 
                             type="number" 
                             step="0.01" 
                             placeholder="0.00" 
                             defaultValue={editingAcc?.monthlyLimit}
-                            className="h-9 font-mono"
+                            className="h-10 font-mono font-black text-lg bg-background"
                           />
                         </div>
                       )}
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button type="submit" className="w-full">Save Financial Node</Button>
+                    <Button type="submit" className="w-full h-11 font-black uppercase text-xs shadow-lg shadow-primary/20">Save Financial Node</Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
@@ -193,7 +201,7 @@ export default function COAManagement() {
                   key={type} 
                   variant="ghost" 
                   size="sm" 
-                  className={`h-8 px-4 text-[10px] font-bold uppercase tracking-wider ${activeType === type ? 'bg-background shadow-sm' : 'opacity-50'}`}
+                  className={`h-8 px-4 text-[10px] font-bold uppercase tracking-wider ${activeType === type ? 'bg-background shadow-sm text-primary' : 'opacity-50'}`}
                   onClick={() => setActiveType(type as any)}
                 >
                   {type}
@@ -201,47 +209,49 @@ export default function COAManagement() {
               ))}
             </div>
 
-            <Card className="border-none ring-1 ring-border shadow-xl bg-card">
+            <Card className="border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
               <CardContent className="p-0">
                 <Table>
-                  <TableHeader className="bg-secondary/20">
-                    <TableRow>
-                      <TableHead className="h-10 text-[10px] uppercase font-bold pl-6">Code</TableHead>
-                      <TableHead className="h-10 text-[10px] uppercase font-bold">Account Name</TableHead>
-                      <TableHead className="h-10 text-[10px] uppercase font-bold">Type / Subtype</TableHead>
-                      <TableHead className="h-10 text-[10px] uppercase font-bold text-right">Balance</TableHead>
-                      <TableHead className="h-10 text-[10px] uppercase font-bold text-center">Budget</TableHead>
-                      <TableHead className="h-10 text-[10px] uppercase font-bold text-right pr-6">Actions</TableHead>
+                  <TableHeader className="bg-secondary/30">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="h-10 text-[10px] uppercase font-black pl-6">Code</TableHead>
+                      <TableHead className="h-10 text-[10px] uppercase font-black">Account Name</TableHead>
+                      <TableHead className="h-10 text-[10px] uppercase font-black">Type / Subtype</TableHead>
+                      <TableHead className="h-10 text-[10px] uppercase font-black text-right">Balance</TableHead>
+                      <TableHead className="h-10 text-[10px] uppercase font-black text-center">Budget Hub</TableHead>
+                      <TableHead className="h-10 text-[10px] uppercase font-black text-right pr-6">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
-                      <TableRow><TableCell colSpan={6} className="text-center py-12 text-xs">Synchronizing ledger...</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={6} className="text-center py-12 text-xs uppercase font-bold animate-pulse">Synchronizing ledger...</TableCell></TableRow>
                     ) : filteredAccounts.length === 0 ? (
                       <TableRow><TableCell colSpan={6} className="text-center py-12 text-xs text-muted-foreground">No accounts registered in this category.</TableCell></TableRow>
                     ) : filteredAccounts.map((acc) => (
-                      <TableRow key={acc.id} className="h-12 hover:bg-secondary/10 transition-colors">
-                        <TableCell className="font-mono text-[11px] font-bold pl-6">{acc.code}</TableCell>
-                        <TableCell className="font-bold text-xs">{acc.name}</TableCell>
+                      <TableRow key={acc.id} className="h-14 hover:bg-secondary/10 transition-colors border-b-border/30">
+                        <TableCell className="font-mono text-[11px] font-black text-primary pl-6 uppercase">{acc.code}</TableCell>
+                        <TableCell className="font-black text-xs uppercase tracking-tight">{acc.name}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-[9px] h-4 bg-primary/5 text-primary uppercase">{acc.type}</Badge>
-                            <span className="text-[10px] text-muted-foreground opacity-50">{acc.subtype}</span>
+                            <Badge variant="outline" className="text-[8px] h-4 bg-primary/5 text-primary border-none font-black uppercase">{acc.type}</Badge>
+                            <span className="text-[10px] text-muted-foreground uppercase font-bold opacity-50">{acc.subtype}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-right font-mono font-bold text-[11px]">
+                        <TableCell className="text-right font-mono font-black text-xs text-foreground/80">
                           {acc.balance?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </TableCell>
                         <TableCell className="text-center">
                           {acc.isTrackedForBudget ? (
-                            <Badge variant="secondary" className="text-[8px] h-4 bg-emerald-500/10 text-emerald-500 font-bold">TRACKED</Badge>
+                            <Badge variant="secondary" className="text-[8px] h-4 bg-emerald-500/10 text-emerald-500 font-black border-none uppercase shadow-sm">
+                              Enrolled
+                            </Badge>
                           ) : (
                             <span className="text-[8px] text-muted-foreground opacity-30">—</span>
                           )}
                         </TableCell>
                         <TableCell className="text-right pr-6">
-                          <Button variant="ghost" size="icon" className="size-7" onClick={() => openEdit(acc)}>
-                            <Edit2 className="size-3.5" />
+                          <Button variant="ghost" size="icon" className="size-8" onClick={() => openEdit(acc)}>
+                            <Edit2 className="size-3.5 text-primary" />
                           </Button>
                         </TableCell>
                       </TableRow>

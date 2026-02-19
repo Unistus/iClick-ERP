@@ -19,10 +19,11 @@ import {
   ShieldCheck, 
   Zap,
   Plus,
-  Trash2,
   Lock,
   Unlock,
-  AlertTriangle
+  AlertTriangle,
+  ShoppingCart,
+  ShieldAlert
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
@@ -60,8 +61,10 @@ export default function BudgetSetupPage() {
     const formData = new FormData(e.currentTarget);
     const updates: any = {};
     formData.forEach((value, key) => {
-      if (key === 'enableThresholdAlerts' || key === 'strictBudgetControl') {
+      if (key === 'enableThresholdAlerts' || key === 'strictBudgetControl' || key === 'strictPoEnforcement') {
         updates[key] = value === 'on';
+      } else if (key === 'varianceTolerance') {
+        updates[key] = parseFloat(value as string) || 0;
       } else {
         updates[key] = value;
       }
@@ -73,7 +76,7 @@ export default function BudgetSetupPage() {
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      logSystemEvent(db, selectedInstId, user, 'BUDGETING', 'Update Setup', 'Institutional budget policies modified.');
+      logSystemEvent(db, selectedInstId, user, 'BUDGETING', 'Update Setup', 'Institutional budget and PO enforcement policies modified.');
       toast({ title: "Policies Deployed" });
     } catch (err) {
       toast({ variant: "destructive", title: "Deployment Failed" });
@@ -127,12 +130,12 @@ export default function BudgetSetupPage() {
           </div>
           
           <Select value={selectedInstId} onValueChange={setSelectedInstId}>
-            <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold">
+            <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
               <SelectValue placeholder="Select Institution" />
             </SelectTrigger>
             <SelectContent>
               {institutions?.map(i => (
-                <SelectItem key={i.id} value={i.id} className="text-xs">{i.name}</SelectItem>
+                <SelectItem key={i.id} value={i.id} className="text-xs font-bold">{i.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -214,7 +217,7 @@ export default function BudgetSetupPage() {
                       <ShieldCheck className="size-4 text-emerald-500" /> Control Parameters
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="p-6 space-y-6">
+                  <CardContent className="p-6 space-y-8">
                     <div className="grid md:grid-cols-2 gap-8">
                       <div className="space-y-6">
                         <div className="flex items-center justify-between">
@@ -226,34 +229,45 @@ export default function BudgetSetupPage() {
                         </div>
                         <div className="flex items-center justify-between">
                           <div className="space-y-0.5">
-                            <Label className="text-xs font-bold">Strict Control Mode</Label>
-                            <p className="text-[10px] text-muted-foreground">Block PO generation if it exceeds allocated budget.</p>
+                            <Label className="text-xs font-bold">Strict Budget Control</Label>
+                            <p className="text-[10px] text-muted-foreground">Force spend adherence across all modules.</p>
                           </div>
                           <Switch name="strictBudgetControl" defaultChecked={setup?.strictBudgetControl} />
+                        </div>
+                        <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl border border-primary/10">
+                          <div className="space-y-0.5">
+                            <Label className="text-xs font-bold flex items-center gap-2 text-primary">
+                              <ShoppingCart className="size-3.5" /> Strict PO Enforcement
+                            </Label>
+                            <p className="text-[10px] text-muted-foreground leading-tight">Block Purchase Orders if they breach the account budget ceiling.</p>
+                          </div>
+                          <Switch name="strictPoEnforcement" defaultChecked={setup?.strictPoEnforcement} />
                         </div>
                       </div>
                       <div className="space-y-4">
                         <div className="space-y-2">
                           <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Variance Tolerance (%)</Label>
-                          <Input name="varianceTolerance" type="number" defaultValue={setup?.varianceTolerance || 5} className="h-9" />
+                          <Input name="varianceTolerance" type="number" step="0.1" defaultValue={setup?.varianceTolerance || 5} className="h-10 text-lg font-black bg-secondary/5" />
                         </div>
-                        <div className="p-3 bg-amber-500/5 border border-amber-500/10 rounded-lg flex items-center gap-3">
-                          <AlertTriangle className="size-4 text-amber-600" />
-                          <p className="text-[10px] leading-tight text-muted-foreground italic">Tightening tolerance reduces fiscal risk but requires higher frequency approvals.</p>
+                        <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-xl flex items-start gap-3">
+                          <AlertTriangle className="size-5 text-amber-600 shrink-0 mt-0.5" />
+                          <p className="text-[10px] leading-relaxed text-muted-foreground italic font-medium">
+                            "Tightening tolerance reduces fiscal risk but increases operational friction. Recommended level: 5% for mature institutions."
+                          </p>
                         </div>
                       </div>
                     </div>
                   </CardContent>
                   <div className="p-6 bg-secondary/10 border-t border-border/50 flex justify-end">
                     <Button type="submit" disabled={isSaving} className="h-10 px-8 font-black uppercase text-xs gap-2 shadow-lg shadow-primary/20">
-                      {isSaving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />} Deploy Policies
+                      {isSaving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />} Deploy Fiscal Policies
                     </Button>
                   </div>
                 </Card>
               </form>
             </div>
 
-            <div className="lg:col-span-4">
+            <div className="lg:col-span-4 space-y-6">
               <Card className="border-none ring-1 ring-border shadow-xl bg-secondary/5 h-full relative overflow-hidden">
                 <div className="absolute -right-4 -bottom-4 opacity-5 rotate-12"><Zap className="size-32 text-primary" /></div>
                 <CardHeader>
@@ -263,9 +277,13 @@ export default function BudgetSetupPage() {
                   <p className="text-[11px] leading-relaxed text-muted-foreground italic font-medium">
                     "Institutional budget logic governs the financial ceilings applied to every operational module. Strict control mode enforces absolute adherence during procurement."
                   </p>
-                  <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl space-y-2">
+                  <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl space-y-3">
+                    <div className="flex items-center gap-2">
+                      <ShieldAlert className="size-4 text-primary" />
+                      <p className="text-[10px] font-black uppercase tracking-widest text-primary">PO Gatekeeper</p>
+                    </div>
                     <p className="text-[10px] leading-snug">
-                      Closing a fiscal period prevents further allocations and locks the variance data for that cycle.
+                      When **Strict PO Enforcement** is active, the system checks the live ledger balance + the new PO value against the period limit before finalization.
                     </p>
                   </div>
                 </CardContent>

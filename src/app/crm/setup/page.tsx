@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, serverTimestamp, setDoc, deleteDoc } from "firebase/firestore";
-import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { 
   Settings2, 
   Save, 
@@ -46,6 +46,12 @@ export default function CRMSetupPage() {
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instColRef);
 
+  const globalSettingsRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return doc(db, 'institutions', selectedInstId, 'settings', 'global');
+  }, [db, selectedInstId]);
+  const { data: globalSettings } = useDoc(globalSettingsRef);
+
   const setupRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return doc(db, 'institutions', selectedInstId, 'settings', 'crm');
@@ -70,6 +76,14 @@ export default function CRMSetupPage() {
   }, [db, selectedInstId]);
   const { data: promos } = useCollection(promosRef);
 
+  const coaRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'coa');
+  }, [db, selectedInstId]);
+  const { data: accounts } = useCollection(coaRef);
+
+  const currency = globalSettings?.general?.currencySymbol || "KES";
+
   const handleSavePolicy = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || !setupRef) return;
@@ -80,7 +94,7 @@ export default function CRMSetupPage() {
     formData.forEach((value, key) => {
       if (key === 'autoAwardPoints' || key === 'strictCreditControl' || key === 'autoAssignPromo') {
         updates[key] = value === 'on';
-      } else if (key === 'promoThresholdAmount') {
+      } else if (key === 'promoThresholdAmount' || key === 'pointsEarnRate' || key === 'defaultCreditLimit') {
         updates[key] = parseFloat(value as string) || 0;
       } else {
         updates[key] = value;
@@ -172,7 +186,7 @@ export default function CRMSetupPage() {
                       </CardHeader>
                       <CardContent className="p-6 grid gap-8 md:grid-cols-2">
                         <div className="space-y-4">
-                          <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Points per 100 Currency Spent</Label>
+                          <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Points per 100 {currency} Spent</Label>
                           <Input name="pointsEarnRate" type="number" step="0.1" defaultValue={setup?.pointsEarnRate || 1} className="h-10 text-lg font-black bg-secondary/5" />
                           <p className="text-[9px] text-muted-foreground italic leading-tight">Standard institutional rate. Awarded on finalized invoices.</p>
                         </div>
@@ -227,7 +241,7 @@ export default function CRMSetupPage() {
                           <TableRow key={s.id} className="h-10 hover:bg-secondary/5 group">
                             <TableCell className="text-xs font-bold pl-6 uppercase tracking-tight">{s.name}</TableCell>
                             <TableCell className="text-right pr-6">
-                              <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteSubItem('customer_segments', s.id)}>
+                              <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'customer_segments', s.id))}>
                                 <Trash2 className="size-3.5" />
                               </Button>
                             </TableCell>
@@ -257,7 +271,7 @@ export default function CRMSetupPage() {
                           <TableRow key={t.id} className="h-10 hover:bg-secondary/5 group">
                             <TableCell className="text-xs font-bold pl-6 uppercase tracking-tight">{t.name}</TableCell>
                             <TableCell className="text-right pr-6">
-                              <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteSubItem('customer_types', t.id)}>
+                              <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'customer_types', t.id))}>
                                 <Trash2 className="size-3.5" />
                               </Button>
                             </TableCell>

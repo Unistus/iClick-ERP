@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -44,6 +43,13 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { logSystemEvent } from "@/lib/audit-service";
 import { cn } from "@/lib/utils";
 import Link from 'next/link';
@@ -147,7 +153,7 @@ export default function CustomerDirectoryPage() {
         {!selectedInstId ? (
           <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed rounded-2xl bg-secondary/5">
             <UserCircle className="size-12 text-muted-foreground opacity-20 mb-3" />
-            <p className="text-sm font-medium text-muted-foreground">Select an institution to access its customer vault.</p>
+            <p className="text-sm font-medium text-muted-foreground text-center">Select an institution to access its customer vault.</p>
           </div>
         ) : (
           <Card className="border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">

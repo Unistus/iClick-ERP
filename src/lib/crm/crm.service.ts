@@ -12,7 +12,7 @@ export interface CustomerPayload {
   registrationDate?: string;
   email: string;
   phone: string;
-  status: 'Lead' | 'Active' | 'Blocked';
+  status: 'Lead' | 'Pending' | 'Active' | 'Blocked';
   tier?: 'Silver' | 'Gold' | 'Platinum';
   creditLimit?: number;
   currencyId?: string;
@@ -30,11 +30,8 @@ export interface CustomerPayload {
     role: string;
     phone: string;
   };
+  kycVerified?: boolean;
 }
-
-/**
- * Service to manage customer lifecycle and loyalty logic with automated accounting.
- */
 
 /**
  * Bootstraps the required CRM financial nodes in the COA.
@@ -59,7 +56,6 @@ export async function bootstrapCRMFinancials(db: Firestore, institutionId: strin
     }, { merge: true });
   }
 
-  // Update CRM settings with these default mappings
   const setupRef = doc(db, 'institutions', institutionId, 'settings', 'crm');
   await setDoc(setupRef, {
     walletAccountId: 'wallet_liability',
@@ -78,16 +74,40 @@ export function registerCustomer(db: Firestore, institutionId: string, payload: 
     loyaltyPoints: 0,
     walletBalance: 0,
     tier: payload.tier || 'Silver',
+    status: payload.status || 'Pending', // New customers start as Pending or Lead
+    kycVerified: false,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   };
 
-  addDoc(colRef, data).catch(err => {
+  return addDoc(colRef, data).catch(err => {
     errorEmitter.emit('permission-error', new FirestorePermissionError({
       path: colRef.path,
       operation: 'create',
       requestResourceData: data
     } satisfies SecurityRuleContext));
+  });
+}
+
+export function approveCustomer(db: Firestore, institutionId: string, customerId: string) {
+  const customerRef = doc(db, 'institutions', institutionId, 'customers', customerId);
+  return updateDoc(customerRef, {
+    status: 'Active',
+    updatedAt: serverTimestamp()
+  }).catch(err => {
+    errorEmitter.emit('permission-error', new FirestorePermissionError({
+      path: customerRef.path,
+      operation: 'update',
+      requestResourceData: { status: 'Active' }
+    } satisfies SecurityRuleContext));
+  });
+}
+
+export function verifyKYC(db: Firestore, institutionId: string, customerId: string) {
+  const customerRef = doc(db, 'institutions', institutionId, 'customers', customerId);
+  return updateDoc(customerRef, {
+    kycVerified: true,
+    updatedAt: serverTimestamp()
   });
 }
 
@@ -98,7 +118,7 @@ export function updateCustomer(db: Firestore, institutionId: string, customerId:
     updatedAt: serverTimestamp()
   };
 
-  updateDoc(customerRef, data).catch(err => {
+  return updateDoc(customerRef, data).catch(err => {
     errorEmitter.emit('permission-error', new FirestorePermissionError({
       path: customerRef.path,
       operation: 'update',
@@ -109,7 +129,7 @@ export function updateCustomer(db: Firestore, institutionId: string, customerId:
 
 export function archiveCustomer(db: Firestore, institutionId: string, customerId: string) {
   const customerRef = doc(db, 'institutions', institutionId, 'customers', customerId);
-  deleteDoc(customerRef).catch(err => {
+  return deleteDoc(customerRef).catch(err => {
     errorEmitter.emit('permission-error', new FirestorePermissionError({
       path: customerRef.path,
       operation: 'delete'
@@ -117,9 +137,6 @@ export function archiveCustomer(db: Firestore, institutionId: string, customerId
   });
 }
 
-/**
- * Updates wallet and posts to GL.
- */
 export async function updateCustomerWallet(db: Firestore, institutionId: string, customerId: string, amount: number, reference: string) {
   const customerRef = doc(db, 'institutions', institutionId, 'customers', customerId);
   const walletLogRef = collection(db, 'institutions', institutionId, 'wallets');
@@ -144,7 +161,6 @@ export async function updateCustomerWallet(db: Firestore, institutionId: string,
       timestamp: serverTimestamp()
     });
 
-    // POST TO LEDGER
     if (crmSetup?.walletAccountId && accSetup?.cashOnHandAccountId) {
       await postJournalEntry(db, institutionId, {
         date: new Date(),
@@ -159,16 +175,12 @@ export async function updateCustomerWallet(db: Firestore, institutionId: string,
   });
 }
 
-/**
- * Awards points and provisions for loyalty liability.
- */
 export async function awardLoyaltyPoints(db: Firestore, institutionId: string, customerId: string, points: number, reference: string) {
   const customerRef = doc(db, 'institutions', institutionId, 'customers', customerId);
   const crmSetupRef = doc(db, 'institutions', institutionId, 'settings', 'crm');
   const crmSnap = await getDoc(crmSetupRef);
   const crmSetup = crmSnap.data();
 
-  // For simplicity, we assume 1 Point = 1 KES for provisioning
   if (crmSetup?.loyaltyLiabilityAccountId && crmSetup?.loyaltyExpenseAccountId) {
     await postJournalEntry(db, institutionId, {
       date: new Date(),
@@ -197,7 +209,7 @@ export function createMarketingCampaign(db: Firestore, institutionId: string, pa
     updatedAt: serverTimestamp()
   };
 
-  addDoc(colRef, data).catch(err => {
+  return addDoc(colRef, data).catch(err => {
     errorEmitter.emit('permission-error', new FirestorePermissionError({
       path: colRef.path,
       operation: 'create',
@@ -243,7 +255,6 @@ export async function createGiftCard(db: Firestore, institutionId: string, paylo
   const crmSetup = crmSnap.data();
   const accSetup = accSnap.data();
 
-  // POST TO LEDGER
   if (crmSetup?.giftCardAccountId && accSetup?.cashOnHandAccountId) {
     await postJournalEntry(db, institutionId, {
       date: new Date(),

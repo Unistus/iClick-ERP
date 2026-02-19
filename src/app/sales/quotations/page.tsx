@@ -10,9 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, query, orderBy, doc, updateDoc } from "firebase/firestore";
+import { collection, query, orderBy, doc, updateDoc, where } from "firebase/firestore";
 import { format } from "date-fns";
-import { Quote, Plus, Search, Filter, History, MoreVertical, Loader2, Send, CheckCircle2, FileText } from "lucide-react";
+import { Quote, Plus, Search, Filter, History, MoreVertical, Loader2, Send, CheckCircle2, FileText, UserCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { createQuotation, updateQuotationStatus } from "@/lib/sales/sales.service";
 import { toast } from "@/hooks/use-toast";
@@ -43,6 +43,13 @@ export default function QuotationsPage() {
   }, [db, selectedInstId]);
   const { data: products } = useCollection(productsRef);
 
+  // GATEKEEPER: Only Approved (Active) customers can receive quotes
+  const customersQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return query(collection(db, 'institutions', selectedInstId, 'customers'), where('status', '==', 'Active'));
+  }, [db, selectedInstId]);
+  const { data: activeCustomers } = useCollection(customersQuery);
+
   const quotesQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return query(collection(db, 'institutions', selectedInstId, 'sales_quotations'), orderBy('createdAt', 'desc'));
@@ -55,8 +62,12 @@ export default function QuotationsPage() {
     setIsProcessing(true);
 
     const formData = new FormData(e.currentTarget);
+    const customerId = formData.get('customerId') as string;
+    const customer = activeCustomers?.find(c => c.id === customerId);
+
     const data = {
-      customerName: formData.get('customerName') as string,
+      customerId,
+      customerName: customer?.name || 'Unknown',
       expiryDate: new Date(formData.get('expiryDate') as string),
       total: parseFloat(formData.get('total') as string),
       status: 'Draft',
@@ -109,7 +120,7 @@ export default function QuotationsPage() {
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (
-                  <SelectItem key={i.id} value={i.id} className="text-xs">{i.name}</SelectItem>
+                  <SelectItem key={i.id} value={i.id} className="text-xs font-medium">{i.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -132,14 +143,14 @@ export default function QuotationsPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
                 <Input placeholder="Search quotes..." className="pl-9 h-8 text-[10px] bg-secondary/20 border-none" />
               </div>
-              <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest">Workflow Stage: QUOTING</Badge>
+              <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest text-primary bg-primary/5 border-primary/20">Authorized Quoting Cycle</Badge>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader className="bg-secondary/20">
                   <TableRow>
                     <TableHead className="h-10 text-[10px] uppercase font-black pl-6">Quote #</TableHead>
-                    <TableHead className="h-10 text-[10px] uppercase font-black">Customer</TableHead>
+                    <TableHead className="h-10 text-[10px] uppercase font-black">Approved Customer</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-black text-center">Status</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-black text-right">Amount</TableHead>
                     <TableHead className="h-10 text-right text-[10px] uppercase font-black pr-6">Management</TableHead>
@@ -152,7 +163,7 @@ export default function QuotationsPage() {
                     <TableRow><TableCell colSpan={5} className="text-center py-20 text-xs text-muted-foreground uppercase font-bold">No active quotations.</TableCell></TableRow>
                   ) : quotations?.map((q) => (
                     <TableRow key={q.id} className="h-14 hover:bg-secondary/10 transition-colors border-b-border/30 group">
-                      <TableCell className="pl-6 font-mono text-[11px] font-bold text-primary">{q.quoteNumber}</TableCell>
+                      <TableCell className="pl-6 font-mono text-[11px] font-bold text-primary uppercase">{q.quoteNumber}</TableCell>
                       <TableCell className="text-xs font-bold uppercase">{q.customerName}</TableCell>
                       <TableCell className="text-center">
                         <Badge variant="outline" className={cn("text-[8px] h-4 uppercase font-bold", 
@@ -201,27 +212,42 @@ export default function QuotationsPage() {
           <DialogContent className="max-w-md">
             <form onSubmit={handleCreateQuote}>
               <DialogHeader>
-                <DialogTitle>Generate Quotation</DialogTitle>
-                <CardDescription>Issue a formal price estimate to a prospective client.</CardDescription>
+                <div className="flex items-center gap-2 mb-2">
+                  <Quote className="size-5 text-primary" />
+                  <DialogTitle>Generate Quotation</DialogTitle>
+                </div>
+                <CardDescription className="text-xs font-bold text-primary">Compliance: APPROVED CUSTOMERS ONLY</CardDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4 text-xs">
                 <div className="space-y-2">
-                  <Label>Customer Identity</Label>
-                  <Input name="customerName" required />
+                  <Label className="uppercase font-bold tracking-widest opacity-60">Verified Customer</Label>
+                  <Select name="customerId" required>
+                    <SelectTrigger className="h-11 font-bold">
+                      <SelectValue placeholder="Search Active Directory..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeCustomers?.map(c => (
+                        <SelectItem key={c.id} value={c.id} className="text-xs font-bold uppercase">
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[8px] text-muted-foreground italic">Only customers with 'Active' status appear in this selection.</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Expiry Date</Label>
+                    <Label className="uppercase font-bold tracking-widest opacity-60">Expiry Date</Label>
                     <Input name="expiryDate" type="date" defaultValue={format(addDays(new Date(), 7), 'yyyy-MM-dd')} required />
                   </div>
                   <div className="space-y-2">
-                    <Label>Estimated Total</Label>
-                    <Input name="total" type="number" step="0.01" required />
+                    <Label className="uppercase font-bold tracking-widest opacity-60">Estimated Total</Label>
+                    <Input name="total" type="number" step="0.01" placeholder="0.00" required className="h-10 font-black text-lg" />
                   </div>
                 </div>
               </div>
               <DialogFooter>
-                <Button type="submit" disabled={isProcessing} className="h-10 font-bold uppercase text-xs w-full shadow-xl shadow-primary/20">
+                <Button type="submit" disabled={isProcessing} className="h-11 font-bold uppercase text-xs w-full shadow-xl shadow-primary/20 bg-primary hover:bg-primary/90">
                   {isProcessing ? <Loader2 className="size-3 animate-spin mr-2" /> : <Quote className="size-3 mr-2" />} Save Draft Quote
                 </Button>
               </DialogFooter>

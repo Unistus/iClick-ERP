@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, query, orderBy, limit } from "firebase/firestore";
+import { collection, query, orderBy, limit, where } from "firebase/firestore";
 import { format } from "date-fns";
 import { 
   ClipboardCheck, 
@@ -24,7 +24,8 @@ import {
   Zap,
   Trash2,
   ShoppingCart,
-  FileText
+  FileText,
+  UserCircle
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { createSalesOrder, confirmSalesOrder, type SalesItem } from "@/lib/sales/sales.service";
@@ -49,12 +50,19 @@ export default function SalesOrdersPage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Form State
-  const [customerName, setCustomerName] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [orderItems, setOrderItems] = useState<SalesItem[]>([]);
 
   // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instColRef);
+
+  // GATEKEEPER: Only Approved (Active) customers can receive orders
+  const customersQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return query(collection(db, 'institutions', selectedInstId, 'customers'), where('status', '==', 'Active'));
+  }, [db, selectedInstId]);
+  const { data: activeCustomers } = useCollection(customersQuery);
 
   const ordersQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -93,11 +101,13 @@ export default function SalesOrdersPage() {
     if (!selectedInstId || !user || isProcessing) return;
     setIsProcessing(true);
 
+    const customer = activeCustomers?.find(c => c.id === selectedCustomerId);
     const subtotal = orderItems.reduce((sum, i) => sum + i.total, 0);
     const taxTotal = subtotal * 0.16;
 
     const data = {
-      customerName,
+      customerId: selectedCustomerId,
+      customerName: customer?.name || 'Unknown',
       items: orderItems,
       subtotal,
       taxTotal,
@@ -107,11 +117,11 @@ export default function SalesOrdersPage() {
 
     try {
       await createSalesOrder(db, selectedInstId, data, user.uid);
-      logSystemEvent(db, selectedInstId, user, 'SALES', 'Create Order', `Draft Sales Order created for ${customerName}.`);
+      logSystemEvent(db, selectedInstId, user, 'SALES', 'Create Order', `Draft Sales Order created for ${data.customerName}.`);
       toast({ title: "Order Initialized" });
       setIsCreateOpen(false);
       setOrderItems([]);
-      setCustomerName("");
+      setSelectedCustomerId("");
     } catch (err: any) {
       toast({ variant: "destructive", title: "Failed to create order" });
     } finally {
@@ -207,7 +217,7 @@ export default function SalesOrdersPage() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
                   <Input placeholder="Search orders..." className="pl-9 h-8 text-[10px] bg-secondary/20 border-none" />
                 </div>
-                <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest">Workflow Stage: FULFILLMENT</Badge>
+                <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest text-emerald-500 bg-emerald-500/5 border-emerald-500/20">Approved Customers Only</Badge>
               </CardHeader>
               <CardContent className="p-0 overflow-x-auto">
                 <Table>
@@ -244,14 +254,9 @@ export default function SalesOrdersPage() {
                                 <CheckCircle2 className="size-3" /> Confirm
                               </Button>
                             )}
-                            {o.status === 'Confirmed' && (
-                              <Button size="sm" variant="ghost" className="h-7 text-[9px] font-bold uppercase gap-1.5 text-primary">
-                                <Zap className="size-3" /> Create Invoice
-                              </Button>
-                            )}
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100"><MoreVertical className="size-4" /></Button>
+                                <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100 transition-all"><MoreVertical className="size-4" /></Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-48">
                                 <DropdownMenuItem className="text-xs gap-2"><FileText className="size-3.5" /> View Details</DropdownMenuItem>
@@ -279,18 +284,24 @@ export default function SalesOrdersPage() {
                   <ClipboardCheck className="size-5 text-primary" />
                   <DialogTitle>New Sales Order</DialogTitle>
                 </div>
-                <CardDescription className="text-xs uppercase font-black tracking-tight">Phase: INTERNAL DRAFT</CardDescription>
+                <CardDescription className="text-[10px] uppercase font-black text-primary">Compliance Status: ENFORCED</CardDescription>
               </DialogHeader>
               
               <div className="grid gap-6 py-4 text-xs">
                 <div className="space-y-2">
-                  <Label>Customer Identity</Label>
-                  <Input 
-                    value={customerName} 
-                    onChange={(e) => setCustomerName(e.target.value)} 
-                    placeholder="e.g. Acme Corp"
-                    required 
-                  />
+                  <Label className="uppercase font-bold tracking-widest opacity-60">Verified Customer Account</Label>
+                  <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId} required>
+                    <SelectTrigger className="h-11 font-bold uppercase">
+                      <SelectValue placeholder="Search Approved Members..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activeCustomers?.map(c => (
+                        <SelectItem key={c.id} value={c.id} className="text-xs font-bold uppercase">
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="border rounded-xl overflow-hidden shadow-inner bg-secondary/5">
@@ -307,7 +318,7 @@ export default function SalesOrdersPage() {
                     <Table>
                       <TableBody>
                         {orderItems.length === 0 ? (
-                          <TableRow><TableCell className="text-center py-8 text-muted-foreground opacity-50 uppercase font-bold">No items added to order.</TableCell></TableRow>
+                          <TableRow><TableCell className="text-center py-8 text-muted-foreground opacity-50 uppercase font-bold">No items added.</TableCell></TableRow>
                         ) : orderItems.map((item, idx) => (
                           <TableRow key={idx} className="h-10 border-none hover:bg-transparent">
                             <TableCell className="text-xs font-bold pl-4">{item.name}</TableCell>
@@ -325,22 +336,22 @@ export default function SalesOrdersPage() {
                     <p className="text-[10px] uppercase font-bold opacity-60">Estimated Total Value</p>
                     <p className="text-2xl font-black text-primary">KES {calculateTotal().toLocaleString()}</p>
                   </div>
-                  <div className="p-3 bg-primary/5 border border-primary/10 rounded-lg">
-                    <p className="text-[9px] text-muted-foreground leading-tight italic">
-                      Final taxes and commissions will be calculated during the invoicing stage.
+                  <div className="p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-lg">
+                    <p className="text-[9px] text-emerald-600 leading-tight italic uppercase font-bold">
+                      Institutional Guard: Only Active customers permitted.
                     </p>
                   </div>
                 </div>
               </div>
 
               <DialogFooter className="bg-secondary/10 p-6 -mx-6 -mb-6 rounded-b-lg gap-2">
-                <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs h-10 font-bold uppercase">Cancel</Button>
+                <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs h-10 font-bold uppercase tracking-widest">Discard</Button>
                 <Button 
                   type="submit" 
-                  disabled={isProcessing || orderItems.length === 0} 
-                  className="h-10 px-10 font-bold uppercase text-xs shadow-xl shadow-primary/20 gap-2"
+                  disabled={isProcessing || orderItems.length === 0 || !selectedCustomerId} 
+                  className="h-10 px-10 font-bold uppercase text-xs shadow-xl shadow-primary/20 bg-primary hover:bg-primary/90 gap-2"
                 >
-                  {isProcessing ? <Loader2 className="size-3 animate-spin mr-2" /> : <ClipboardCheck className="size-3 mr-2" />} Save Draft Order
+                  {isProcessing ? <Loader2 className="size-3 animate-spin mr-2" /> : <ClipboardCheck className="size-3 mr-2" />} Initialize Order Cycle
                 </Button>
               </DialogFooter>
             </form>

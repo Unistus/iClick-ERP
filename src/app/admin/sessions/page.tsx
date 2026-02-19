@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Loader2,
   CheckCircle2,
+  Activity,
   Trash2
 } from "lucide-react";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
@@ -119,15 +120,16 @@ export default function SessionManagerPage() {
                   <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Mobile Assets</span>
                   <Smartphone className="size-3 text-primary" />
                 </CardHeader>
-                <CardContent className="pb-3">
+                <CardContent className="pb-4">
                   <div className="text-xl font-bold">{sessions?.filter(s => s.deviceType === 'Mobile').length || 0} DEVICES</div>
                 </CardContent>
+              </Card>
               <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm">
                 <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
                   <span className="text-[9px] font-black uppercase text-primary tracking-widest">Auth Integrity</span>
                   <CheckCircle2 className="size-3 text-primary" />
                 </CardHeader>
-                <CardContent className="pb-3">
+                <CardContent className="pb-4">
                   <div className="text-xl font-bold">HEALTHY</div>
                 </CardContent>
               </Card>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -72,7 +71,7 @@ export default function EmployeeDirectoryPage() {
   const { data: branches } = useCollection(branchesRef);
 
   const filteredEmployees = employees?.filter(emp => 
-    `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    `${emp.firstName || ''} ${emp.lastName || ''}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.employeeId?.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
@@ -166,7 +165,7 @@ export default function EmployeeDirectoryPage() {
               <CardContent className="p-0 overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-secondary/20">
-                    <TableRow className="hover:bg-transparent">
+                    <TableRow>
                       <TableHead className="h-10 text-[10px] uppercase font-black pl-6">Employee Identity</TableHead>
                       <TableHead className="h-10 text-[10px] uppercase font-black text-center">Status</TableHead>
                       <TableHead className="h-10 text-[10px] uppercase font-black">Role / Title</TableHead>
@@ -185,10 +184,10 @@ export default function EmployeeDirectoryPage() {
                         <TableCell className="pl-6">
                           <div className="flex items-center gap-3">
                             <div className="size-9 rounded bg-primary/10 flex items-center justify-center text-primary font-black text-xs uppercase shadow-sm">
-                              {emp.firstName[0]}{emp.lastName[0]}
+                              {(emp.firstName?.[0] || '?')}{(emp.lastName?.[0] || '?')}
                             </div>
                             <div className="flex flex-col">
-                              <span className="text-xs font-black uppercase tracking-tight text-foreground/90">{emp.firstName} {emp.lastName}</span>
+                              <span className="text-xs font-black uppercase tracking-tight text-foreground/90">{emp.firstName || ''} {emp.lastName || ''}</span>
                               <span className="text-[9px] text-muted-foreground font-mono font-bold tracking-widest">{emp.employeeId}</span>
                             </div>
                           </div>

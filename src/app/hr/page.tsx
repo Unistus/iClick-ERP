@@ -132,10 +132,10 @@ export default function HRDashboardPage() {
                       <div key={emp.id} className="p-4 flex items-center justify-between hover:bg-secondary/5 transition-colors">
                         <div className="flex items-center gap-4">
                           <div className={`size-10 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0 font-bold text-xs uppercase`}>
-                            {emp.firstName[0]}{emp.lastName[0]}
+                            {(emp.firstName?.[0] || '?')}{(emp.lastName?.[0] || '?')}
                           </div>
                           <div>
-                            <p className="text-xs font-bold uppercase">{emp.firstName} {emp.lastName}</p>
+                            <p className="text-xs font-bold uppercase">{emp.firstName || ''} {emp.lastName || ''}</p>
                             <p className="text-[9px] text-muted-foreground font-mono uppercase tracking-tighter">{emp.jobTitle} • {emp.employeeId}</p>
                           </div>
                         </div>

@@ -144,3 +144,31 @@ export function createMarketingCampaign(db: Firestore, institutionId: string, pa
     } satisfies SecurityRuleContext));
   });
 }
+
+export function createPromoCode(db: Firestore, institutionId: string, payload: any) {
+  const colRef = collection(db, 'institutions', institutionId, 'promo_codes');
+  const data = {
+    ...payload,
+    redemptionCount: 0,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  };
+
+  return addDoc(colRef, data).catch(err => {
+    errorEmitter.emit('permission-error', new FirestorePermissionError({
+      path: colRef.path,
+      operation: 'create',
+      requestResourceData: data
+    } satisfies SecurityRuleContext));
+  });
+}
+
+export function updatePromoStatus(db: Firestore, institutionId: string, promoId: string, status: 'Active' | 'Paused' | 'Expired') {
+  const ref = doc(db, 'institutions', institutionId, 'promo_codes', promoId);
+  return updateDoc(ref, { status, updatedAt: serverTimestamp() }).catch(err => {
+    errorEmitter.emit('permission-error', new FirestorePermissionError({
+      path: ref.path,
+      operation: 'update'
+    } satisfies SecurityRuleContext));
+  });
+}

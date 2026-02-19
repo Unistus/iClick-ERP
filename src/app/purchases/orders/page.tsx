@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -18,6 +17,7 @@ import { ClipboardCheck, Plus, Search, Filter, History, MoreVertical, Loader2, P
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
+import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 
 export default function PurchaseOrdersPage() {
   const db = useFirestore();
@@ -26,21 +26,24 @@ export default function PurchaseOrdersPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
-  const { data: institutions } = useCollection(instColRef);
+  // 1. Data Fetching: Permitted Institutions
+  const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
+  // 2. Data Fetching: Suppliers
   const suppliersRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return collection(db, 'institutions', selectedInstId, 'suppliers');
   }, [db, selectedInstId]);
   const { data: suppliers } = useCollection(suppliersRef);
 
+  // 3. Data Fetching: Chart of Accounts
   const coaRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return collection(db, 'institutions', selectedInstId, 'coa');
   }, [db, selectedInstId]);
   const { data: accounts } = useCollection(coaRef);
 
+  // 4. Data Fetching: Purchase Orders
   const poQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return query(collection(db, 'institutions', selectedInstId, 'purchase_orders'), orderBy('createdAt', 'desc'));
@@ -139,61 +142,104 @@ export default function PurchaseOrdersPage() {
             <p className="text-sm font-medium text-muted-foreground">Select an institution to manage PO lifecycle.</p>
           </div>
         ) : (
-          <Card className="border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
-            <CardHeader className="py-3 px-6 border-b border-border/50 bg-secondary/10 flex flex-row items-center justify-between">
-              <div className="relative max-w-sm w-full">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-                <Input placeholder="Search PO # or vendor..." className="pl-9 h-8 text-[10px] bg-secondary/20 border-none" />
-              </div>
-              <Badge 
-                variant="outline" 
-                className={cn(
-                  "text-[10px] font-bold uppercase tracking-widest transition-all",
-                  isEnforced ? "text-primary border-primary/20 bg-primary/5" : "text-muted-foreground border-border bg-secondary/10"
-                )}
-              >
-                Budget Check: {isEnforced ? "ENFORCED" : "ADVISORY"}
-              </Badge>
-            </CardHeader>
-            <CardContent className="p-0 overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-secondary/20">
-                  <TableRow>
-                    <TableHead className="h-10 text-[10px] uppercase font-black pl-6">PO #</TableHead>
-                    <TableHead className="h-10 text-[10px] uppercase font-black">Supplier Entity</TableHead>
-                    <TableHead className="h-10 text-[10px] uppercase font-black text-center">Status</TableHead>
-                    <TableHead className="h-10 text-[10px] uppercase font-black text-right">Value</TableHead>
-                    <TableHead className="h-10 text-right text-[10px] uppercase font-black pr-6">Manage</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse font-bold uppercase">Syncing Orders Hub...</TableCell></TableRow>
-                  ) : orders?.length === 0 ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-20 text-xs text-muted-foreground uppercase font-bold">No purchase orders found.</TableCell></TableRow>
-                  ) : orders?.map((o) => (
-                    <TableRow key={o.id} className="h-14 hover:bg-secondary/10 transition-colors border-b-border/30 group">
-                      <TableCell className="pl-6 font-mono text-[11px] font-bold text-primary">{o.poNumber}</TableCell>
-                      <TableCell className="text-xs font-bold uppercase tracking-tight">{o.supplierName}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline" className={cn("text-[8px] h-4 uppercase font-bold", 
-                          o.status === 'Draft' ? 'bg-secondary text-muted-foreground' : 'bg-emerald-500/10 text-emerald-500 border-none'
-                        )}>
-                          {o.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs font-black text-primary">KES {o.total?.toLocaleString()}</TableCell>
-                      <TableCell className="text-right pr-6">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100 transition-all"><MoreVertical className="size-4" /></Button>
-                        </div>
-                      </TableCell>
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card className="bg-card border-none ring-1 ring-border shadow-sm">
+                <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase text-muted-foreground">Draft Orders</span>
+                  <ShoppingCart className="size-3 text-muted-foreground" />
+                </CardHeader>
+                <CardContent className="pb-3">
+                  <div className="text-lg font-bold">{orders?.filter(o => o.status === 'Draft').length || 0}</div>
+                </CardContent>
+              </Card>
+              <Card className="bg-card border-none ring-1 ring-border shadow-sm">
+                <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase text-accent">Confirmed</span>
+                  <CheckCircle2 className="size-3 text-accent" />
+                </CardHeader>
+                <CardContent className="pb-3">
+                  <div className="text-lg font-bold">{orders?.filter(o => o.status === 'Confirmed').length || 0}</div>
+                </CardContent>
+              </Card>
+              <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm overflow-hidden">
+                <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
+                  <span className="text-[10px] font-bold uppercase text-primary">Pipeline Value</span>
+                  <Zap className="size-3 text-primary" />
+                </CardHeader>
+                <CardContent className="pb-3">
+                  <div className="text-lg font-bold text-primary">KES {(orders?.reduce((sum, o) => sum + (o.total || 0), 0) || 0).toLocaleString()}</div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
+              <CardHeader className="py-3 px-6 border-b border-border/50 bg-secondary/10 flex flex-row items-center justify-between">
+                <div className="relative max-w-sm w-full">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                  <Input placeholder="Search PO # or vendor..." className="pl-9 h-8 text-[10px] bg-secondary/20 border-none" />
+                </div>
+                <Badge 
+                  variant="outline" 
+                  className={cn(
+                    "text-[10px] font-bold uppercase tracking-widest transition-all",
+                    isEnforced ? "text-primary border-primary/20 bg-primary/5" : "text-muted-foreground border-border bg-secondary/10"
+                  )}
+                >
+                  Budget Check: {isEnforced ? "ENFORCED" : "ADVISORY"}
+                </Badge>
+              </CardHeader>
+              <CardContent className="p-0 overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-secondary/20">
+                    <TableRow>
+                      <TableHead className="h-10 text-[10px] uppercase font-black pl-6">PO #</TableHead>
+                      <TableHead className="h-10 text-[10px] uppercase font-black">Supplier Entity</TableHead>
+                      <TableHead className="h-10 text-[10px] uppercase font-black text-center">Status</TableHead>
+                      <TableHead className="h-10 text-[10px] uppercase font-black text-right">Value</TableHead>
+                      <TableHead className="h-10 text-right text-[10px] uppercase font-black pr-6">Manage</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? (
+                      <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse font-bold uppercase">Syncing Orders Hub...</TableCell></TableRow>
+                    ) : orders?.length === 0 ? (
+                      <TableRow><TableCell colSpan={5} className="text-center py-20 text-xs text-muted-foreground uppercase font-bold">No purchase orders found.</TableCell></TableRow>
+                    ) : orders?.map((o) => (
+                      <TableRow key={o.id} className="h-14 hover:bg-secondary/10 transition-colors border-b-border/30 group">
+                        <TableCell className="pl-6 font-mono text-[11px] font-bold text-primary">{o.poNumber}</TableCell>
+                        <TableCell className="text-xs font-bold uppercase tracking-tight">{o.supplierName}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={cn("text-[8px] h-4 uppercase font-bold", 
+                            o.status === 'Draft' ? 'bg-secondary text-muted-foreground' : 'bg-emerald-500/10 text-emerald-500 border-none'
+                          )}>
+                            {o.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs font-black text-primary">KES {o.total?.toLocaleString()}</TableCell>
+                        <TableCell className="text-right pr-6">
+                          <div className="flex justify-end gap-2">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100 transition-all"><MoreVertical className="size-4" /></Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Order Ops</DropdownMenuLabel>
+                                <DropdownMenuItem className="text-xs gap-2"><FileText className="size-3.5" /> View Details</DropdownMenuItem>
+                                <DropdownMenuItem className="text-xs gap-2"><History className="size-3.5" /> History</DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-xs gap-2 text-destructive"><Trash2 className="size-3.5" /> Cancel PO</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>

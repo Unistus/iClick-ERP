@@ -239,11 +239,11 @@ function ManagementForm() {
                     <Input name="regDate" type="date" defaultValue={editingCustomer?.registrationDate} className="h-11" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-2 uppercase font-black text-[10px] tracking-widest opacity-60"><Briefcase className="size-3" /> Profile Type</Label>
-                    <Select name="typeId" defaultValue={editingCustomer?.typeId}>
-                      <SelectTrigger className="h-11 font-bold uppercase"><SelectValue placeholder="Pick Type..." /></SelectTrigger>
+                    <Label className="flex items-center gap-2 uppercase font-black text-[10px] tracking-widest opacity-60"><Tag className="size-3 text-primary" /> Customer Segment</Label>
+                    <Select name="segmentId" defaultValue={editingCustomer?.segmentId}>
+                      <SelectTrigger className="h-11 font-bold uppercase"><SelectValue placeholder="Select Segment..." /></SelectTrigger>
                       <SelectContent>
-                        {customerTypes?.map(t => <SelectItem key={t.id} value={t.id} className="text-[10px] font-black uppercase">{t.name}</SelectItem>)}
+                        {segments?.map(s => <SelectItem key={s.id} value={s.id} className="text-[10px] font-black uppercase">{s.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -348,11 +348,11 @@ function ManagementForm() {
                   <div className="space-y-6">
                     <div className="grid grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <Label className="flex items-center gap-2 text-primary font-black uppercase text-[10px] tracking-widest"><Tag className="size-4" /> Segmentation</Label>
-                        <Select name="segmentId" defaultValue={editingCustomer?.segmentId}>
-                          <SelectTrigger className="h-11 uppercase font-black text-[10px]"><SelectValue placeholder="Cluster..." /></SelectTrigger>
+                        <Label className="flex items-center gap-2 text-primary font-black uppercase text-[10px] tracking-widest"><Briefcase className="size-4 text-accent" /> Profile Type</Label>
+                        <Select name="typeId" defaultValue={editingCustomer?.typeId}>
+                          <SelectTrigger className="h-11 uppercase font-black text-[10px]"><SelectValue placeholder="Pick Type..." /></SelectTrigger>
                           <SelectContent>
-                            {segments?.map(s => <SelectItem key={s.id} value={s.id} className="text-[10px] font-black uppercase">{s.name}</SelectItem>)}
+                            {customerTypes?.map(t => <SelectItem key={t.id} value={t.id} className="text-[10px] font-black uppercase">{t.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>

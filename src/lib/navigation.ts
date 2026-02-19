@@ -76,7 +76,12 @@ import {
   Mail,
   UserCircle,
   Globe,
-  Settings2
+  Settings2,
+  Fingerprint,
+  Lock,
+  Clock,
+  ShieldCheck,
+  Globe2
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -268,6 +273,10 @@ export const navConfig: NavItem[] = [
       { title: "Departments", icon: Briefcase, url: "/admin/departments", id: "departments" },
       { title: "Geo Hierarchy", icon: Globe, url: "/admin/geo-hierarchy", id: "geo_hierarchy" },
       { title: "Roles & Permissions", icon: Shield, url: "/admin/roles", id: "roles" },
+      { title: "Session Manager", icon: Clock, url: "/admin/sessions", id: "sessions" },
+      { title: "Data Encryption", icon: Lock, url: "/admin/encryption", id: "encryption" },
+      { title: "Two-Factor Auth", icon: ShieldCheck, url: "/admin/2fa", id: "2fa" },
+      { title: "IP Restriction", icon: Globe2, url: "/admin/ip-restrictions", id: "ip_restriction" },
       { title: "Approval Workflows", icon: GitPullRequest, url: "/admin/approval-workflows", id: "workflows" },
       { title: "Tax Config", icon: Percent, url: "/admin/tax", id: "tax_config" },
       { title: "Currencies", icon: Coins, url: "/admin/currencies", id: "currencies" },

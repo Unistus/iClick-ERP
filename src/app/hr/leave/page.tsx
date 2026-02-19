@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -23,13 +24,17 @@ import {
   FileText,
   History,
   Activity,
-  UserCircle
+  UserCircle,
+  ShieldAlert,
+  Venus,
+  Mars
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { submitLeaveRequest } from "@/lib/hr/hr.service";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
 import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
+import { cn } from "@/lib/utils";
 
 export default function LeaveManagementPage() {
   const db = useFirestore();
@@ -37,6 +42,9 @@ export default function LeaveManagementPage() {
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Selection Logic for Filtering
+  const [targetEmployeeId, setTargetEmployeeId] = useState<string>("");
 
   const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
@@ -52,6 +60,28 @@ export default function LeaveManagementPage() {
   }, [db, selectedInstId]);
   const { data: employees } = useCollection(employeesRef);
 
+  const leaveTypesRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'leave_types');
+  }, [db, selectedInstId]);
+  const { data: leaveTypes } = useCollection(leaveTypesRef);
+
+  // Dynamic Filtering: Find selected employee gender
+  const targetEmployee = useMemo(() => 
+    employees?.find(e => e.id === targetEmployeeId), 
+    [employees, targetEmployeeId]
+  );
+
+  const filteredLeaveTypes = useMemo(() => {
+    if (!leaveTypes) return [];
+    if (!targetEmployee) return leaveTypes; // Default to all if no employee selected
+
+    return leaveTypes.filter(lt => 
+      lt.genderApplicability === 'All' || 
+      lt.genderApplicability === targetEmployee.gender
+    );
+  }, [leaveTypes, targetEmployee]);
+
   const handleRequest = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || isProcessing) return;
@@ -59,7 +89,7 @@ export default function LeaveManagementPage() {
 
     const formData = new FormData(e.currentTarget);
     const data = {
-      employeeId: formData.get('employeeId') as string,
+      employeeId: targetEmployeeId,
       leaveType: formData.get('leaveType') as string,
       startDate: formData.get('startDate') as string,
       endDate: formData.get('endDate') as string,
@@ -70,6 +100,7 @@ export default function LeaveManagementPage() {
       await submitLeaveRequest(db, selectedInstId, data);
       toast({ title: "Request Submitted", description: "Awaiting departmental approval." });
       setIsCreateOpen(false);
+      setTargetEmployeeId("");
     } catch (err) {
       toast({ variant: "destructive", title: "Submission Failed" });
     } finally {
@@ -93,7 +124,7 @@ export default function LeaveManagementPage() {
           
           <div className="flex gap-2 w-full md:w-auto">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
-              <SelectTrigger className="w-[220px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold">
+              <SelectTrigger className="w-[220px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
                 <SelectValue placeholder="Select Institution" />
               </SelectTrigger>
               <SelectContent>
@@ -200,49 +231,73 @@ export default function LeaveManagementPage() {
                   <CalendarDays className="size-5 text-primary" />
                   <DialogTitle className="text-sm font-bold uppercase tracking-wider">Raise Absence Requisition</DialogTitle>
                 </div>
-                <CardDescription className="text-xs uppercase tracking-tight">Departmental Sign-off Workflow</CardDescription>
+                <CardDescription className="text-xs uppercase tracking-tight">Institutional Compliance Check: ON</CardDescription>
               </DialogHeader>
               
               <div className="grid gap-4 py-4 text-xs">
                 <div className="space-y-2">
-                  <Label>Requesting Employee</Label>
-                  <Select name="employeeId" required>
-                    <SelectTrigger className="h-10"><SelectValue placeholder="Pick Identity..." /></SelectTrigger>
+                  <Label className="uppercase font-bold tracking-widest opacity-60">Requesting Employee</Label>
+                  <Select value={targetEmployeeId} onValueChange={setTargetEmployeeId} required>
+                    <SelectTrigger className="h-10 font-bold uppercase"><SelectValue placeholder="Pick Identity..." /></SelectTrigger>
                     <SelectContent>
-                      {employees?.map(e => <SelectItem key={e.id} value={e.id}>{e.firstName} {e.lastName}</SelectItem>)}
+                      {employees?.map(e => (
+                        <SelectItem key={e.id} value={e.id} className="text-xs font-bold uppercase">
+                          {e.firstName} {e.lastName} ({e.gender})
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
+
                 <div className="space-y-2">
-                  <Label>Absence Category</Label>
-                  <Select name="leaveType" defaultValue="Annual" required>
-                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                  <Label className="uppercase font-bold tracking-widest opacity-60">Leave Category</Label>
+                  <Select name="leaveType" required disabled={!targetEmployeeId}>
+                    <SelectTrigger className="h-10 font-bold uppercase">
+                      <SelectValue placeholder={targetEmployeeId ? "Select Eligibility..." : "Select Employee First"} />
+                    </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Annual">Annual / Vacation</SelectItem>
-                      <SelectItem value="Sick">Sick Leave</SelectItem>
-                      <SelectItem value="Maternity">Maternity / Paternity</SelectItem>
-                      <SelectItem value="Unpaid">Unpaid / Sabbatical</SelectItem>
+                      {filteredLeaveTypes.map(lt => (
+                        <SelectItem key={lt.id} value={lt.name} className="text-xs font-bold uppercase">
+                          {lt.name} ({lt.daysPerYear} Days)
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                  {targetEmployee && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="outline" className="text-[8px] h-4 bg-primary/5 text-primary border-none font-black uppercase">
+                        {targetEmployee.gender === 'Male' ? <Mars className="size-2 mr-1" /> : <Venus className="size-2 mr-1" />}
+                        Enforcing {targetEmployee.gender} Rules
+                      </Badge>
+                    </div>
+                  )}
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Start Date</Label>
+                    <Label className="uppercase font-bold tracking-widest opacity-60">Start Date</Label>
                     <Input name="startDate" type="date" required />
                   </div>
                   <div className="space-y-2">
-                    <Label>End Date</Label>
+                    <Label className="uppercase font-bold tracking-widest opacity-60">End Date</Label>
                     <Input name="endDate" type="date" required />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Reason / Justification</Label>
+                  <Label className="uppercase font-bold tracking-widest opacity-60">Reason / Justification</Label>
                   <Input name="reason" placeholder="Briefly state reason..." required />
+                </div>
+
+                <div className="p-3 bg-primary/5 border border-primary/10 rounded-xl flex gap-3 items-start">
+                  <ShieldAlert className="size-4 text-primary shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-muted-foreground leading-relaxed italic">
+                    The category list above is restricted based on the selected employee's gender to ensure institutional compliance.
+                  </p>
                 </div>
               </div>
 
               <DialogFooter>
-                <Button type="submit" disabled={isProcessing} className="h-10 font-bold uppercase text-xs w-full bg-primary shadow-lg shadow-primary/20">
+                <Button type="submit" disabled={isProcessing || !targetEmployeeId} className="h-10 font-bold uppercase text-xs w-full bg-primary shadow-lg shadow-primary/20">
                   {isProcessing ? <Loader2 className="size-3 animate-spin mr-2" /> : <CheckCircle2 className="size-3 mr-2" />} Submit Requisition
                 </Button>
               </DialogFooter>

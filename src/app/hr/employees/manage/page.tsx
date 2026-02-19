@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
@@ -28,7 +29,8 @@ import {
   Loader2,
   CheckCircle2,
   ChevronLeft,
-  GraduationCap
+  GraduationCap,
+  Users
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
@@ -87,6 +89,7 @@ function EmployeeManagementForm() {
       lastName: formData.get('lastName') as string,
       email: formData.get('email') as string,
       phone: formData.get('phone') as string,
+      gender: formData.get('gender') as string,
       branchId: formData.get('branchId') as string,
       departmentId: formData.get('departmentId') as string,
       jobTitle: formData.get('jobTitle') as string,
@@ -156,7 +159,7 @@ function EmployeeManagementForm() {
                     <Input name="lastName" defaultValue={editingEmp?.lastName} required className="h-12 font-bold" />
                   </div>
                 </div>
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid md:grid-cols-3 gap-6">
                   <div className="space-y-2">
                     <Label className="uppercase font-black text-[10px] tracking-widest opacity-60">Corporate Email</Label>
                     <Input name="email" type="email" defaultValue={editingEmp?.email} required className="h-11" />
@@ -164,6 +167,18 @@ function EmployeeManagementForm() {
                   <div className="space-y-2">
                     <Label className="uppercase font-black text-[10px] tracking-widest opacity-60">Personal Phone</Label>
                     <Input name="phone" defaultValue={editingEmp?.phone} required className="h-11" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="uppercase font-black text-[10px] tracking-widest opacity-60 flex items-center gap-2"><Users className="size-3" /> Biological Gender</Label>
+                    <Select name="gender" defaultValue={editingEmp?.gender || "Female"}>
+                      <SelectTrigger className="h-11 font-bold">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Male">Male Identity</SelectItem>
+                        <SelectItem value="Female">Female Identity</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </TabsContent>

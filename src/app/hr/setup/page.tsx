@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, serverTimestamp, setDoc, deleteDoc } from "firebase/firestore";
+import { collection, doc, serverTimestamp, setDoc, query, orderBy, updateDoc } from "firebase/firestore";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { 
   Settings2, 
@@ -32,11 +32,14 @@ import {
   GraduationCap,
   Scale,
   Landmark,
-  Timer
+  Timer,
+  Venus,
+  Mars
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export default function HRSetupPage() {
   const db = useFirestore();
@@ -115,10 +118,41 @@ export default function HRSetupPage() {
     };
     if (col === 'leave_types') {
       data.daysPerYear = parseInt(formData.get('days') as string) || 0;
+      data.genderApplicability = formData.get('genderApplicability') || 'All';
     }
     addDocumentNonBlocking(collection(db, 'institutions', selectedInstId, col), data);
     e.currentTarget.reset();
     toast({ title: "Policy Node Added" });
+  };
+
+  const handleTogglePeriod = async (periodId: string, currentStatus: string) => {
+    if (!selectedInstId) return;
+    const newStatus = currentStatus === 'Open' ? 'Closed' : 'Open';
+    const ref = doc(db, 'institutions', selectedInstId, 'fiscal_periods', periodId);
+    try {
+      await updateDoc(ref, { status: newStatus, updatedAt: serverTimestamp() });
+      toast({ title: `Period ${newStatus}` });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Status Update Failed" });
+    }
+  };
+
+  const handleAddPeriod = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedInstId) return;
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      name: formData.get('name'),
+      startDate: formData.get('startDate'),
+      endDate: formData.get('endDate'),
+      status: 'Open',
+      institutionId: selectedInstId,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+    addDocumentNonBlocking(collection(db, 'institutions', selectedInstId, 'fiscal_periods'), data);
+    e.currentTarget.reset();
+    toast({ title: "Fiscal Period Created" });
   };
 
   const AccountSelect = ({ name, label, description, typeFilter }: { name: string, label: string, description: string, typeFilter?: string[] }) => (
@@ -156,16 +190,18 @@ export default function HRSetupPage() {
             </div>
           </div>
           
-          <Select value={selectedInstId} onValueChange={setSelectedInstId}>
-            <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
-              <SelectValue placeholder="Select Institution" />
-            </SelectTrigger>
-            <SelectContent>
-              {institutions?.map(i => (
-                <SelectItem key={i.id} value={i.id} className="text-xs font-bold">{i.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2 items-center">
+            <Select value={selectedInstId} onValueChange={setSelectedInstId}>
+              <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
+                <SelectValue placeholder="Select Institution" />
+              </SelectTrigger>
+              <SelectContent>
+                {institutions?.map(i => (
+                  <SelectItem key={i.id} value={i.id} className="text-xs font-bold">{i.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {!selectedInstId ? (
@@ -253,17 +289,28 @@ export default function HRSetupPage() {
                     </CardHeader>
                     <CardContent className="p-0">
                       <div className="p-4 border-b bg-secondary/5">
-                        <form onSubmit={(e) => handleAddSubItem('leave_types', e)} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <form onSubmit={(e) => handleAddSubItem('leave_types', e)} className="grid grid-cols-1 md:grid-cols-4 gap-3">
                           <Input name="name" placeholder="Category (e.g. Annual)" required className="h-9 text-xs" />
-                          <Input name="days" type="number" placeholder="Days per Year" required className="h-9 text-xs" />
-                          <Button type="submit" size="sm" className="h-9 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Register Type</Button>
+                          <Input name="days" type="number" placeholder="Days/Yr" required className="h-9 text-xs" />
+                          <Select name="genderApplicability" defaultValue="All">
+                            <SelectTrigger className="h-9 text-xs uppercase font-bold">
+                              <SelectValue placeholder="Gender" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="All" className="text-xs">All Genders</SelectItem>
+                              <SelectItem value="Male" className="text-xs">Male Only</SelectItem>
+                              <SelectItem value="Female" className="text-xs">Female Only</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button type="submit" size="sm" className="h-9 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Register</Button>
                         </form>
                       </div>
                       <Table>
                         <TableHeader className="bg-secondary/20">
                           <TableRow>
                             <TableHead className="h-9 text-[10px] font-black uppercase pl-6">Leave Category</TableHead>
-                            <TableHead className="h-9 text-[10px] font-black uppercase text-center">Yearly Allowance</TableHead>
+                            <TableHead className="h-9 text-[10px] font-black uppercase text-center">Allowance</TableHead>
+                            <TableHead className="h-9 text-[10px] font-black uppercase text-center">Eligibility</TableHead>
                             <TableHead className="h-9 text-right pr-6 text-[10px] font-black uppercase">Lifecycle</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -272,6 +319,18 @@ export default function HRSetupPage() {
                             <TableRow key={t.id} className="h-12 hover:bg-secondary/5 group border-b-border/30">
                               <TableCell className="text-xs font-bold pl-6 uppercase tracking-tight">{t.name}</TableCell>
                               <TableCell className="text-center font-mono font-black text-primary">{t.daysPerYear} DAYS</TableCell>
+                              <TableCell className="text-center">
+                                <Badge variant="outline" className={cn(
+                                  "text-[8px] h-4 uppercase font-black border-none ring-1",
+                                  t.genderApplicability === 'Male' ? "bg-blue-500/10 text-blue-500 ring-blue-500/20" :
+                                  t.genderApplicability === 'Female' ? "bg-pink-500/10 text-pink-500 ring-pink-500/20" :
+                                  "bg-emerald-500/10 text-emerald-500 ring-emerald-500/20"
+                                )}>
+                                  {t.genderApplicability === 'Male' && <Mars className="size-2 mr-1" />}
+                                  {t.genderApplicability === 'Female' && <Venus className="size-2 mr-1" />}
+                                  {t.genderApplicability || 'All'}
+                                </Badge>
+                              </TableCell>
                               <TableCell className="text-right pr-6">
                                 <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'leave_types', t.id))}>
                                   <Trash2 className="size-3.5" />
@@ -288,10 +347,10 @@ export default function HRSetupPage() {
                   <Card className="bg-secondary/10 border-none ring-1 ring-border shadow p-6">
                     <div className="flex items-center gap-2 mb-4">
                       <Scale className="size-4 text-accent" />
-                      <p className="text-[10px] font-black uppercase text-accent tracking-widest">Compliance Protocol</p>
+                      <p className="text-[10px] font-black uppercase text-accent tracking-widest">Gender Compliance</p>
                     </div>
                     <p className="text-[11px] leading-relaxed text-muted-foreground italic">
-                      "Yearly allowances are reset at the start of each fiscal cycle. Unused days roll-over logic is managed via manual HR journal adjustment."
+                      "Leave types are filtered during requisition based on the employee's registered gender. This enforces institutional regulatory standards automatically."
                     </p>
                   </Card>
                 </div>
@@ -344,7 +403,7 @@ export default function HRSetupPage() {
                     <div className="grid md:grid-cols-2 gap-8">
                       <AccountSelect name="salariesExpenseAccountId" label="Salaries & Wages" description="Primary expense node for monthly payroll." typeFilter={['Expense']} />
                       <AccountSelect name="salariesPayableAccountId" label="Salaries Payable" description="Liability node for pending payroll runs." typeFilter={['Liability']} />
-                      <AccountSelect name="payeLiabilityAccountId" label="PAYE Tax Liability" description="Liability node for statutory deductions." typeFilter={['Liability']} />
+                      <AccountSelect name="payeLiabilityAccountId" label="P.A.Y.E Tax Liability" description="Liability node for statutory deductions." typeFilter={['Liability']} />
                       <AccountSelect name="benefitsExpenseAccountId" label="Staff Benefits" description="Expense node for medical/pension costs." typeFilter={['Expense']} />
                     </div>
 

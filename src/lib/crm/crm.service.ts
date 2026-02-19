@@ -1,8 +1,9 @@
 'use client';
 
-import { Firestore, collection, doc, serverTimestamp, addDoc, updateDoc, increment, runTransaction, deleteDoc } from 'firebase/firestore';
+import { Firestore, collection, doc, serverTimestamp, addDoc, updateDoc, increment, runTransaction, deleteDoc, getDoc, setDoc } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/firebase/errors';
+import { postJournalEntry } from '../accounting/journal.service';
 
 export interface CustomerPayload {
   name: string;
@@ -32,8 +33,43 @@ export interface CustomerPayload {
 }
 
 /**
- * Service to manage customer lifecycle and loyalty logic.
+ * Service to manage customer lifecycle and loyalty logic with automated accounting.
  */
+
+/**
+ * Bootstraps the required CRM financial nodes in the COA.
+ */
+export async function bootstrapCRMFinancials(db: Firestore, institutionId: string) {
+  const nodes = [
+    { id: 'wallet_liability', code: '2400', name: 'Customer Stored Value', type: 'Liability', subtype: 'Accrued Liabilities' },
+    { id: 'giftcard_liability', code: '2410', name: 'Gift Card Liability', type: 'Liability', subtype: 'Accrued Liabilities' },
+    { id: 'loyalty_liability', code: '2420', name: 'Loyalty Points Provision', type: 'Liability', subtype: 'Accrued Liabilities' },
+    { id: 'marketing_expense', code: '6300', name: 'Marketing & Outreach', type: 'Expense', subtype: 'Marketing' },
+    { id: 'loyalty_expense', code: '6310', name: 'Loyalty Program Costs', type: 'Expense', subtype: 'Marketing' },
+    { id: 'sales_discounts', code: '4100', name: 'Sales Discounts (Promos)', type: 'Income', subtype: 'Sales Revenue' },
+  ];
+
+  for (const node of nodes) {
+    const coaRef = doc(db, 'institutions', institutionId, 'coa', node.id);
+    await setDoc(coaRef, {
+      ...node,
+      balance: 0,
+      isActive: true,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  }
+
+  // Update CRM settings with these default mappings
+  const setupRef = doc(db, 'institutions', institutionId, 'settings', 'crm');
+  await setDoc(setupRef, {
+    walletAccountId: 'wallet_liability',
+    giftCardAccountId: 'giftcard_liability',
+    loyaltyLiabilityAccountId: 'loyalty_liability',
+    loyaltyExpenseAccountId: 'loyalty_expense',
+    marketingAccountId: 'marketing_expense',
+    discountAccountId: 'sales_discounts',
+  }, { merge: true });
+}
 
 export function registerCustomer(db: Firestore, institutionId: string, payload: CustomerPayload) {
   const colRef = collection(db, 'institutions', institutionId, 'customers');
@@ -55,9 +91,6 @@ export function registerCustomer(db: Firestore, institutionId: string, payload: 
   });
 }
 
-/**
- * Updates an existing customer profile.
- */
 export function updateCustomer(db: Firestore, institutionId: string, customerId: string, payload: Partial<CustomerPayload>) {
   const customerRef = doc(db, 'institutions', institutionId, 'customers', customerId);
   const data = {
@@ -74,9 +107,6 @@ export function updateCustomer(db: Firestore, institutionId: string, customerId:
   });
 }
 
-/**
- * Removes a customer profile from the active directory.
- */
 export function archiveCustomer(db: Firestore, institutionId: string, customerId: string) {
   const customerRef = doc(db, 'institutions', institutionId, 'customers', customerId);
   deleteDoc(customerRef).catch(err => {
@@ -87,11 +117,20 @@ export function archiveCustomer(db: Firestore, institutionId: string, customerId
   });
 }
 
-export function updateCustomerWallet(db: Firestore, institutionId: string, customerId: string, amount: number, reference: string) {
+/**
+ * Updates wallet and posts to GL.
+ */
+export async function updateCustomerWallet(db: Firestore, institutionId: string, customerId: string, amount: number, reference: string) {
   const customerRef = doc(db, 'institutions', institutionId, 'customers', customerId);
   const walletLogRef = collection(db, 'institutions', institutionId, 'wallets');
+  const crmSetupRef = doc(db, 'institutions', institutionId, 'settings', 'crm');
+  const accSetupRef = doc(db, 'institutions', institutionId, 'settings', 'accounting');
 
-  runTransaction(db, async (transaction) => {
+  const [crmSnap, accSnap] = await Promise.all([getDoc(crmSetupRef), getDoc(accSetupRef)]);
+  const crmSetup = crmSnap.data();
+  const accSetup = accSnap.data();
+
+  return runTransaction(db, async (transaction) => {
     transaction.update(customerRef, {
       walletBalance: increment(amount),
       updatedAt: serverTimestamp()
@@ -104,25 +143,47 @@ export function updateCustomerWallet(db: Firestore, institutionId: string, custo
       type: amount > 0 ? 'Top-up' : 'Debit',
       timestamp: serverTimestamp()
     });
-  }).catch(err => {
-    errorEmitter.emit('permission-error', new FirestorePermissionError({
-      path: walletLogRef.path,
-      operation: 'write'
-    } satisfies SecurityRuleContext));
+
+    // POST TO LEDGER
+    if (crmSetup?.walletAccountId && accSetup?.cashOnHandAccountId) {
+      await postJournalEntry(db, institutionId, {
+        date: new Date(),
+        description: `Wallet Top-up: ${reference}`,
+        reference: `WLT-${Date.now()}`,
+        items: [
+          { accountId: accSetup.cashOnHandAccountId, amount: Math.abs(amount), type: amount > 0 ? 'Debit' : 'Credit' },
+          { accountId: crmSetup.walletAccountId, amount: Math.abs(amount), type: amount > 0 ? 'Credit' : 'Debit' },
+        ]
+      });
+    }
   });
 }
 
-export function awardLoyaltyPoints(db: Firestore, institutionId: string, customerId: string, points: number, reference: string) {
+/**
+ * Awards points and provisions for loyalty liability.
+ */
+export async function awardLoyaltyPoints(db: Firestore, institutionId: string, customerId: string, points: number, reference: string) {
   const customerRef = doc(db, 'institutions', institutionId, 'customers', customerId);
+  const crmSetupRef = doc(db, 'institutions', institutionId, 'settings', 'crm');
+  const crmSnap = await getDoc(crmSetupRef);
+  const crmSetup = crmSnap.data();
+
+  // For simplicity, we assume 1 Point = 1 KES for provisioning
+  if (crmSetup?.loyaltyLiabilityAccountId && crmSetup?.loyaltyExpenseAccountId) {
+    await postJournalEntry(db, institutionId, {
+      date: new Date(),
+      description: `Loyalty Points Awarded: ${reference}`,
+      reference: `LOY-${Date.now()}`,
+      items: [
+        { accountId: crmSetup.loyaltyExpenseAccountId, amount: points, type: 'Debit' },
+        { accountId: crmSetup.loyaltyLiabilityAccountId, amount: points, type: 'Credit' },
+      ]
+    });
+  }
   
-  updateDoc(customerRef, {
+  return updateDoc(customerRef, {
     loyaltyPoints: increment(points),
     updatedAt: serverTimestamp()
-  }).catch(err => {
-    errorEmitter.emit('permission-error', new FirestorePermissionError({
-      path: customerRef.path,
-      operation: 'update'
-    } satisfies SecurityRuleContext));
   });
 }
 
@@ -173,8 +234,28 @@ export function updatePromoStatus(db: Firestore, institutionId: string, promoId:
   });
 }
 
-export function createGiftCard(db: Firestore, institutionId: string, payload: any) {
+export async function createGiftCard(db: Firestore, institutionId: string, payload: any) {
   const colRef = collection(db, 'institutions', institutionId, 'gift_cards');
+  const crmSetupRef = doc(db, 'institutions', institutionId, 'settings', 'crm');
+  const accSetupRef = doc(db, 'institutions', institutionId, 'settings', 'accounting');
+
+  const [crmSnap, accSnap] = await Promise.all([getDoc(crmSetupRef), getDoc(accSetupRef)]);
+  const crmSetup = crmSnap.data();
+  const accSetup = accSnap.data();
+
+  // POST TO LEDGER
+  if (crmSetup?.giftCardAccountId && accSetup?.cashOnHandAccountId) {
+    await postJournalEntry(db, institutionId, {
+      date: new Date(),
+      description: `Gift Card Issued: ${payload.code}`,
+      reference: `GC-${payload.code}`,
+      items: [
+        { accountId: accSetup.cashOnHandAccountId, amount: payload.initialBalance, type: 'Debit' },
+        { accountId: crmSetup.giftCardAccountId, amount: payload.initialBalance, type: 'Credit' },
+      ]
+    });
+  }
+
   const data = {
     ...payload,
     redemptionCount: 0,

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -32,11 +31,15 @@ import {
   TrendingUp,
   Info,
   Layers,
-  History
+  History,
+  Activity,
+  Landmark,
+  Calculator
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
 import { Badge } from "@/components/ui/badge";
+import { bootstrapCRMFinancials } from '@/lib/crm/crm.service';
 
 interface IncentiveRule {
   threshold: number;
@@ -48,6 +51,7 @@ export default function CRMSetupPage() {
   const { user } = useUser();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(false);
   
   // Dynamic Incentive Rules State
   const [incentiveRules, setIncentiveRules] = useState<IncentiveRule[]>([]);
@@ -67,6 +71,12 @@ export default function CRMSetupPage() {
     return doc(db, 'institutions', selectedInstId, 'settings', 'crm');
   }, [db, selectedInstId]);
   const { data: setup } = useDoc(setupRef);
+
+  const coaRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'coa');
+  }, [db, selectedInstId]);
+  const { data: accounts } = useCollection(coaRef);
 
   const segmentsRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -114,7 +124,6 @@ export default function CRMSetupPage() {
       }
     });
 
-    // Add the dynamic rules to the update payload
     updates.incentiveRules = incentiveRules;
 
     try {
@@ -129,6 +138,19 @@ export default function CRMSetupPage() {
       toast({ variant: "destructive", title: "Deployment Failed" });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleBootstrap = async () => {
+    if (!selectedInstId) return;
+    setIsBootstrapping(true);
+    try {
+      await bootstrapCRMFinancials(db, selectedInstId);
+      toast({ title: "Financial Hub Initialized", description: "CRM nodes added to Chart of Accounts." });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Bootstrap Failed" });
+    } finally {
+      setIsBootstrapping(false);
     }
   };
 
@@ -159,6 +181,27 @@ export default function CRMSetupPage() {
     toast({ title: "Requirement Added" });
   };
 
+  const AccountSelect = ({ name, label, description, typeFilter }: { name: string, label: string, description: string, typeFilter?: string[] }) => (
+    <div className="space-y-2">
+      <Label className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
+        {label} <Info className="size-3 opacity-30" />
+      </Label>
+      <p className="text-[10px] text-muted-foreground leading-none mb-2">{description}</p>
+      <Select name={name} defaultValue={setup?.[name]}>
+        <SelectTrigger className="h-9 text-xs bg-secondary/10 border-none ring-1 ring-border">
+          <SelectValue placeholder="Select Ledger Account" />
+        </SelectTrigger>
+        <SelectContent>
+          {accounts?.filter(acc => !typeFilter || typeFilter.includes(acc.type) || typeFilter.includes(acc.subtype)).map(acc => (
+            <SelectItem key={acc.id} value={acc.id} className="text-xs">
+              [{acc.code}] {acc.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
   return (
     <DashboardLayout>
       <div className="space-y-4">
@@ -173,16 +216,28 @@ export default function CRMSetupPage() {
             </div>
           </div>
           
-          <Select value={selectedInstId} onValueChange={setSelectedInstId}>
-            <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
-              <SelectValue placeholder="Select Institution" />
-            </SelectTrigger>
-            <SelectContent>
-              {institutions?.map(i => (
-                <SelectItem key={i.id} value={i.id} className="text-xs font-bold">{i.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2 items-center">
+            <Select value={selectedInstId} onValueChange={setSelectedInstId}>
+              <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
+                <SelectValue placeholder="Select Institution" />
+              </SelectTrigger>
+              <SelectContent>
+                {institutions?.map(i => (
+                  <SelectItem key={i.id} value={i.id} className="text-xs font-bold">{i.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="gap-2 h-9 text-[10px] font-black uppercase border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/5"
+              disabled={!selectedInstId || isBootstrapping}
+              onClick={handleBootstrap}
+            >
+              {isBootstrapping ? <Loader2 className="size-3 animate-spin" /> : <Calculator className="size-3" />} 
+              Sync Financial Nodes
+            </Button>
+          </div>
         </div>
 
         {!selectedInstId ? (
@@ -224,6 +279,18 @@ export default function CRMSetupPage() {
                             <Switch name="autoAwardPoints" defaultChecked={setup?.autoAwardPoints} />
                           </div>
                         </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-none ring-1 ring-border shadow-xl bg-card">
+                      <CardHeader className="border-b border-border/50 bg-secondary/10">
+                        <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                          <Calculator className="size-4 text-primary" /> Loyalty Ledger Mappings
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-6 grid gap-6 md:grid-cols-2">
+                        <AccountSelect name="loyaltyLiabilityAccountId" label="Loyalty Liability" description="Liability node for accrued points." typeFilter={['Liability']} />
+                        <AccountSelect name="loyaltyExpenseAccountId" label="Loyalty Expense" description="Expense node for program rewards." typeFilter={['Expense']} />
                       </CardContent>
                     </Card>
                   </div>
@@ -334,6 +401,12 @@ export default function CRMSetupPage() {
                         </div>
                       </div>
                     </div>
+
+                    <div className="grid md:grid-cols-2 gap-8 border-t pt-8">
+                      <AccountSelect name="walletAccountId" label="Stored Value Node" description="Liability node for customer wallets." typeFilter={['Liability']} />
+                      <AccountSelect name="giftCardAccountId" label="Gift Card Node" description="Liability node for issued gift cards." typeFilter={['Liability']} />
+                    </div>
+
                     <Button type="submit" disabled={isSaving} className="w-fit h-10 font-black uppercase text-[10px] gap-2 px-10 shadow-lg shadow-emerald-900/20 bg-emerald-600 hover:bg-emerald-700">
                       {isSaving ? <Loader2 className="size-3 animate-spin" /> : <ShieldCheck className="size-3" />} Deploy Financial Policies
                     </Button>
@@ -423,6 +496,11 @@ export default function CRMSetupPage() {
                               </TableBody>
                             </Table>
                           </div>
+                        </div>
+
+                        <div className="grid md:grid-cols-2 gap-6 border-t pt-6">
+                          <AccountSelect name="discountAccountId" label="Promo Discount Node" description="Contra-income node for applied deals." typeFilter={['Income']} />
+                          <AccountSelect name="marketingAccountId" label="Campaign Budget Node" description="Expense node for outreach costs." typeFilter={['Expense']} />
                         </div>
                       </CardContent>
                     </Card>

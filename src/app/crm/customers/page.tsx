@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -45,7 +46,6 @@ import {
   Trash2,
   History,
   Star,
-  Ban,
   UserCheck
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -151,9 +151,9 @@ export default function CustomerDirectoryPage() {
       taxPin: formData.get('taxPin') as string,
       billingAddress: formData.get('billingAddress') as string,
       shippingAddress: formData.get('shippingAddress') as string,
-      geoCountryId: selectedCountryId,
-      geoTownId: selectedTownId,
-      geoAreaId: formData.get('areaId') as string,
+      geoCountryId: formData.get('geoCountryId') as string,
+      geoTownId: formData.get('geoTownId') as string,
+      geoAreaId: formData.get('geoAreaId') as string,
       preferredDeliveryTime: formData.get('preferredDeliveryTime') as any,
       deliveryNotes: formData.get('deliveryNotes') as string,
     };
@@ -277,7 +277,7 @@ export default function CustomerDirectoryPage() {
                     <TableRow key={c.id} className="h-16 hover:bg-secondary/10 transition-colors border-b-border/30 group">
                       <TableCell className="pl-6">
                         <div className="flex flex-col">
-                          <span className="text-xs font-black uppercase tracking-tight">{c.name}</span>
+                          <span className="text-xs font-black uppercase tracking-tight text-foreground/90">{c.name}</span>
                           <span className="text-[9px] text-muted-foreground font-mono uppercase tracking-tighter opacity-60">BRN: {c.registrationNumber || 'PERSONAL'}</span>
                         </div>
                       </TableCell>
@@ -447,6 +447,7 @@ export default function CustomerDirectoryPage() {
                             {countries.map(c => <SelectItem key={c.id} value={c.id} className="text-xs">{c.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
+                        <input type="hidden" name="geoCountryId" value={selectedCountryId} />
                       </div>
                       <div className="space-y-2">
                         <Label className="flex items-center gap-1.5 text-primary"><MapPin className="size-3" /> Town / City</Label>
@@ -456,10 +457,11 @@ export default function CustomerDirectoryPage() {
                             {towns.map(t => <SelectItem key={t.id} value={t.id} className="text-xs">{t.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
+                        <input type="hidden" name="geoTownId" value={selectedTownId} />
                       </div>
                       <div className="space-y-2">
                         <Label className="flex items-center gap-1.5 text-primary"><LayoutGrid className="size-3" /> Specific Area</Label>
-                        <Select name="areaId" defaultValue={editingCustomer?.geoAreaId} disabled={!selectedTownId}>
+                        <Select name="geoAreaId" defaultValue={editingCustomer?.geoAreaId} disabled={!selectedTownId}>
                           <SelectTrigger className="h-10"><SelectValue placeholder="Pick Area" /></SelectTrigger>
                           <SelectContent>
                             {areas.map(a => <SelectItem key={a.id} value={a.id} className="text-xs">{a.name}</SelectItem>)}

@@ -5,17 +5,46 @@ import { Firestore, collection, doc, serverTimestamp, addDoc, updateDoc, getDoc,
 import { getNextSequence } from '../sequence-service';
 
 export interface EmployeePayload {
+  // Identity
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
+  gender: 'Male' | 'Female';
+  nationalId: string;
+  kraPin: string;
+  nssfNumber?: string;
+  nhifNumber?: string;
+  nextOfKin?: {
+    name: string;
+    relation: string;
+    phone: string;
+  };
+
+  // Job Placement
   branchId: string;
   departmentId: string;
+  reportingManagerId?: string;
   jobTitle: string;
-  salary: number;
+  jobLevelId: string;
+  shiftTypeId: string;
+
+  // Compliance
   hireDate: string;
+  employmentType: 'Permanent' | 'Contract' | 'Casual' | 'Intern';
+  probationEndDate?: string;
+  hasWorkPermit?: boolean;
+  workPermitExpiry?: string;
+
+  // Financials
+  salary: number;
+  payGradeId: string;
+  bankName: string;
+  bankBranch: string;
+  bankAccount: string;
+  taxCategory: string;
+  
   status: 'Active' | 'Onboarding' | 'Suspended' | 'Terminated';
-  gender: 'Male' | 'Female';
   userId?: string; 
 }
 
@@ -70,6 +99,14 @@ export async function onboardEmployee(db: Firestore, institutionId: string, payl
   };
 
   return addDoc(colRef, data);
+}
+
+export async function updateEmployee(db: Firestore, institutionId: string, employeeId: string, payload: Partial<EmployeePayload>) {
+  const ref = doc(db, 'institutions', institutionId, 'employees', employeeId);
+  return updateDoc(ref, {
+    ...payload,
+    updatedAt: serverTimestamp()
+  });
 }
 
 export async function recordAttendance(db: Firestore, institutionId: string, employeeId: string, type: 'In' | 'Out', location?: string) {

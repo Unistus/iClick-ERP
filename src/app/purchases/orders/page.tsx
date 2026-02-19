@@ -10,13 +10,35 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from "@/firebase";
-import { collection, query, orderBy, limit, doc, serverTimestamp } from "firebase/firestore";
+import { collection, query, orderBy, doc, limit } from "firebase/firestore";
 import { createPurchaseOrder } from "@/lib/purchases/purchases.service";
 import { checkTransactionAgainstBudget } from "@/lib/budgeting/budget.service";
-import { ClipboardCheck, Plus, Search, Filter, History, MoreVertical, Loader2, PackageCheck, Zap, ShieldAlert, AlertCircle } from "lucide-react";
+import { 
+  ClipboardCheck, 
+  Plus, 
+  Search, 
+  Filter, 
+  History, 
+  MoreVertical, 
+  Loader2, 
+  Zap, 
+  ShieldAlert, 
+  ShoppingCart, 
+  CheckCircle2, 
+  FileText, 
+  Trash2 
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { cn } from '@/lib/utils';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 
 export default function PurchaseOrdersPage() {
@@ -306,7 +328,7 @@ export default function PurchaseOrdersPage() {
               <DialogFooter className="bg-secondary/10 p-6 -mx-6 -mb-6 rounded-b-lg gap-2 border-t border-border/50">
                 <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="text-xs h-11 font-black uppercase tracking-widest">Discard</Button>
                 <Button type="submit" disabled={isProcessing} className="h-11 px-10 font-bold uppercase text-xs shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-2">
-                  {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <ClipboardCheck className="size-4" />} Validate & Commit PO
+                  {isProcessing ? <Loader2 className="size-3 animate-spin mr-2" /> : <ClipboardCheck className="size-4" />} Validate & Commit PO
                 </Button>
               </DialogFooter>
             </form>

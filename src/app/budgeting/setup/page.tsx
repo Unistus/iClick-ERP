@@ -23,7 +23,8 @@ import {
   Unlock,
   AlertTriangle,
   ShoppingCart,
-  ShieldAlert
+  ShieldAlert,
+  Calculator
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
@@ -36,6 +37,7 @@ export default function BudgetSetupPage() {
   const { user } = useUser();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(false);
 
   // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
@@ -85,6 +87,30 @@ export default function BudgetSetupPage() {
     }
   };
 
+  const handleBootstrap = async () => {
+    if (!selectedInstId) return;
+    setIsBootstrapping(true);
+    // Standard Pattern: Ensure a variance/contingency node exists
+    const coaRef = doc(db, 'institutions', selectedInstId, 'coa', 'budget_variance');
+    try {
+      await setDoc(coaRef, {
+        id: 'budget_variance',
+        code: '3200',
+        name: 'Unallocated Budget Buffer',
+        type: 'Equity',
+        subtype: 'Retained Earnings',
+        balance: 0,
+        isActive: true,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      toast({ title: "Financial Nodes Synced", description: "Budget variance and buffer accounts initialized." });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Bootstrap Failed" });
+    } finally {
+      setIsBootstrapping(false);
+    }
+  };
+
   const handleTogglePeriod = async (periodId: string, currentStatus: string) => {
     if (!selectedInstId) return;
     const newStatus = currentStatus === 'Open' ? 'Closed' : 'Open';
@@ -129,16 +155,28 @@ export default function BudgetSetupPage() {
             </div>
           </div>
           
-          <Select value={selectedInstId} onValueChange={setSelectedInstId}>
-            <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
-              <SelectValue placeholder="Select Institution" />
-            </SelectTrigger>
-            <SelectContent>
-              {institutions?.map(i => (
-                <SelectItem key={i.id} value={i.id} className="text-xs font-bold">{i.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2 items-center">
+            <Select value={selectedInstId} onValueChange={setSelectedInstId}>
+              <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
+                <SelectValue placeholder="Select Institution" />
+              </SelectTrigger>
+              <SelectContent>
+                {institutions?.map(i => (
+                  <SelectItem key={i.id} value={i.id} className="text-xs font-bold">{i.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="gap-2 h-9 text-[10px] font-black uppercase border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/5 shadow-sm"
+              disabled={!selectedInstId || isBootstrapping}
+              onClick={handleBootstrap}
+            >
+              {isBootstrapping ? <Loader2 className="size-3 animate-spin" /> : <Calculator className="size-3" />} 
+              Sync Financial Nodes
+            </Button>
+          </div>
         </div>
 
         {!selectedInstId ? (

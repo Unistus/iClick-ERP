@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -40,6 +39,7 @@ import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { bootstrapHRFinancials } from '@/lib/hr/hr.service';
 
 export default function HRSetupPage() {
   const db = useFirestore();
@@ -108,6 +108,19 @@ export default function HRSetupPage() {
     }
   };
 
+  const handleBootstrap = async () => {
+    if (!selectedInstId) return;
+    setIsBootstrapping(true);
+    try {
+      await bootstrapHRFinancials(db, selectedInstId);
+      toast({ title: "Financial Nodes Synced", description: "HR payroll and liability accounts created in COA." });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Bootstrap Failed" });
+    } finally {
+      setIsBootstrapping(false);
+    }
+  };
+
   const handleAddSubItem = (col: string, e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId) return;
@@ -123,36 +136,6 @@ export default function HRSetupPage() {
     addDocumentNonBlocking(collection(db, 'institutions', selectedInstId, col), data);
     e.currentTarget.reset();
     toast({ title: "Policy Node Added" });
-  };
-
-  const handleTogglePeriod = async (periodId: string, currentStatus: string) => {
-    if (!selectedInstId) return;
-    const newStatus = currentStatus === 'Open' ? 'Closed' : 'Open';
-    const ref = doc(db, 'institutions', selectedInstId, 'fiscal_periods', periodId);
-    try {
-      await updateDoc(ref, { status: newStatus, updatedAt: serverTimestamp() });
-      toast({ title: `Period ${newStatus}` });
-    } catch (err) {
-      toast({ variant: "destructive", title: "Status Update Failed" });
-    }
-  };
-
-  const handleAddPeriod = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!selectedInstId) return;
-    const formData = new FormData(e.currentTarget);
-    const data = {
-      name: formData.get('name'),
-      startDate: formData.get('startDate'),
-      endDate: formData.get('endDate'),
-      status: 'Open',
-      institutionId: selectedInstId,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    };
-    addDocumentNonBlocking(collection(db, 'institutions', selectedInstId, 'fiscal_periods'), data);
-    e.currentTarget.reset();
-    toast({ title: "Fiscal Period Created" });
   };
 
   const AccountSelect = ({ name, label, description, typeFilter }: { name: string, label: string, description: string, typeFilter?: string[] }) => (
@@ -192,7 +175,7 @@ export default function HRSetupPage() {
           
           <div className="flex gap-2 items-center">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
-              <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
+              <SelectTrigger className="w-full md:w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
                 <SelectValue placeholder="Select Institution" />
               </SelectTrigger>
               <SelectContent>
@@ -201,6 +184,16 @@ export default function HRSetupPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="gap-2 h-9 text-[10px] font-black uppercase border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/5 shadow-sm"
+              disabled={!selectedInstId || isBootstrapping}
+              onClick={handleBootstrap}
+            >
+              {isBootstrapping ? <Loader2 className="size-3 animate-spin" /> : <Calculator className="size-3" />} 
+              Sync Financial Nodes
+            </Button>
           </div>
         </div>
 
@@ -401,10 +394,18 @@ export default function HRSetupPage() {
                   </CardHeader>
                   <CardContent className="p-6 space-y-8">
                     <div className="grid md:grid-cols-2 gap-8">
-                      <AccountSelect name="salariesExpenseAccountId" label="Salaries & Wages" description="Primary expense node for monthly payroll." typeFilter={['Expense']} />
-                      <AccountSelect name="salariesPayableAccountId" label="Salaries Payable" description="Liability node for pending payroll runs." typeFilter={['Liability']} />
-                      <AccountSelect name="payeLiabilityAccountId" label="P.A.Y.E Tax Liability" description="Liability node for statutory deductions." typeFilter={['Liability']} />
-                      <AccountSelect name="benefitsExpenseAccountId" label="Staff Benefits" description="Expense node for medical/pension costs." typeFilter={['Expense']} />
+                      <div className="space-y-6">
+                        <h3 className="text-xs font-bold text-primary uppercase border-b pb-2">Expense Allocation</h3>
+                        <AccountSelect name="salariesExpenseAccountId" label="Basic Salaries" description="Standard monthly wage node." typeFilter={['Expense']} />
+                        <AccountSelect name="overtimeExpenseAccountId" label="Overtime Wages" description="Node for additional labor hours." typeFilter={['Expense']} />
+                        <AccountSelect name="benefitsExpenseAccountId" label="Staff Welfare" description="Allowance and benefit costs." typeFilter={['Expense']} />
+                      </div>
+                      <div className="space-y-6">
+                        <h3 className="text-xs font-bold text-accent uppercase border-b pb-2">Liability Accrual</h3>
+                        <AccountSelect name="salariesPayableAccountId" label="Net Salaries Payable" description="Net pay owed to staff." typeFilter={['Liability']} />
+                        <AccountSelect name="payeLiabilityAccountId" label="P.A.Y.E Tax Node" description="Tax withheld for the revenue authority." typeFilter={['Liability']} />
+                        <AccountSelect name="statutoryLiabilityAccountId" label="Statutory Deductions" description="Health and pension accruals." typeFilter={['Liability']} />
+                      </div>
                     </div>
 
                     <div className="p-6 bg-primary/5 border border-primary/10 rounded-2xl flex gap-4 items-start shadow-inner">

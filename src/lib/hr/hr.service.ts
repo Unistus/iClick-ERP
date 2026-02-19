@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Firestore, collection, doc, serverTimestamp, addDoc, updateDoc, getDoc, runTransaction, setDoc } from 'firebase/firestore';
@@ -15,18 +14,23 @@ export interface EmployeePayload {
   salary: number;
   hireDate: string;
   status: 'Active' | 'Onboarding' | 'Suspended' | 'Terminated';
+  gender: 'Male' | 'Female';
   userId?: string; 
 }
 
 /**
  * Bootstraps the required HR financial nodes in the COA.
+ * Standard Pattern: Create nodes if missing + Update module settings.
  */
 export async function bootstrapHRFinancials(db: Firestore, institutionId: string) {
   const nodes = [
     { id: 'salaries_expense', code: '6000', name: 'Salaries & Wages', type: 'Expense', subtype: 'Salaries' },
+    { id: 'overtime_expense', code: '6010', name: 'Overtime Compensation', type: 'Expense', subtype: 'Salaries' },
+    { id: 'allowances_expense', code: '6020', name: 'Staff Allowances', type: 'Expense', subtype: 'Salaries' },
     { id: 'salaries_payable', code: '2300', name: 'Net Salaries Payable', type: 'Liability', subtype: 'Accrued Liabilities' },
-    { id: 'paye_liability', code: '2310', name: 'P.A.Y.E Tax Payable', type: 'Liability', subtype: 'VAT Payable' },
-    { id: 'staff_benefits', code: '6010', name: 'Employee Benefits & Welfare', type: 'Expense', subtype: 'Salaries' },
+    { id: 'paye_liability', code: '2310', name: 'P.A.Y.E Tax Payable', type: 'Liability', subtype: 'Accrued Liabilities' },
+    { id: 'statutory_deductions', code: '2320', name: 'Statutory Health & Pension', type: 'Liability', subtype: 'Accrued Liabilities' },
+    { id: 'benefits_expense', code: '6030', name: 'Employee Welfare & Benefits', type: 'Expense', subtype: 'Salaries' },
   ];
 
   for (const node of nodes) {
@@ -45,7 +49,10 @@ export async function bootstrapHRFinancials(db: Firestore, institutionId: string
     salariesExpenseAccountId: 'salaries_expense',
     salariesPayableAccountId: 'salaries_payable',
     payeLiabilityAccountId: 'paye_liability',
-    benefitsExpenseAccountId: 'staff_benefits',
+    benefitsExpenseAccountId: 'benefits_expense',
+    overtimeExpenseAccountId: 'overtime_expense',
+    statutoryLiabilityAccountId: 'statutory_deductions',
+    updatedAt: serverTimestamp(),
   }, { merge: true });
 }
 
@@ -88,6 +95,27 @@ export async function logDisciplinaryRecord(db: Firestore, institutionId: string
   const colRef = collection(db, 'institutions', institutionId, 'disciplinary_records');
   return addDoc(colRef, {
     ...payload,
+    status: 'Active',
     createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+}
+
+export async function conductPerformanceReview(db: Firestore, institutionId: string, payload: any) {
+  const colRef = collection(db, 'institutions', institutionId, 'performance_reviews');
+  return addDoc(colRef, {
+    ...payload,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+}
+
+export async function createShiftAssignment(db: Firestore, institutionId: string, payload: any) {
+  const colRef = collection(db, 'institutions', institutionId, 'shifts');
+  return addDoc(colRef, {
+    ...payload,
+    status: 'Scheduled',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
   });
 }

@@ -22,13 +22,15 @@ import {
   Star, 
   Wallet, 
   Gift, 
-  MessageSquare, 
   Plus, 
   Trash2, 
   ShieldCheck, 
   Sparkles,
   Tag,
-  BadgeCent
+  BadgeCent,
+  Zap,
+  TrendingUp,
+  Info
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
@@ -62,6 +64,12 @@ export default function CRMSetupPage() {
   }, [db, selectedInstId]);
   const { data: types } = useCollection(typesRef);
 
+  const promosRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'promo_codes');
+  }, [db, selectedInstId]);
+  const { data: promos } = useCollection(promosRef);
+
   const handleSavePolicy = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || !setupRef) return;
@@ -70,8 +78,10 @@ export default function CRMSetupPage() {
     const formData = new FormData(e.currentTarget);
     const updates: any = {};
     formData.forEach((value, key) => {
-      if (key === 'autoAwardPoints' || key === 'strictCreditControl') {
+      if (key === 'autoAwardPoints' || key === 'strictCreditControl' || key === 'autoAssignPromo') {
         updates[key] = value === 'on';
+      } else if (key === 'promoThresholdAmount') {
+        updates[key] = parseFloat(value as string) || 0;
       } else {
         updates[key] = value;
       }
@@ -83,7 +93,7 @@ export default function CRMSetupPage() {
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      logSystemEvent(db, selectedInstId, user, 'CRM', 'Update Setup', 'Institutional CRM policies modified.');
+      logSystemEvent(db, selectedInstId, user, 'CRM', 'Update Setup', 'Institutional CRM & Sales policies modified.');
       toast({ title: "Policies Deployed" });
     } catch (err) {
       toast({ variant: "destructive", title: "Deployment Failed" });
@@ -115,7 +125,7 @@ export default function CRMSetupPage() {
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-1.5 rounded bg-primary/20 text-primary shadow-inner">
+            <div className="p-1.5 rounded bg-primary/20 text-primary shadow-inner border border-primary/10">
               <Settings2 className="size-5" />
             </div>
             <div>
@@ -125,7 +135,7 @@ export default function CRMSetupPage() {
           </div>
           
           <Select value={selectedInstId} onValueChange={setSelectedInstId}>
-            <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold">
+            <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
               <SelectValue placeholder="Select Institution" />
             </SelectTrigger>
             <SelectContent>
@@ -143,10 +153,11 @@ export default function CRMSetupPage() {
           </div>
         ) : (
           <Tabs defaultValue="loyalty" className="w-full">
-            <TabsList className="bg-secondary/20 h-auto p-1 mb-6 flex-wrap justify-start gap-1">
-              <TabsTrigger value="loyalty" className="text-xs gap-2"><Star className="size-3.5" /> Loyalty & Points</TabsTrigger>
-              <TabsTrigger value="structure" className="text-xs gap-2"><Users className="size-3.5" /> Customer Identity</TabsTrigger>
-              <TabsTrigger value="financial" className="text-xs gap-2"><Wallet className="size-3.5" /> Financial Policy</TabsTrigger>
+            <TabsList className="bg-secondary/20 h-auto p-1 mb-6 flex-wrap justify-start gap-1 bg-transparent border-b rounded-none">
+              <TabsTrigger value="loyalty" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Star className="size-3.5" /> Loyalty & Points</TabsTrigger>
+              <TabsTrigger value="structure" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Users className="size-3.5" /> Customer Identity</TabsTrigger>
+              <TabsTrigger value="financial" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Wallet className="size-3.5" /> Financial Policy</TabsTrigger>
+              <TabsTrigger value="sales" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><TrendingUp className="size-3.5" /> Sales & Incentives</TabsTrigger>
             </TabsList>
 
             <TabsContent value="loyalty">
@@ -154,7 +165,7 @@ export default function CRMSetupPage() {
                 <div className="grid gap-6 lg:grid-cols-12">
                   <div className="lg:col-span-8 space-y-6">
                     <Card className="border-none ring-1 ring-border shadow-2xl bg-card">
-                      <CardHeader className="border-b border-border/50">
+                      <CardHeader className="border-b border-border/50 bg-secondary/10">
                         <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                           <Star className="size-4 text-accent" /> Reward Parameters
                         </CardTitle>
@@ -162,8 +173,8 @@ export default function CRMSetupPage() {
                       <CardContent className="p-6 grid gap-8 md:grid-cols-2">
                         <div className="space-y-4">
                           <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Points per 100 Currency Spent</Label>
-                          <Input name="pointsEarnRate" type="number" step="0.1" defaultValue={setup?.pointsEarnRate || 1} className="h-10 text-lg font-black" />
-                          <p className="text-[9px] text-muted-foreground italic">Standard: 1 point per 100 KES. Adjust for premium programs.</p>
+                          <Input name="pointsEarnRate" type="number" step="0.1" defaultValue={setup?.pointsEarnRate || 1} className="h-10 text-lg font-black bg-secondary/5" />
+                          <p className="text-[9px] text-muted-foreground italic leading-tight">Standard institutional rate. Awarded on finalized invoices.</p>
                         </div>
                         <div className="space-y-6 pt-2">
                           <div className="flex items-center justify-between">
@@ -185,7 +196,7 @@ export default function CRMSetupPage() {
                         <p className="text-[11px] leading-relaxed text-muted-foreground">
                           Define how your customers earn status. These rates are applied across POS and Sales modules automatically.
                         </p>
-                        <Button type="submit" disabled={isSaving} className="w-full h-10 font-black uppercase text-[10px] gap-2 px-10 shadow-lg shadow-primary/20 bg-primary">
+                        <Button type="submit" disabled={isSaving} className="w-full h-10 font-black uppercase text-[10px] gap-2 px-10 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90">
                           {isSaving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />} Commit Loyalty Rules
                         </Button>
                       </CardContent>
@@ -236,7 +247,7 @@ export default function CRMSetupPage() {
                   <CardContent className="p-0">
                     <div className="p-4 border-b bg-secondary/5">
                       <form onSubmit={(e) => handleAddSubItem('customer_types', e)} className="flex gap-2">
-                        <Input name="name" placeholder="Type (e.g. Corporate, Gov, Individual)" required className="h-9 text-xs" />
+                        <Input name="name" placeholder="Type (e.g. Corporate, Individual)" required className="h-9 text-xs" />
                         <Button type="submit" size="sm" className="h-9 px-4 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
                       </form>
                     </div>
@@ -262,7 +273,7 @@ export default function CRMSetupPage() {
             <TabsContent value="financial">
               <form onSubmit={handleSavePolicy}>
                 <Card className="border-none ring-1 ring-border shadow-2xl bg-card">
-                  <CardHeader className="border-b border-border/50 bg-secondary/5">
+                  <CardHeader className="border-b border-border/50 bg-secondary/10">
                     <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                       <BadgeCent className="size-4 text-emerald-500" /> Trust & Credit Governance
                     </CardTitle>
@@ -270,15 +281,15 @@ export default function CRMSetupPage() {
                   <CardContent className="p-6 space-y-8">
                     <div className="grid md:grid-cols-2 gap-8">
                       <div className="space-y-4">
-                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Default Credit Limit (KES)</Label>
-                        <Input name="defaultCreditLimit" type="number" defaultValue={setup?.defaultCreditLimit || 0} className="h-10 font-bold" />
-                        <p className="text-[9px] text-muted-foreground italic">Applied to all new 'Approved' customers automatically.</p>
+                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Default Credit Limit ({currency})</Label>
+                        <Input name="defaultCreditLimit" type="number" defaultValue={setup?.defaultCreditLimit || 0} className="h-10 font-bold bg-secondary/5" />
+                        <p className="text-[9px] text-muted-foreground italic">Assigned automatically to new 'Approved' customers.</p>
                       </div>
                       <div className="space-y-6 pt-4">
                         <div className="flex items-center justify-between">
                           <div className="space-y-0.5">
                             <Label className="text-xs font-bold">Strict Credit Control</Label>
-                            <p className="text-[10px] text-muted-foreground">Block invoices if total balance exceeds customer limit.</p>
+                            <p className="text-[10px] text-muted-foreground">Block invoices if balance exceeds customer limit.</p>
                           </div>
                           <Switch name="strictCreditControl" defaultChecked={setup?.strictCreditControl} />
                         </div>
@@ -289,6 +300,70 @@ export default function CRMSetupPage() {
                     </Button>
                   </CardContent>
                 </Card>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="sales">
+              <form onSubmit={handleSavePolicy}>
+                <div className="grid gap-6 lg:grid-cols-12">
+                  <div className="lg:col-span-8 space-y-6">
+                    <Card className="border-none ring-1 ring-border shadow-2xl bg-card">
+                      <CardHeader className="border-b border-border/50 bg-secondary/10">
+                        <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                          <Zap className="size-4 text-primary" /> Automated Rewards
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-6 space-y-6">
+                        <div className="grid md:grid-cols-2 gap-8">
+                          <div className="space-y-4">
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Trigger Threshold Amount ({currency})</Label>
+                            <Input name="promoThresholdAmount" type="number" defaultValue={setup?.promoThresholdAmount || 5000} className="h-10 font-black bg-secondary/5" />
+                            <p className="text-[9px] text-muted-foreground italic">Min. invoice total to automatically assign a reward.</p>
+                          </div>
+                          <div className="space-y-4">
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Auto-Assign Promo Code</Label>
+                            <Select name="autoPromoId" defaultValue={setup?.autoPromoId}>
+                              <SelectTrigger className="h-10 font-bold uppercase bg-secondary/5">
+                                <SelectValue placeholder="Select Reward Rule..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {promos?.map(p => (
+                                  <SelectItem key={p.id} value={p.id} className="text-xs font-bold uppercase">{p.code} ({p.value}{p.type === 'Percentage' ? '%' : ''} Off)</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-[9px] text-muted-foreground italic">This promo will be tagged during invoice creation.</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl border border-primary/10">
+                          <div className="space-y-0.5">
+                            <Label className="text-xs font-bold">Enable Auto-Promotion</Label>
+                            <p className="text-[10px] text-muted-foreground">Trigger rewards instantly when threshold is breached in Sales.</p>
+                          </div>
+                          <Switch name="autoAssignPromo" defaultChecked={setup?.autoAssignPromo} />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  <div className="lg:col-span-4">
+                    <Card className="border-none ring-1 ring-border shadow-xl bg-secondary/5 h-full relative overflow-hidden">
+                      <div className="absolute -right-4 -bottom-4 opacity-5 rotate-12"><Zap className="size-24 text-primary" /></div>
+                      <CardHeader><CardTitle className="text-xs font-black uppercase tracking-widest">Incentive Hub</CardTitle></CardHeader>
+                      <CardContent className="space-y-4 relative z-10">
+                        <div className="flex gap-3 items-start">
+                          <Info className="size-4 text-primary shrink-0 mt-0.5" />
+                          <p className="text-[11px] leading-relaxed text-muted-foreground font-medium italic">
+                            "Incentive automation reduces manual staff friction at checkout. High-value transactions are instantly recognized and rewarded, improving customer retention cycles."
+                          </p>
+                        </div>
+                        <Button type="submit" disabled={isSaving} className="w-full h-11 font-black uppercase text-[10px] gap-2 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90">
+                          {isSaving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />} Commit Sales Config
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
               </form>
             </TabsContent>
           </Tabs>

@@ -6,6 +6,7 @@ import { addDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase/no
 import { postJournalEntry } from '../accounting/journal.service';
 import { recordStockMovement } from '../inventory/inventory.service';
 import { getNextSequence } from '../sequence-service';
+import { createGiftCard } from '../crm/crm.service';
 
 export interface SalesItem {
   productId: string;
@@ -25,6 +26,9 @@ export interface SalesInvoicePayload {
   total: number;
   paymentMethod: 'Credit' | 'Cash' | 'Bank';
   orderId?: string;
+  issueGiftCard?: boolean;
+  giftCardAmount?: number;
+  appliedPromoId?: string;
 }
 
 /**
@@ -45,7 +49,7 @@ export async function createSalesInvoice(db: Firestore, institutionId: string, p
 
   // 2. Initial Save as Draft (No Posting Yet)
   const invoiceRef = collection(db, 'institutions', institutionId, 'sales_invoices');
-  return addDoc(invoiceRef, {
+  const newInvoice = await addDoc(invoiceRef, {
     ...payload,
     invoiceNumber,
     status: 'Draft',
@@ -55,6 +59,22 @@ export async function createSalesInvoice(db: Firestore, institutionId: string, p
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   });
+
+  // 3. Optional: Issue Gift Card autonomously
+  if (payload.issueGiftCard && payload.giftCardAmount && payload.giftCardAmount > 0) {
+    const gcCode = await getNextSequence(db, institutionId, 'gift_card');
+    await createGiftCard(db, institutionId, {
+      code: gcCode,
+      initialBalance: payload.giftCardAmount,
+      balance: payload.giftCardAmount,
+      status: 'Active',
+      customerId: payload.customerId,
+      sourceInvoiceId: newInvoice.id,
+      issuedBy: userId
+    });
+  }
+
+  return newInvoice;
 }
 
 /**

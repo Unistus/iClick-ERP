@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -105,6 +106,13 @@ export default function CustomerDirectoryPage() {
   }, [db, selectedInstId]);
   const { data: customerTypes } = useCollection(typesRef);
 
+  // GLOBAL SETTINGS FOR CURRENCY
+  const settingsRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return doc(db, 'institutions', selectedInstId, 'settings', 'global');
+  }, [db, selectedInstId]);
+  const { data: settings } = useDoc(settingsRef);
+
   const crmSetupRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return doc(db, 'institutions', selectedInstId, 'settings', 'crm');
@@ -128,6 +136,8 @@ export default function CustomerDirectoryPage() {
 
   const staffRef = useMemoFirebase(() => collection(db, 'users'), [db]);
   const { data: staffMembers } = useCollection(staffRef);
+
+  const currency = settings?.general?.currencySymbol || "KES";
 
   const countries = geoNodes?.filter(n => n.level === 'Country') || [];
   const towns = geoNodes?.filter(n => n.level === 'Town' && n.parentId === selectedCountryId) || [];
@@ -227,7 +237,7 @@ export default function CustomerDirectoryPage() {
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-1.5 rounded bg-primary/20 text-primary shadow-inner">
+            <div className="p-1.5 rounded bg-primary/20 text-primary shadow-inner border border-primary/10">
               <Users className="size-5" />
             </div>
             <div>
@@ -371,7 +381,7 @@ export default function CustomerDirectoryPage() {
                                 <History className="size-3.5" /> View Activity Stream
                               </DropdownMenuItem>
                               <DropdownMenuItem className="text-xs gap-2">
-                                <FileText className="size-3.5 text-accent" /> Export Statements
+                                <FileText className="size-3.5" /> Export Statements
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem className="text-xs gap-2 text-destructive" onClick={() => handleDelete(c.id)}>

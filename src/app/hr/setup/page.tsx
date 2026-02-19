@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -33,7 +34,11 @@ import {
   Landmark,
   Timer,
   Venus,
-  Mars
+  Mars,
+  ShieldAlert,
+  Calendar,
+  Flame,
+  UserCheck
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
@@ -70,6 +75,24 @@ export default function HRSetupPage() {
   }, [db, selectedInstId]);
   const { data: jobLevels } = useCollection(jobLevelsRef);
 
+  const payGradesRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'pay_grades');
+  }, [db, selectedInstId]);
+  const { data: payGrades } = useCollection(payGradesRef);
+
+  const shiftTypesRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'shift_types');
+  }, [db, selectedInstId]);
+  const { data: shiftTypes } = useCollection(shiftTypesRef);
+
+  const holidaysRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'holidays');
+  }, [db, selectedInstId]);
+  const { data: holidays } = useCollection(holidaysRef);
+
   const coaRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return collection(db, 'institutions', selectedInstId, 'coa');
@@ -84,9 +107,9 @@ export default function HRSetupPage() {
     const formData = new FormData(e.currentTarget);
     const updates: any = {};
     formData.forEach((value, key) => {
-      if (key === 'enableAutoOvertime' || key === 'strictGeoFencing' || key === 'requireManagerSignoff') {
+      if (['enableAutoOvertime', 'strictGeoFencing', 'requireManagerSignoff', 'restrictPosByShift', 'blockHolidayClockIn', 'strictOtApproval'].includes(key)) {
         updates[key] = value === 'on';
-      } else if (key === 'lateToleranceMins' || key === 'standardShiftHours') {
+      } else if (['lateToleranceMins', 'standardShiftHours'].includes(key)) {
         updates[key] = parseInt(value as string) || 0;
       } else {
         updates[key] = value;
@@ -129,13 +152,25 @@ export default function HRSetupPage() {
       name: formData.get('name'),
       createdAt: serverTimestamp()
     };
+    
     if (col === 'leave_types') {
       data.daysPerYear = parseInt(formData.get('days') as string) || 0;
       data.genderApplicability = formData.get('genderApplicability') || 'All';
+    } else if (col === 'shift_types') {
+      data.startTime = formData.get('start');
+      data.endTime = formData.get('end');
+      data.graceMins = parseInt(formData.get('grace') as string) || 0;
+    } else if (col === 'holidays') {
+      data.date = formData.get('date');
+      data.type = formData.get('type');
+    } else if (col === 'pay_grades') {
+      data.minSalary = parseFloat(formData.get('min') as string) || 0;
+      data.maxSalary = parseFloat(formData.get('max') as string) || 0;
     }
+
     addDocumentNonBlocking(collection(db, 'institutions', selectedInstId, col), data);
     e.currentTarget.reset();
-    toast({ title: "Policy Node Added" });
+    toast({ title: "Node Registered" });
   };
 
   const AccountSelect = ({ name, label, description, typeFilter }: { name: string, label: string, description: string, typeFilter?: string[] }) => (
@@ -175,7 +210,7 @@ export default function HRSetupPage() {
           
           <div className="flex gap-2 items-center">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
-              <SelectTrigger className="w-full md:w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
+              <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
                 <SelectValue placeholder="Select Institution" />
               </SelectTrigger>
               <SelectContent>
@@ -206,6 +241,7 @@ export default function HRSetupPage() {
           <Tabs defaultValue="policy" className="w-full">
             <TabsList className="bg-secondary/20 h-auto p-1 mb-6 flex-wrap justify-start gap-1 bg-transparent border-b rounded-none">
               <TabsTrigger value="policy" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Timer className="size-3.5" /> Shift & Attendance</TabsTrigger>
+              <TabsTrigger value="holidays" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Calendar className="size-3.5" /> Hours & Holidays</TabsTrigger>
               <TabsTrigger value="leave" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><CalendarDays className="size-3.5" /> Leave Registry</TabsTrigger>
               <TabsTrigger value="structure" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Briefcase className="size-3.5" /> Job Structure</TabsTrigger>
               <TabsTrigger value="financial" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Calculator className="size-3.5" /> Payroll Ledger</TabsTrigger>
@@ -226,11 +262,13 @@ export default function HRSetupPage() {
                           <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Late-in Tolerance (Minutes)</Label>
                             <Input name="lateToleranceMins" type="number" defaultValue={setup?.lateToleranceMins || 15} className="h-10 text-lg font-black bg-secondary/5" />
-                            <p className="text-[9px] text-muted-foreground italic">Grace period before shift is flagged as "Late".</p>
                           </div>
-                          <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Standard Shift Duration (Hours)</Label>
-                            <Input name="standardShiftHours" type="number" defaultValue={setup?.standardShiftHours || 8} className="h-10 text-lg font-black bg-secondary/5" />
+                          <div className="flex items-center justify-between p-4 bg-accent/5 rounded-xl border border-accent/10 mt-4">
+                            <div className="space-y-0.5">
+                              <Label className="text-xs font-bold text-accent">Restrict POS Access</Label>
+                              <p className="text-[10px] text-muted-foreground">Only allow POS login during assigned shift window.</p>
+                            </div>
+                            <Switch name="restrictPosByShift" defaultChecked={setup?.restrictPosByShift} />
                           </div>
                         </div>
                         <div className="space-y-6 pt-2">
@@ -243,22 +281,55 @@ export default function HRSetupPage() {
                           </div>
                           <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
-                              <Label className="text-xs font-bold">Auto-Overtime Trigger</Label>
-                              <p className="text-[10px] text-muted-foreground">Calculate OT automatically after shift end.</p>
+                              <Label className="text-xs font-bold">Require Manager Signoff</Label>
+                              <p className="text-[10px] text-muted-foreground">Manual attendance edits require admin approval.</p>
                             </div>
-                            <Switch name="enableAutoOvertime" defaultChecked={setup?.enableAutoOvertime} />
+                            <Switch name="requireManagerSignoff" defaultChecked={setup?.requireManagerSignoff} />
                           </div>
                         </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
+                      <CardHeader className="bg-secondary/10 border-b flex flex-row items-center justify-between">
+                        <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                          <Timer className="size-4 text-primary" /> Shift Type Registry
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <div className="p-4 border-b bg-secondary/5">
+                          <form onSubmit={(e) => handleAddSubItem('shift_types', e)} className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                            <Input name="name" placeholder="Shift Name" required className="h-9 text-xs col-span-2" />
+                            <Input name="start" type="time" required className="h-9 text-xs" />
+                            <Input name="end" type="time" required className="h-9 text-xs" />
+                            <Button type="submit" size="sm" className="h-9 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
+                          </form>
+                        </div>
+                        <Table>
+                          <TableBody>
+                            {shiftTypes?.map(s => (
+                              <TableRow key={s.id} className="h-12 hover:bg-secondary/5 group">
+                                <TableCell className="text-xs font-bold pl-6 uppercase">{s.name}</TableCell>
+                                <TableCell className="text-center text-[10px] font-mono text-primary font-bold">{s.startTime} — {s.endTime}</TableCell>
+                                <TableCell className="text-right pr-6">
+                                  <Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'shift_types', s.id))}>
+                                    <Trash2 className="size-3.5" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
                       </CardContent>
                     </Card>
                   </div>
                   <div className="lg:col-span-4">
                     <Card className="border-none ring-1 ring-border shadow bg-primary/5 h-full relative overflow-hidden">
-                      <div className="absolute -right-4 -bottom-4 opacity-5 rotate-12"><Sparkles className="size-24" /></div>
-                      <CardHeader><CardTitle className="text-xs font-black uppercase tracking-widest">Labor Logic</CardTitle></CardHeader>
+                      <div className="absolute -right-4 -bottom-4 opacity-5 rotate-12"><Zap className="size-24" /></div>
+                      <CardHeader><CardTitle className="text-xs font-black uppercase tracking-widest">Shift Authority</CardTitle></CardHeader>
                       <CardContent className="space-y-4 relative z-10">
-                        <p className="text-[11px] leading-relaxed text-muted-foreground">
-                          These policies govern the real-time **Time & Attendance** module. Changes will take effect for all subsequent shift logs.
+                        <p className="text-[11px] leading-relaxed text-muted-foreground italic">
+                          "Enabling **POS Shift Restriction** prevents unauthorized users from performing sales outside their assigned roster hours."
                         </p>
                         <Button type="submit" disabled={isSaving} className="w-full h-10 font-black uppercase text-[10px] gap-2 px-10 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90">
                           {isSaving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />} Commit Labor Rules
@@ -268,6 +339,97 @@ export default function HRSetupPage() {
                   </div>
                 </div>
               </form>
+            </TabsContent>
+
+            <TabsContent value="holidays">
+              <div className="grid gap-6 lg:grid-cols-12">
+                <div className="lg:col-span-8 space-y-6">
+                  <form onSubmit={handleSavePolicy}>
+                    <Card className="border-none ring-1 ring-border shadow-xl bg-card">
+                      <CardHeader className="bg-secondary/10 border-b">
+                        <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                          <Flame className="size-4 text-accent" /> Overtime & Holiday Policy
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-6 space-y-6">
+                        <div className="grid md:grid-cols-2 gap-8">
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between p-4 bg-secondary/10 rounded-xl border">
+                              <div className="space-y-0.5">
+                                <Label className="text-xs font-bold">Block Holiday Clock-In</Label>
+                                <p className="text-[10px] text-muted-foreground">Prevent entry on holidays unless OT is allocated.</p>
+                              </div>
+                              <Switch name="blockHolidayClockIn" defaultChecked={setup?.blockHolidayClockIn} />
+                            </div>
+                            <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl border border-primary/10">
+                              <div className="space-y-0.5">
+                                <Label className="text-xs font-bold text-primary">Strict OT Approval</Label>
+                                <p className="text-[10px] text-muted-foreground">Only direct Reporting Managers can approve overtime.</p>
+                              </div>
+                              <Switch name="strictOtApproval" defaultChecked={setup?.strictOtApproval} />
+                            </div>
+                          </div>
+                          <div className="space-y-4">
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Overtime Approver Role</Label>
+                            <Select name="otApproverRole" defaultValue={setup?.otApproverRole || "Reporting Manager"}>
+                              <SelectTrigger className="h-10 font-bold uppercase text-[10px]"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Reporting Manager" className="text-xs">Reporting Manager</SelectItem>
+                                <SelectItem value="HR Admin" className="text-xs">HR Admin</SelectItem>
+                                <SelectItem value="Institutional Admin" className="text-xs">Institutional Admin</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button type="submit" disabled={isSaving} className="w-full h-10 font-bold uppercase text-[10px] gap-2 mt-4"><Save className="size-3" /> Commit Policy</Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </form>
+
+                  <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
+                    <CardHeader className="bg-secondary/10 border-b flex flex-row items-center justify-between">
+                      <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                        <Calendar className="size-4 text-primary" /> Institutional Holidays
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="p-4 border-b bg-secondary/5">
+                        <form onSubmit={(e) => handleAddSubItem('holidays', e)} className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                          <Input name="name" placeholder="Holiday (e.g. Christmas)" required className="h-9 text-xs col-span-2" />
+                          <Input name="date" type="date" required className="h-9 text-xs" />
+                          <Button type="submit" size="sm" className="h-9 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
+                        </form>
+                      </div>
+                      <Table>
+                        <TableBody>
+                          {holidays?.map(h => (
+                            <TableRow key={h.id} className="h-12 hover:bg-secondary/5 group">
+                              <TableCell className="text-xs font-bold pl-6 uppercase">{h.name}</TableCell>
+                              <TableCell className="text-center font-mono text-[10px] text-muted-foreground">{h.date}</TableCell>
+                              <TableCell className="text-right pr-6">
+                                <Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'holidays', h.id))}>
+                                  <Trash2 className="size-3.5" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </div>
+                <div className="lg:col-span-4">
+                  <Card className="bg-accent/5 border-none ring-1 ring-accent/20 p-6 shadow-inner">
+                    <div className="flex items-center gap-2 mb-4">
+                      <ShieldAlert className="size-4 text-accent" />
+                      <p className="text-[10px] font-black uppercase text-accent tracking-widest">Labor Lock Engine</p>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground italic font-medium">
+                      "Holiday blocks prevent accidental labor cost accrual. Overtime must be explicitly allocated by a Reporting Manager before the shift starts to allow network entry."
+                    </p>
+                  </div>
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="leave">
@@ -353,15 +515,50 @@ export default function HRSetupPage() {
             <TabsContent value="structure">
               <div className="grid gap-6 lg:grid-cols-2">
                 <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
+                  <CardHeader className="bg-secondary/10 border-b flex items-center justify-between">
+                    <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                      <Landmark className="size-4 text-primary" /> Institutional Pay Grades
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="p-4 border-b bg-secondary/5">
+                      <form onSubmit={(e) => handleAddSubItem('pay_grades', e)} className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                        <Input name="name" placeholder="Grade ID" required className="h-9 text-xs col-span-1" />
+                        <Input name="min" type="number" placeholder="Min Pay" required className="h-9 text-xs" />
+                        <Input name="max" type="number" placeholder="Max Pay" required className="h-9 text-xs" />
+                        <Button type="submit" size="sm" className="h-9 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
+                      </form>
+                    </div>
+                    <Table>
+                      <TableBody>
+                        {payGrades?.map(g => (
+                          <TableRow key={g.id} className="h-12 hover:bg-secondary/5 group">
+                            <TableCell className="text-xs font-black pl-6 uppercase text-primary">{g.name}</TableCell>
+                            <TableCell className="text-[10px] font-mono text-muted-foreground">
+                              {currency} {g.minSalary.toLocaleString()} — {g.maxSalary.toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right pr-6">
+                              <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'pay_grades', g.id))}>
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
                   <CardHeader className="bg-secondary/10 border-b">
                     <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                      <GraduationCap className="size-4 text-primary" /> Job Seniority Levels
+                      <GraduationCap className="size-4 text-primary" /> Seniority & Level Node
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-0">
                     <div className="p-4 border-b bg-secondary/5">
                       <form onSubmit={(e) => handleAddSubItem('job_levels', e)} className="flex gap-2">
-                        <Input name="name" placeholder="Level (e.g. Junior, Manager)" required className="h-9 text-xs" />
+                        <Input name="name" placeholder="Level Title (e.g. L4 Manager)" required className="h-9 text-xs" />
                         <Button type="submit" size="sm" className="h-9 px-4 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
                       </form>
                     </div>

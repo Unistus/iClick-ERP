@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Firestore, collection, doc, serverTimestamp, addDoc, updateDoc, getDoc, runTransaction, setDoc } from 'firebase/firestore';
@@ -20,7 +21,6 @@ export interface EmployeePayload {
 
 /**
  * Bootstraps the required HR financial nodes in the COA.
- * Standard Pattern: Create nodes if missing + Update module settings.
  */
 export async function bootstrapHRFinancials(db: Firestore, institutionId: string) {
   const nodes = [
@@ -39,7 +39,7 @@ export async function bootstrapHRFinancials(db: Firestore, institutionId: string
       ...node,
       balance: 0,
       isActive: true,
-      isTrackedForBudget: true, // Auto-track HR expenses
+      isTrackedForBudget: true,
       updatedAt: serverTimestamp(),
     }, { merge: true });
   }

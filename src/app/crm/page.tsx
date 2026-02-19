@@ -83,13 +83,22 @@ export default function CRMOverviewPage() {
         ) : (
           <div className="space-y-6 animate-in fade-in duration-700">
             <div className="grid gap-4 md:grid-cols-4">
-              <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden group hover:ring-primary/30 transition-all">
-                <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Global Reach</span></CardHeader>
-                <CardContent className="pb-4">
-                  <div className="text-2xl font-black font-headline text-primary">{recentCustomers?.length || 0} PROFILES</div>
-                  <p className="text-[9px] text-emerald-500 font-bold mt-1 uppercase">Profiles Aggregated</p>
-                </CardContent>
-              </Card>
+              <Link href="/crm/customers" className="block group">
+                <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden relative group hover:ring-primary/30 transition-all cursor-pointer">
+                  <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform"><Users className="size-24" /></div>
+                  <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
+                    <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Global Reach</span>
+                    <ArrowUpRight className="size-3 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </CardHeader>
+                  <CardContent className="pb-4">
+                    <div className="text-2xl font-black font-headline text-primary">{recentCustomers?.length || 0} PROFILES</div>
+                    <div className="flex items-center gap-1.5 mt-1 text-emerald-500 font-bold text-[9px] uppercase">
+                      <span>View Detailed List</span>
+                      <ChevronRight className="size-2.5" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
 
               <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden">
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-accent tracking-widest">Active Loyalty</span></CardHeader>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -9,8 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, query, orderBy, doc, serverTimestamp } from "firebase/firestore";
+import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from "@/firebase";
+import { collection, query, orderBy, limit, doc, serverTimestamp } from "firebase/firestore";
 import { createPurchaseOrder } from "@/lib/purchases/purchases.service";
 import { checkTransactionAgainstBudget } from "@/lib/budgeting/budget.service";
 import { ClipboardCheck, Plus, Search, Filter, History, MoreVertical, Loader2, PackageCheck, Zap, ShieldAlert, AlertCircle } from "lucide-react";
@@ -45,6 +46,15 @@ export default function PurchaseOrdersPage() {
     return query(collection(db, 'institutions', selectedInstId, 'purchase_orders'), orderBy('createdAt', 'desc'));
   }, [db, selectedInstId]);
   const { data: orders, isLoading } = useCollection(poQuery);
+
+  // DYNAMIC BUDGET CHECK STATUS
+  const budgetSetupRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return doc(db, 'institutions', selectedInstId, 'settings', 'budgeting');
+  }, [db, selectedInstId]);
+  const { data: budgetSetup } = useDoc(budgetSetupRef);
+
+  const isEnforced = !!budgetSetup?.strictPoEnforcement;
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -108,7 +118,7 @@ export default function PurchaseOrdersPage() {
           <div className="flex gap-2 w-full md:w-auto">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
               <SelectTrigger className="w-[220px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold">
-                <SelectValue placeholder="Select Institution" />
+                <SelectValue placeholder={instLoading ? "Authorizing..." : "Select Institution"} />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (
@@ -135,12 +145,20 @@ export default function PurchaseOrdersPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
                 <Input placeholder="Search PO # or vendor..." className="pl-9 h-8 text-[10px] bg-secondary/20 border-none" />
               </div>
-              <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest text-primary">Budget Check: ENFORCED</Badge>
+              <Badge 
+                variant="outline" 
+                className={cn(
+                  "text-[10px] font-bold uppercase tracking-widest transition-all",
+                  isEnforced ? "text-primary border-primary/20 bg-primary/5" : "text-muted-foreground border-border bg-secondary/10"
+                )}
+              >
+                Budget Check: {isEnforced ? "ENFORCED" : "ADVISORY"}
+              </Badge>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader className="bg-secondary/20">
-                  <TableRow className="hover:bg-transparent">
+                  <TableRow>
                     <TableHead className="h-10 text-[10px] uppercase font-black pl-6">PO #</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-black">Supplier Entity</TableHead>
                     <TableHead className="h-10 text-[10px] uppercase font-black text-center">Status</TableHead>
@@ -158,7 +176,7 @@ export default function PurchaseOrdersPage() {
                       <TableCell className="pl-6 font-mono text-[11px] font-bold text-primary">{o.poNumber}</TableCell>
                       <TableCell className="text-xs font-bold uppercase tracking-tight">{o.supplierName}</TableCell>
                       <TableCell className="text-center">
-                        <Badge variant="outline" className={cn("text-[8px] h-4 uppercase font-black", 
+                        <Badge variant="outline" className={cn("text-[8px] h-4 uppercase font-bold", 
                           o.status === 'Draft' ? 'bg-secondary text-muted-foreground' : 'bg-emerald-500/10 text-emerald-500 border-none'
                         )}>
                           {o.status}
@@ -167,7 +185,7 @@ export default function PurchaseOrdersPage() {
                       <TableCell className="text-right font-mono text-xs font-black text-primary">KES {o.total?.toLocaleString()}</TableCell>
                       <TableCell className="text-right pr-6">
                         <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100"><MoreVertical className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100 transition-all"><MoreVertical className="size-4" /></Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -186,7 +204,9 @@ export default function PurchaseOrdersPage() {
                   <div className="p-1.5 rounded-lg bg-primary/10 text-primary"><ClipboardCheck className="size-5" /></div>
                   <DialogTitle className="text-lg font-bold">Raise Purchase Order</DialogTitle>
                 </div>
-                <CardDescription className="text-[10px] uppercase font-black tracking-widest text-primary">Compliance Verification: ACTIVE</CardDescription>
+                <CardDescription className="text-[10px] uppercase font-black tracking-widest text-primary">
+                  Compliance Status: {isEnforced ? "STRICT" : "MANUAL"}
+                </CardDescription>
               </DialogHeader>
               
               <div className="grid gap-6 py-6 text-xs">
@@ -229,7 +249,9 @@ export default function PurchaseOrdersPage() {
                   <div className="space-y-1">
                     <p className="text-[10px] font-black uppercase tracking-widest">Budget Gatekeeper</p>
                     <p className="text-[11px] leading-relaxed italic font-medium">
-                      Finalizing this PO will perform a real-time check against your institutional ceilings. Invoices exceeding the allowed threshold will be blocked if strict mode is active.
+                      {isEnforced 
+                        ? "Finalizing this PO will perform a real-time check. Invoices exceeding institutional ceilings will be blocked."
+                        : "Threshold checks are currently set to ADVISORY mode. Over-budget transactions will be flagged but not blocked."}
                     </p>
                   </div>
                 </div>

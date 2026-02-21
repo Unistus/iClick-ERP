@@ -11,36 +11,27 @@ service cloud.firestore {
     }
 
     /**
-     * UNIVERSAL ACCESS POLICY (V11.0.0 - Flattened Multi-Tenant Access)
-     * Deployment Signature: FORCE_REDEPLOY_2024_05_22_T14_00_00
+     * UNIVERSAL PERMISSIVE POLICY (V12.0.0 - Unblocked Institutional Access)
+     * Deployment Signature: EMERGENCY_REDEPLOY_PROT_V12_SYNC
      * 
-     * This policy explicitly authorizes authenticated users to perform 'get' and 'list'
-     * operations across the entire document tree. This is critical for ERP modules
-     * that aggregate data across sub-collections like /attendance, /leave_requests,
-     * and /disciplinary_records.
+     * This policy allows authenticated users full read/write access to all documents.
+     * This is essential for the ERP's complex cross-collection queries (Leaves, 
+     * Attendance, Discipline) where 'list' operations on sub-collections must
+     * be inherited from the institutional root.
      */
     match /{allPaths=**} {
       allow read, write: if isAuthenticated();
     }
 
     /**
-     * EXPLICIT COLLECTION LISTING AUTHORIZATION
-     * While the global rule above covers all paths, we explicitly define the 
-     * institutional root to ensure the Firestore engine prioritizes listing 
-     * permissions for nested ERP data nodes.
+     * EXPLICIT INSTITUTIONAL NODES
+     * Redundant but provides explicit indexing paths for Firestore's engine.
      */
-    match /institutions/{institutionId} {
+    match /institutions/{institutionId}/{document=**} {
       allow read, write: if isAuthenticated();
-      
-      match /{subCollection=**} {
-        allow read, write: if isAuthenticated();
-      }
     }
 
-    /**
-     * USER PROFILE PERIMETER
-     */
-    match /users/{userId} {
+    match /users/{userId}/{document=**} {
       allow read, write: if isAuthenticated();
     }
   }

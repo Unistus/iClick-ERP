@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, Suspense } from 'react';
@@ -37,7 +38,10 @@ import {
   Loader2,
   UserCog,
   LayoutGrid,
-  Plus
+  Plus,
+  Mars,
+  Venus,
+  ArrowUpRight
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -61,199 +65,279 @@ function PortalContent() {
   // Data Fetching: Leave History
   const leaveQuery = useMemoFirebase(() => {
     if (!selectedInstId || !employeeId) return null;
-    return query(collection(db, 'institutions', selectedInstId, 'leave_requests'), where('employeeId', '==', employeeId), orderBy('createdAt', 'desc'));
+    return query(
+      collection(db, 'institutions', selectedInstId, 'leave_requests'), 
+      where('employeeId', '==', employeeId), 
+      orderBy('createdAt', 'desc')
+    );
   }, [db, selectedInstId, employeeId]);
   const { data: leaves } = useCollection(leaveQuery);
 
   // Data Fetching: Performance Reviews
   const reviewsQuery = useMemoFirebase(() => {
     if (!selectedInstId || !employeeId) return null;
-    return query(collection(db, 'institutions', selectedInstId, 'performance_reviews'), where('employeeId', '==', employeeId), orderBy('date', 'desc'));
+    return query(
+      collection(db, 'institutions', selectedInstId, 'performance_reviews'), 
+      where('employeeId', '==', employeeId), 
+      orderBy('date', 'desc')
+    );
   }, [db, selectedInstId, employeeId]);
   const { data: reviews } = useCollection(reviewsQuery);
 
   // Data Fetching: Disciplinary Records
   const conductQuery = useMemoFirebase(() => {
     if (!selectedInstId || !employeeId) return null;
-    return query(collection(db, 'institutions', selectedInstId, 'disciplinary_records'), where('employeeId', '==', employeeId), orderBy('createdAt', 'desc'));
+    return query(
+      collection(db, 'institutions', selectedInstId, 'disciplinary_records'), 
+      where('employeeId', '==', employeeId), 
+      orderBy('createdAt', 'desc')
+    );
   }, [db, selectedInstId, employeeId]);
   const { data: conduct } = useCollection(conductQuery);
 
-  // Data Fetching: Attendance
+  // Data Fetching: Attendance Stream
   const attQuery = useMemoFirebase(() => {
     if (!selectedInstId || !employeeId) return null;
-    return query(collection(db, 'institutions', selectedInstId, 'attendance'), where('employeeId', '==', employeeId), orderBy('timestamp', 'desc'), limit(10));
+    return query(
+      collection(db, 'institutions', selectedInstId, 'attendance'), 
+      where('employeeId', '==', employeeId), 
+      orderBy('timestamp', 'desc'), 
+      limit(15)
+    );
   }, [db, selectedInstId, employeeId]);
   const { data: attendance } = useCollection(attQuery);
+
+  // Data Fetching: Branches for lookup
+  const branchesRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'branches');
+  }, [db, selectedInstId]);
+  const { data: branches } = useCollection(branchesRef);
 
   const avgPerformance = useMemo(() => {
     if (!reviews?.length) return 0;
     return reviews.reduce((sum, r) => sum + (r.score || 0), 0) / reviews.length;
   }, [reviews]);
 
+  const kraAttainment = useMemo(() => {
+    if (!reviews?.length) return 0;
+    const achieved = reviews.filter(r => r.kraAchieved).length;
+    return (achieved / reviews.length) * 100;
+  }, [reviews]);
+
   if (empLoading) {
-    return <div className="h-[60vh] flex items-center justify-center"><Loader2 className="size-8 animate-spin text-primary" /></div>;
+    return (
+      <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
+        <Loader2 className="size-10 animate-spin text-primary opacity-20" />
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground animate-pulse">Initializing Identity Hub...</p>
+      </div>
+    );
   }
 
   if (!employee) {
-    return <div className="p-12 text-center text-muted-foreground">Identity node not found.</div>;
+    return (
+      <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
+        <ShieldAlert className="size-12 text-destructive opacity-20" />
+        <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Identity Node Not Found</p>
+        <Button variant="outline" size="sm" onClick={() => router.push('/hr/employees')}>Return to Directory</Button>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      {/* PORTAL HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-card border border-border/50 p-8 rounded-3xl shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-8 opacity-5"><UserCog className="size-32" /></div>
-        <div className="flex items-center gap-6 relative z-10">
-          <div className="size-20 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black text-3xl uppercase shadow-inner border border-primary/20">
-            {employee.firstName?.[0]}{employee.lastName?.[0]}
+    <div className="space-y-6 animate-in fade-in duration-700">
+      {/* PORTAL HEADER COMMAND CENTER */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-card border border-border/50 p-8 rounded-[2rem] shadow-2xl relative overflow-hidden ring-1 ring-border/50">
+        <div className="absolute top-0 right-0 p-8 opacity-[0.03]"><UserCog className="size-48" /></div>
+        
+        <div className="flex flex-col sm:flex-row items-center gap-6 relative z-10">
+          <div className="relative group">
+            <div className="size-24 rounded-3xl bg-primary/10 flex items-center justify-center text-primary font-black text-4xl uppercase shadow-inner border border-primary/20 transition-all group-hover:scale-105 group-hover:rotate-3">
+              {employee.firstName?.[0]}{employee.lastName?.[0]}
+            </div>
+            <div className="absolute -bottom-2 -right-2 p-1.5 rounded-full bg-background ring-2 ring-emerald-500 shadow-lg">
+              <CheckCircle2 className="size-4 text-emerald-500" />
+            </div>
           </div>
-          <div className="space-y-1">
-            <h1 className="text-3xl font-headline font-bold text-foreground">
+          
+          <div className="space-y-2 text-center sm:text-left">
+            <h1 className="text-3xl font-headline font-black text-foreground tracking-tight">
               {employee.firstName} {employee.lastName}
             </h1>
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge variant="secondary" className="h-6 px-3 bg-emerald-500/10 text-emerald-500 font-bold uppercase border-none ring-1 ring-emerald-500/20">
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
+              <Badge variant="secondary" className={cn(
+                "h-6 px-3 font-black uppercase border-none ring-1",
+                employee.status === 'Active' ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : 'bg-amber-500/10 text-amber-500 ring-amber-500/20'
+              )}>
                 {employee.status}
               </Badge>
-              <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <Briefcase className="size-3.5" /> {employee.jobTitle}
+              <span className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1.5 bg-secondary/30 px-2 py-1 rounded-md">
+                <Briefcase className="size-3 text-primary" /> {employee.jobTitle}
               </span>
-              <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <Hash className="size-3.5" /> {employee.employeeId}
+              <span className="text-[10px] font-mono font-black text-primary/60 flex items-center gap-1.5">
+                <Hash className="size-3" /> {employee.employeeId}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="flex gap-4 w-full md:w-auto">
-          <div className="p-4 rounded-2xl bg-secondary/20 border border-border/50 flex-1 md:flex-none text-center min-w-[120px]">
-            <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest mb-1">Leave Balance</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 w-full lg:w-auto">
+          <div className="p-4 rounded-2xl bg-secondary/10 border border-border/50 text-center flex flex-col justify-center">
+            <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest mb-1">Absence Credits</p>
             <p className="text-xl font-black text-primary">{employee.leaveBalance || 0} DAYS</p>
           </div>
-          <div className="p-4 rounded-2xl bg-secondary/20 border border-border/50 flex-1 md:flex-none text-center min-w-[120px]">
-            <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest mb-1">Performance</p>
+          <div className="p-4 rounded-2xl bg-secondary/10 border border-border/50 text-center flex flex-col justify-center">
+            <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest mb-1">Audit Score</p>
             <p className="text-xl font-black text-accent">{avgPerformance.toFixed(1)}/10</p>
+          </div>
+          <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 text-center hidden sm:flex flex-col justify-center">
+            <p className="text-[8px] font-black uppercase text-primary tracking-widest mb-1">KRA Attainment</p>
+            <p className="text-xl font-black text-foreground">{kraAttainment.toFixed(0)}%</p>
           </div>
         </div>
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="bg-secondary/20 h-auto p-1 mb-6 flex-wrap justify-start gap-1 bg-transparent border-b rounded-none">
-          <TabsTrigger value="profile" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><User className="size-3.5" /> Identity Node</TabsTrigger>
-          <TabsTrigger value="leave" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><CalendarDays className="size-3.5" /> Absence Matrix</TabsTrigger>
-          <TabsTrigger value="performance" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Star className="size-3.5" /> Growth Scorecard</TabsTrigger>
-          <TabsTrigger value="conduct" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><ShieldAlert className="size-3.5" /> Conduct Archive</TabsTrigger>
-          <TabsTrigger value="payroll" className="text-xs gap-2 px-6 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><BadgeCent className="size-3.5" /> Settlement Node</TabsTrigger>
+        <TabsList className="bg-secondary/20 h-auto p-1 mb-8 flex-wrap justify-start gap-1 bg-transparent border-b rounded-none w-full">
+          <TabsTrigger value="profile" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><User className="size-3.5" /> Identity Node</TabsTrigger>
+          <TabsTrigger value="leave" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><CalendarDays className="size-3.5" /> Absence Matrix</TabsTrigger>
+          <TabsTrigger value="performance" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Star className="size-3.5" /> Growth Scorecard</TabsTrigger>
+          <TabsTrigger value="attendance" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Timer className="size-3.5" /> Shift Stream</TabsTrigger>
+          <TabsTrigger value="conduct" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><ShieldAlert className="size-3.5" /> Conduct Archive</TabsTrigger>
+          <TabsTrigger value="payroll" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><BadgeCent className="size-3.5" /> Settlement</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="profile" className="space-y-6">
+        <TabsContent value="profile" className="space-y-6 mt-0">
           <div className="grid md:grid-cols-2 gap-6">
             <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
-              <CardHeader className="bg-secondary/10 border-b border-border/50">
-                <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
+              <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6 flex flex-row items-center justify-between">
+                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
                   <User className="size-4 text-primary" /> Biographical Core
                 </CardTitle>
+                {employee.gender === 'Male' ? <Mars className="size-4 text-blue-500" /> : <Venus className="size-4 text-pink-500" />}
               </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <CardContent className="p-6 space-y-6">
+                <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50">Government ID</p>
-                    <p className="text-sm font-bold font-mono">{employee.nationalId}</p>
+                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">National ID Node</p>
+                    <p className="text-sm font-bold font-mono tracking-tight">{employee.nationalId || 'PENDING'}</p>
                   </div>
                   <div>
-                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50">KRA PIN</p>
-                    <p className="text-sm font-bold font-mono uppercase">{employee.kraPin}</p>
+                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Fiscal KRA PIN</p>
+                    <p className="text-sm font-bold font-mono uppercase tracking-tight">{employee.kraPin || 'PENDING'}</p>
                   </div>
                   <div>
-                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50">Contact Email</p>
-                    <p className="text-sm font-bold">{employee.email}</p>
+                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Official Email</p>
+                    <p className="text-sm font-bold truncate">{employee.email}</p>
                   </div>
                   <div>
-                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50">Secure Mobile</p>
+                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Verified Phone</p>
                     <p className="text-sm font-bold">{employee.phone}</p>
                   </div>
                 </div>
-                <div className="pt-4 border-t border-border/50">
-                  <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 mb-2">Emergency Contact Node</p>
-                  <div className="p-3 rounded-xl bg-secondary/10 flex items-center justify-between">
+                <div className="pt-6 border-t border-border/50">
+                  <p className="text-[10px] font-black uppercase text-primary tracking-widest mb-3 flex items-center gap-2">
+                    <Heart className="size-3" /> Kin Verification Node
+                  </p>
+                  <div className="p-4 rounded-2xl bg-secondary/10 border border-dashed border-border flex items-center justify-between group hover:bg-secondary/20 transition-all">
                     <div>
-                      <p className="text-xs font-bold uppercase">{employee.nextOfKin?.name || 'NOT DEFINED'}</p>
-                      <p className="text-[10px] text-muted-foreground italic">{employee.nextOfKin?.relation}</p>
+                      <p className="text-xs font-black uppercase">{employee.nextOfKin?.name || 'NOT DEFINED'}</p>
+                      <p className="text-[9px] text-muted-foreground font-bold uppercase mt-0.5">{employee.nextOfKin?.relation}</p>
                     </div>
-                    <p className="text-xs font-mono font-bold text-primary">{employee.nextOfKin?.phone}</p>
+                    <div className="text-right">
+                      <p className="text-xs font-mono font-black text-primary">{employee.nextOfKin?.phone}</p>
+                      <p className="text-[8px] text-muted-foreground uppercase">Emergency Line</p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
-              <CardHeader className="bg-secondary/10 border-b border-border/50">
-                <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                  <Building className="size-4 text-accent" /> Institutional Placement
+              <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6">
+                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
+                  <Building className="size-4 text-accent" /> Institutional Topology
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-6 space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded bg-primary/10 text-primary"><MapPin className="size-4" /></div>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="flex items-start gap-3 p-4 rounded-2xl bg-primary/5 border border-primary/10">
+                    <MapPin className="size-5 text-primary shrink-0" />
                     <div>
-                      <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50">Branch</p>
-                      <p className="text-sm font-bold uppercase">{employee.branchId || 'Central'}</p>
+                      <p className="text-[9px] font-black uppercase text-primary tracking-widest">Active Branch</p>
+                      <p className="text-xs font-black uppercase mt-1">
+                        {branches?.find(b => b.id === employee.branchId)?.name || 'Central Command'}
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded bg-accent/10 text-accent"><LayoutGrid className="size-4" /></div>
+                  <div className="flex items-start gap-3 p-4 rounded-2xl bg-accent/5 border border-accent/10">
+                    <LayoutGrid className="size-5 text-accent shrink-0" />
                     <div>
-                      <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50">Department</p>
-                      <p className="text-sm font-bold uppercase">{employee.departmentId || 'Operations'}</p>
+                      <p className="text-[9px] font-black uppercase text-accent tracking-widest">Dept. Node</p>
+                      <p className="text-xs font-black uppercase mt-1">{employee.departmentId || 'Operations'}</p>
                     </div>
                   </div>
                 </div>
-                <div className="p-4 rounded-2xl bg-secondary/5 border border-dashed border-border/50 flex items-center gap-4">
-                  <UserCircle className="size-10 text-primary opacity-30" />
-                  <div>
-                    <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Reporting Manager</p>
-                    <p className="text-sm font-bold text-foreground/90">Institutional Supervisor Node</p>
+                <div className="p-6 rounded-2xl bg-secondary/5 border border-dashed border-border flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="size-12 rounded-full bg-background border flex items-center justify-center shadow-lg">
+                      <UserCog className="size-6 text-primary opacity-40" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Command Hierarchy</p>
+                      <p className="text-xs font-bold text-foreground/90">Reports to Institutional Supervisor</p>
+                    </div>
                   </div>
+                  <ChevronRight className="size-4 text-muted-foreground opacity-20" />
                 </div>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="leave" className="space-y-6">
+        <TabsContent value="leave" className="mt-0">
           <Card className="border-none ring-1 ring-border bg-card shadow-2xl overflow-hidden">
-            <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-black uppercase tracking-widest">Absence Requisition History</CardTitle>
-              <Button size="sm" className="h-8 gap-2 font-bold uppercase text-[9px]"><Plus className="size-3" /> New Request</Button>
+            <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="space-y-1 text-center sm:text-left">
+                <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">Absence Matrix</CardTitle>
+                <CardDescription className="text-[10px]">Real-time history of institutional leave requisitions.</CardDescription>
+              </div>
+              <Button size="sm" className="h-9 px-6 gap-2 font-black uppercase text-[10px] shadow-lg bg-primary hover:bg-primary/90">
+                <Plus className="size-3.5" /> Initialize Request
+              </Button>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
               <Table>
-                <TableHeader className="bg-secondary/20">
-                  <TableRow>
-                    <TableHead className="h-10 text-[9px] font-black uppercase pl-6">Leave Category</TableHead>
-                    <TableHead className="h-10 text-[9px] font-black uppercase">Time Window</TableHead>
-                    <TableHead className="h-10 text-[9px] font-black uppercase">Justification</TableHead>
-                    <TableHead className="h-10 text-right pr-6 text-[9px] font-black uppercase">Status</TableHead>
+                <TableHeader className="bg-secondary/30">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Classification</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase">Validity Window</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase">Justification</TableHead>
+                    <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Workflow Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {!leaves?.length ? (
-                    <TableRow><TableCell colSpan={4} className="text-center py-12 text-xs opacity-30 italic uppercase font-bold">No absence cycles found.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="text-center py-20 text-[10px] opacity-30 italic uppercase font-black tracking-[0.3em]">No absence cycles found.</TableCell></TableRow>
                   ) : leaves.map(l => (
-                    <TableRow key={l.id} className="h-14 hover:bg-secondary/5 border-b-border/30">
-                      <TableCell className="pl-6">
-                        <Badge variant="outline" className="text-[8px] h-5 bg-primary/5 text-primary border-none font-black uppercase">
+                    <TableRow key={l.id} className="h-16 hover:bg-secondary/5 border-b-border/30 transition-colors">
+                      <TableCell className="pl-8">
+                        <Badge variant="outline" className="text-[9px] h-5 px-3 bg-primary/10 text-primary border-none font-black uppercase shadow-sm">
                           {l.leaveType}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-[10px] font-mono font-bold uppercase tracking-tighter opacity-70">{l.startDate} to {l.endDate}</TableCell>
-                      <TableCell className="text-[11px] italic opacity-60 truncate max-w-[250px]">"{l.reason}"</TableCell>
-                      <TableCell className="text-right pr-6">
+                      <TableCell className="text-[11px] font-mono font-black uppercase tracking-tighter text-foreground/70">
+                        {l.startDate} <span className="mx-1.5 opacity-20">→</span> {l.endDate}
+                      </TableCell>
+                      <TableCell className="text-[11px] italic opacity-60 truncate max-w-[300px]">
+                        "{l.reason}"
+                      </TableCell>
+                      <TableCell className="text-right pr-8">
                         <Badge variant="outline" className={cn(
-                          "text-[8px] h-5 px-2.5 font-black uppercase border-none ring-1",
-                          l.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : 'bg-amber-500/10 text-amber-500 ring-amber-500/20 animate-pulse'
+                          "text-[9px] h-5 px-3 font-black uppercase border-none ring-1",
+                          l.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : 
+                          l.status === 'Declined' ? 'bg-destructive/10 text-destructive ring-destructive/20' : 
+                          'bg-amber-500/10 text-amber-500 ring-amber-500/20 animate-pulse'
                         )}>
                           {l.status}
                         </Badge>
@@ -266,46 +350,51 @@ function PortalContent() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="performance" className="space-y-6">
-          <div className="grid md:grid-cols-3 gap-6">
-            <Card className="md:col-span-2 border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
-              <CardHeader className="bg-secondary/10 border-b border-border/50">
-                <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                  <Star className="size-4 text-accent" /> Performance Scorecard
+        <TabsContent value="performance" className="mt-0 space-y-6">
+          <div className="grid lg:grid-cols-3 gap-6">
+            <Card className="lg:col-span-2 border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
+              <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6 flex items-center justify-between">
+                <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-accent">
+                  <Star className="size-4" /> Audit Stream
                 </CardTitle>
+                <Badge variant="outline" className="text-[8px] font-black uppercase bg-accent/10 text-accent border-none">Growth History</Badge>
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
                   <TableHeader className="bg-secondary/20">
-                    <TableRow>
-                      <TableHead className="h-10 text-[9px] font-black uppercase pl-6">Review Date</TableHead>
-                      <TableHead className="h-10 text-[9px] font-black uppercase text-center">Score</TableHead>
-                      <TableHead className="h-10 text-[9px] font-black uppercase">KRA Status</TableHead>
-                      <TableHead className="h-10 text-right pr-6 text-[9px] font-black uppercase">Manager Feedback</TableHead>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Review Date</TableHead>
+                      <TableHead className="h-12 text-[9px] font-black uppercase text-center">Velocity Score</TableHead>
+                      <TableHead className="h-12 text-[9px] font-black uppercase">Objective Status</TableHead>
+                      <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Final Feedback</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {!reviews?.length ? (
-                      <TableRow><TableCell colSpan={4} className="text-center py-12 text-xs opacity-30 italic uppercase font-bold">No historical audits.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={4} className="text-center py-20 text-[10px] opacity-30 italic uppercase font-black tracking-[0.3em]">No historical audits found.</TableCell></TableRow>
                     ) : reviews.map(r => (
-                      <TableRow key={r.id} className="h-16 hover:bg-secondary/5 border-b-border/30 group">
-                        <TableCell className="pl-6 text-[10px] font-bold uppercase">{format(new Date(r.date), 'dd MMM yyyy')}</TableCell>
+                      <TableRow key={r.id} className="h-20 hover:bg-secondary/5 border-b-border/30 transition-colors">
+                        <TableCell className="pl-8 text-[11px] font-black uppercase text-foreground/80">
+                          {format(new Date(r.date), 'dd MMM yyyy')}
+                        </TableCell>
                         <TableCell className="text-center">
-                          <span className={cn("font-mono font-black text-xs px-2 py-0.5 rounded", 
-                            r.score >= 8 ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"
+                          <span className={cn("font-mono font-black text-xs px-3 py-1 rounded-full shadow-sm border", 
+                            r.score >= 8 ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : 
+                            r.score >= 5 ? "bg-amber-500/10 text-amber-500 border-amber-500/20" : 
+                            "bg-destructive/10 text-destructive border-destructive/20"
                           )}>
-                            {r.score}/10
+                            {r.score} / 10
                           </span>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={cn("text-[8px] h-4 font-black border-none", 
-                            r.kraAchieved ? 'bg-emerald-500/10 text-emerald-500' : 'bg-destructive/10 text-destructive'
+                          <Badge variant="outline" className={cn("text-[8px] h-5 px-2 font-black border-none ring-1", 
+                            r.kraAchieved ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : 'bg-destructive/10 text-destructive ring-destructive/20'
                           )}>
                             {r.kraAchieved ? 'KRA ACHIEVED' : 'BELOW TARGET'}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right pr-6 max-w-[200px]">
-                          <p className="text-[10px] italic text-muted-foreground line-clamp-2">"{r.feedback}"</p>
+                        <TableCell className="text-right pr-8">
+                          <p className="text-[10px] italic text-muted-foreground line-clamp-2 leading-relaxed">"{r.feedback}"</p>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -314,69 +403,92 @@ function PortalContent() {
               </CardContent>
             </Card>
 
-            <Card className="border-none ring-1 ring-border bg-accent/5 p-6 flex flex-col justify-between">
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="size-5 text-accent" />
-                  <p className="text-[10px] font-black uppercase text-accent tracking-widest">Growth Velocity</p>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-[10px] font-black uppercase">
-                    <span className="opacity-50">Technical Proficiency</span>
-                    <span className="text-accent">84%</span>
+            <div className="space-y-6">
+              <Card className="border-none ring-1 ring-accent/30 bg-accent/5 p-8 flex flex-col justify-between relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-5"><TrendingUp className="size-24" /></div>
+                <div className="space-y-6 relative z-10">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="size-5 text-accent" />
+                    <p className="text-[10px] font-black uppercase text-accent tracking-[0.2em]">Career Velocity</p>
                   </div>
-                  <div className="h-1 w-full bg-secondary rounded-full overflow-hidden"><div className="h-full bg-accent w-[84%]" /></div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-[10px] font-black uppercase">
-                    <span className="opacity-50">Process Adherence</span>
-                    <span className="text-accent">92%</span>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
+                        <span className="opacity-50">Operational Intensity</span>
+                        <span className="text-accent">84%</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden shadow-inner"><div className="h-full bg-accent w-[84%] transition-all duration-1000" /></div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
+                        <span className="opacity-50">SOP Compliance</span>
+                        <span className="text-accent">92%</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden shadow-inner"><div className="h-full bg-accent w-[92%] transition-all duration-1000" /></div>
+                    </div>
                   </div>
-                  <div className="h-1 w-full bg-secondary rounded-full overflow-hidden"><div className="h-full bg-accent w-[92%]" /></div>
                 </div>
-              </div>
-              <div className="pt-6 border-t border-border/50">
-                <p className="text-[11px] leading-relaxed text-muted-foreground italic font-medium">
-                  "Employee shows consistent process excellence. Recommended for cross-training in Senior Node leadership."
-                </p>
-              </div>
-            </Card>
+                <div className="pt-8 border-t border-accent/20 mt-8">
+                  <p className="text-[11px] leading-relaxed text-muted-foreground italic font-medium text-center">
+                    "Consistent high performance across all process nodes. High potential for promotion track."
+                  </p>
+                </div>
+              </Card>
+              
+              <Card className="border-none ring-1 ring-primary/30 bg-primary/5 p-6 shadow-xl">
+                <div className="flex items-center gap-3 mb-4">
+                  <Zap className="size-5 text-primary animate-pulse" />
+                  <p className="text-[10px] font-black uppercase text-primary tracking-widest">Next Audit Window</p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-lg font-black font-headline">Q4 ANNUAL</p>
+                  <Badge className="bg-primary text-white font-bold">14 DAYS</Badge>
+                </div>
+              </Card>
+            </div>
           </div>
         </TabsContent>
 
-        <TabsContent value="conduct" className="space-y-6">
+        <TabsContent value="attendance" className="mt-0">
           <Card className="border-none ring-1 ring-border bg-card shadow-2xl overflow-hidden">
-            <CardHeader className="bg-destructive/10 border-b border-destructive/20 py-4 px-6">
-              <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                <ShieldAlert className="size-4 text-destructive" /> Compliance & Conduct Archive
+            <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-8">
+              <CardTitle className="text-sm font-black uppercase tracking-[0.2em] flex items-center gap-2 text-primary">
+                <Clock className="size-4" /> Live Attendance Stream
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-0 overflow-x-auto">
+            <CardContent className="p-0">
               <Table>
                 <TableHeader className="bg-secondary/20">
-                  <TableRow>
-                    <TableHead className="h-10 text-[9px] font-black uppercase pl-6">Incident Timestamp</TableHead>
-                    <TableHead className="h-10 text-[9px] font-black uppercase">Classification</TableHead>
-                    <TableHead className="h-10 text-[9px] font-black uppercase">Action Enforced</TableHead>
-                    <TableHead className="h-10 text-right pr-6 text-[9px] font-black uppercase">Context</TableHead>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Event Timestamp</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase text-center">Direction</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase">Institutional Node</TableHead>
+                    <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Integrity Proof</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {!conduct?.length ? (
-                    <TableRow><TableCell colSpan={4} className="text-center py-12 text-xs opacity-30 italic uppercase font-bold">Zero conduct violations recorded.</TableCell></TableRow>
-                  ) : conduct.map(c => (
-                    <TableRow key={c.id} className="h-14 hover:bg-destructive/5 border-b-border/30">
-                      <TableCell className="pl-6 text-[10px] font-mono text-muted-foreground">
-                        {c.createdAt?.toDate ? format(c.createdAt.toDate(), 'dd/MM/yyyy HH:mm') : '...'}
+                  {!attendance?.length ? (
+                    <TableRow><TableCell colSpan={4} className="text-center py-20 text-[10px] opacity-30 italic uppercase font-black tracking-[0.3em]">No shift activity recorded.</TableCell></TableRow>
+                  ) : attendance.map(a => (
+                    <TableRow key={a.id} className="h-14 hover:bg-secondary/5 border-b-border/30">
+                      <TableCell className="pl-8 text-[11px] font-mono font-black text-foreground/70">
+                        {a.timestamp?.toDate ? format(a.timestamp.toDate(), 'dd MMM yyyy HH:mm:ss') : '...'}
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-[8px] h-4 bg-destructive/10 text-destructive border-none font-black uppercase">
-                          {c.type}
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className={cn(
+                          "text-[8px] h-5 px-3 font-black uppercase border-none ring-1",
+                          a.type === 'In' ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : 'bg-destructive/10 text-destructive ring-destructive/20'
+                        )}>
+                          SHIFT {a.type.toUpperCase()}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs font-bold uppercase">{c.actionTaken}</TableCell>
-                      <TableCell className="text-right pr-6 max-w-[300px]">
-                        <p className="text-[10px] text-muted-foreground italic truncate">"{c.description}"</p>
+                      <TableCell className="text-[10px] font-black uppercase tracking-tight opacity-60">
+                        {a.location || 'HEAD OFFICE HUB'}
+                      </TableCell>
+                      <TableCell className="text-right pr-8">
+                        <div className="flex items-center justify-end gap-2 text-[9px] font-black uppercase text-emerald-500/60">
+                          <ShieldCheck className="size-3" /> GPS VERIFIED
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -386,27 +498,72 @@ function PortalContent() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="payroll" className="space-y-6">
+        <TabsContent value="conduct" className="mt-0">
+          <Card className="border-none ring-1 ring-destructive/30 bg-card shadow-2xl overflow-hidden">
+            <CardHeader className="bg-destructive/5 border-b border-destructive/10 py-4 px-8">
+              <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-destructive">
+                <ShieldAlert className="size-4" /> Conduct & Disciplinary Archive
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-secondary/20">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Incident Date</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase">Classification</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase">Enforced Action</TableHead>
+                    <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Detailed Context</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {!conduct?.length ? (
+                    <TableRow><TableCell colSpan={4} className="text-center py-24 text-[10px] opacity-20 italic uppercase font-black tracking-[0.4em]">Zero compliance violations recorded.</TableCell></TableRow>
+                  ) : conduct.map(c => (
+                    <TableRow key={c.id} className="h-16 hover:bg-destructive/5 border-b-border/30 transition-colors group">
+                      <TableCell className="pl-8 text-[11px] font-black text-muted-foreground">
+                        {c.createdAt?.toDate ? format(c.createdAt.toDate(), 'dd/MM/yyyy') : '...'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[8px] h-5 px-3 bg-destructive/10 text-destructive border-none font-black uppercase ring-1 ring-destructive/20">
+                          {c.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs font-black uppercase tracking-tight text-foreground/80">{c.actionTaken}</TableCell>
+                      <TableCell className="text-right pr-8 max-w-[400px]">
+                        <p className="text-[10px] italic text-muted-foreground truncate group-hover:whitespace-normal group-hover:break-words">"{c.description}"</p>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="payroll" className="mt-0 space-y-6">
           <div className="grid md:grid-cols-12 gap-6">
             <Card className="md:col-span-8 border-none ring-1 ring-border bg-card shadow-2xl overflow-hidden">
-              <CardHeader className="bg-primary/10 border-b border-primary/20">
+              <CardHeader className="bg-primary/10 border-b border-primary/20 py-4 px-8 flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                  <FileText className="size-4 text-primary" /> Payslip Vault
+                  <FileText className="size-4 text-primary" /> Verified Payslip Vault
                 </CardTitle>
+                <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase gap-2">
+                  <Download className="size-3" /> Export Statement
+                </Button>
               </CardHeader>
               <CardContent className="p-0 overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-secondary/20">
-                    <TableRow>
-                      <TableHead className="h-10 text-[9px] font-black uppercase pl-6">Pay Period</TableHead>
-                      <TableHead className="h-10 text-[9px] font-black uppercase">Method</TableHead>
-                      <TableHead className="h-10 text-[9px] font-black uppercase text-right">Net Settlement</TableHead>
-                      <TableHead className="h-10 text-right pr-6 text-[9px] font-black uppercase">Action</TableHead>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Pay Period</TableHead>
+                      <TableHead className="h-12 text-[9px] font-black uppercase">Settlement Logic</TableHead>
+                      <TableHead className="h-12 text-[9px] font-black uppercase text-right">Net Disbursement</TableHead>
+                      <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Audit Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow className="h-14 opacity-30 italic">
-                      <TableCell colSpan={4} className="text-center text-[10px] font-black uppercase tracking-widest py-12">
+                    <TableRow className="h-24 opacity-30 italic">
+                      <TableCell colSpan={4} className="text-center text-[10px] font-black uppercase tracking-[0.3em] py-12">
                         Payroll module integration pending first cycle finalization.
                       </TableCell>
                     </TableRow>
@@ -416,28 +573,39 @@ function PortalContent() {
             </Card>
 
             <div className="md:col-span-4 space-y-6">
-              <Card className="border-none ring-1 ring-border bg-card p-6 shadow-xl">
-                <div className="flex items-center gap-2 mb-6">
-                  <Landmark className="size-5 text-primary" />
-                  <p className="text-[10px] font-black uppercase text-primary tracking-widest">Bank Settlement Hub</p>
+              <Card className="border-none ring-1 ring-border bg-card p-8 shadow-2xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:rotate-12 transition-transform"><Landmark className="size-24 text-primary" /></div>
+                <div className="flex items-center gap-3 mb-8 relative z-10">
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary"><Landmark className="size-5" /></div>
+                  <p className="text-[10px] font-black uppercase text-primary tracking-[0.2em]">Settlement Registry</p>
                 </div>
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50">Financial Entity</p>
-                    <p className="text-sm font-bold">{employee.bankName || 'NOT REGISTERED'}</p>
+                <div className="space-y-6 relative z-10">
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest">Authorized Entity</p>
+                    <p className="text-sm font-black uppercase">{employee.bankName || 'NOT REGISTERED'}</p>
                   </div>
-                  <div>
-                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50">Encrypted Account Node</p>
-                    <p className="text-sm font-bold font-mono">••••••••{employee.bankAccount?.slice(-4) || '0000'}</p>
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest">Encrypted Account Node</p>
+                    <p className="text-sm font-black font-mono tracking-tighter">
+                      {employee.bankAccount ? `•••• ${employee.bankAccount.slice(-4)}` : '•••• 0000'}
+                    </p>
                   </div>
-                  <div className="pt-4 border-t border-border/50">
-                    <p className="text-[10px] font-black uppercase text-primary mb-2">Base Compensation</p>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-[10px] font-bold text-muted-foreground">KES</span>
-                      <span className="text-2xl font-black font-headline text-foreground/90">{employee.salary?.toLocaleString() || 0}</span>
+                  <div className="pt-6 border-t border-border/50">
+                    <p className="text-[10px] font-black uppercase text-primary mb-3 flex items-center gap-2">
+                      <BadgeCent className="size-3" /> Contractual Remuneration
+                    </p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-[10px] font-black text-muted-foreground">KES</span>
+                      <span className="text-3xl font-black font-headline text-foreground/90 tracking-tighter">
+                        {employee.salary?.toLocaleString() || 0}
+                      </span>
                     </div>
+                    <p className="text-[8px] text-muted-foreground uppercase font-bold mt-1">Base Monthly Gross</p>
                   </div>
                 </div>
+                <Button className="w-full mt-8 h-11 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 font-black uppercase text-[10px] tracking-widest gap-2">
+                  <ArrowUpRight className="size-3.5" /> View Compensation Structure
+                </Button>
               </Card>
             </div>
           </div>
@@ -450,7 +618,12 @@ function PortalContent() {
 export default function PortalPage() {
   return (
     <DashboardLayout>
-      <Suspense fallback={<div className="h-screen flex items-center justify-center"><Loader2 className="size-8 animate-spin text-primary" /></div>}>
+      <Suspense fallback={
+        <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
+          <Loader2 className="size-10 animate-spin text-primary opacity-20" />
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Synchronizing Employee Nodes...</p>
+        </div>
+      }>
         <PortalContent />
       </Suspense>
     </DashboardLayout>

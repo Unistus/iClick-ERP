@@ -30,7 +30,8 @@ import {
   MoreVertical,
   Zap,
   Sparkles,
-  Loader2
+  Loader2,
+  ShieldCheck
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { createJobPost } from "@/lib/hr/hr.service";
@@ -122,7 +123,7 @@ export default function RecruitmentHubPage() {
         </div>
 
         {!selectedInstId ? (
-          <div className="flex flex-col items-center justify-center py-32 border-2 border-dashed rounded-[2.5rem] bg-secondary/5">
+          <div className="flex flex-col items-center justify-center py-32 border-2 border-dashed rounded-[2rem] bg-secondary/5">
             <Users className="size-16 text-muted-foreground opacity-10 mb-4 animate-pulse" />
             <p className="text-sm font-medium text-muted-foreground text-center px-6 max-w-sm">
               Select an institution to initialize the Talent Acquisition pipeline and candidate matrix.

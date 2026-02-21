@@ -68,7 +68,7 @@ export default function PayrollDashboard() {
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-primary/20 text-primary shadow-inner">
+            <div className="p-2.5 rounded-xl bg-primary/20 text-primary shadow-inner border border-primary/10">
               <Banknote className="size-6" />
             </div>
             <div>

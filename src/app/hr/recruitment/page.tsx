@@ -45,7 +45,7 @@ const STAGES = ["New", "Screening", "Interview", "Offer", "Hired", "Rejected"];
 export default function RecruitmentHubPage() {
   const db = useFirestore();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
-  const [isCreateJobOpen, setIsCreateJobOpen] = useState(false);
+  const [isCreateOpen, setIsCreateJobOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeTab, setActiveTab] = useState<'jobs' | 'applicants'>('jobs');
 

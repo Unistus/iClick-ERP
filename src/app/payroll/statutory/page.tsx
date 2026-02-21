@@ -17,7 +17,6 @@ import {
   Search, 
   Filter, 
   CheckCircle2, 
-  ArrowUpRight, 
   ExternalLink,
   History,
   Scale,
@@ -34,18 +33,16 @@ import { cn } from "@/lib/utils";
 export default function StatutoryHubPage() {
   const db = useFirestore();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
-  const [isSyncing, setIsSyncing] = useState(false);
 
   const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
-  // Data Fetching: Finalized Runs (Source of statutory data)
+  // Data Fetching: Runs (Simplified query to avoid composite index requirement)
   const runsQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return query(
       collection(db, 'institutions', selectedInstId, 'payroll_runs'), 
-      where('status', '==', 'Posted'),
       orderBy('createdAt', 'desc'),
-      limit(12)
+      limit(20)
     );
   }, [db, selectedInstId]);
   const { data: runs, isLoading: runsLoading } = useCollection(runsQuery);
@@ -57,6 +54,9 @@ export default function StatutoryHubPage() {
   const { data: settings } = useDoc(settingsRef);
 
   const currency = settings?.general?.currencySymbol || "KES";
+
+  // In-memory filter for finalized runs
+  const finalizedRuns = runs?.filter(r => r.status === 'Posted') || [];
 
   const handleExport = (type: string) => {
     toast({ title: "Filing Ready", description: `Generating ${type} CSV for regulatory upload.` });
@@ -148,7 +148,7 @@ export default function StatutoryHubPage() {
               <CardContent className="p-0 overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-secondary/20">
-                    <TableRow className="hover:bg-transparent">
+                    <TableRow>
                       <TableHead className="h-12 text-[9px] font-black uppercase pl-8 text-muted-foreground">Cycle Period</TableHead>
                       <TableHead className="h-12 text-[9px] font-black uppercase text-muted-foreground">Gross Payload</TableHead>
                       <TableHead className="h-12 text-[9px] font-black uppercase text-center text-muted-foreground">Filing Integrity</TableHead>
@@ -158,10 +158,10 @@ export default function StatutoryHubPage() {
                   </TableHeader>
                   <TableBody>
                     {runsLoading ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse font-black uppercase">Polling Compliances...</TableCell></TableRow>
-                    ) : !runs || runs.length === 0 ? (
+                      <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse uppercase font-black">Polling Compliances...</TableCell></TableRow>
+                    ) : finalizedRuns.length === 0 ? (
                       <TableRow><TableCell colSpan={5} className="text-center py-24 text-xs text-muted-foreground uppercase font-black tracking-widest opacity-20 italic">No finalized cycles available for filing.</TableCell></TableRow>
-                    ) : runs.map((run) => (
+                    ) : finalizedRuns.map((run) => (
                       <TableRow key={run.id} className="h-16 hover:bg-secondary/10 transition-colors border-b-border/30 group">
                         <TableCell className="pl-8 font-black uppercase text-xs tracking-tight">{run.runNumber}</TableCell>
                         <TableCell className="font-mono text-[10px] opacity-60 uppercase">{currency} {run.totalGross?.toLocaleString()}</TableCell>

@@ -36,6 +36,7 @@ import { conductPerformanceReview } from "@/lib/hr/hr.service";
 import { toast } from "@/hooks/use-toast";
 import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export default function PerformanceReviewsPage() {
   const db = useFirestore();
@@ -141,7 +142,7 @@ export default function PerformanceReviewsPage() {
                     </TableHeader>
                     <TableBody>
                       {isLoading ? (
-                        <TableRow><TableCell colSpan={4} className="text-center py-12 text-xs animate-pulse uppercase">Syncing Scorecards...</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={4} className="text-center py-12 text-xs animate-pulse uppercase font-black">Syncing Scorecards...</TableCell></TableRow>
                       ) : reviews?.length === 0 ? (
                         <TableRow><TableCell colSpan={4} className="text-center py-20 text-xs text-muted-foreground uppercase font-bold">No performance logs.</TableCell></TableRow>
                       ) : reviews?.map((r) => (

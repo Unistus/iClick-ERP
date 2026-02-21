@@ -32,7 +32,8 @@ import {
   FileText,
   Calendar,
   AlertTriangle,
-  ArrowRight
+  ArrowRight,
+  Info
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { createPayrollRun } from "@/lib/hr/hr.service";
@@ -179,8 +180,7 @@ export default function PayrollCommandPage() {
                   <div className="text-2xl font-black font-headline">LOCKED</div>
                   <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Statutory Sync: OK</p>
                 </CardContent>
-              </Card>
-            </div>
+              </div>
 
             {/* RUNS LEDGER */}
             <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
@@ -202,7 +202,7 @@ export default function PayrollCommandPage() {
               <CardContent className="p-0 overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-secondary/20">
-                    <TableRow className="hover:bg-transparent">
+                    <TableRow>
                       <TableHead className="h-12 text-[9px] font-black uppercase pl-8 text-muted-foreground">Run Reference</TableHead>
                       <TableHead className="h-12 text-[9px] font-black uppercase text-muted-foreground">Fiscal Period</TableHead>
                       <TableHead className="h-12 text-[9px] font-black uppercase text-center text-muted-foreground">Workflow Stage</TableHead>

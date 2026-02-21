@@ -44,7 +44,9 @@ import {
   Venus,
   ArrowUpRight,
   Download,
-  Heart
+  Heart,
+  Fingerprint,
+  Scale
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -71,7 +73,6 @@ function PortalContent() {
   const { data: employee, isLoading: empLoading } = useDoc(empRef);
 
   // Data Fetching: Leave History
-  // REMOVED orderBy to ensure no index-related permission issues during prototyping
   const leaveQuery = useMemoFirebase(() => {
     if (!selectedInstId || !employeeId) return null;
     return query(
@@ -112,12 +113,25 @@ function PortalContent() {
   }, [db, selectedInstId, employeeId]);
   const { data: attendance } = useCollection(attQuery);
 
-  // Data Fetching: Institutional Structure (Branches)
+  // Data Fetching: Institutional Structure
   const branchesRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return collection(db, 'institutions', selectedInstId, 'branches');
   }, [db, selectedInstId]);
   const { data: branches } = useCollection(branchesRef);
+
+  // Fetching Departments for the specific branch the employee is in
+  const deptsRef = useMemoFirebase(() => {
+    if (!selectedInstId || !employee?.branchId) return null;
+    return collection(db, 'institutions', selectedInstId, 'branches', employee.branchId, 'departments');
+  }, [db, selectedInstId, employee?.branchId]);
+  const { data: departments } = useCollection(deptsRef);
+
+  // Resolve Department Name
+  const resolvedDeptName = useMemo(() => {
+    if (!departments || !employee?.departmentId) return "Operations Node";
+    return departments.find(d => d.id === employee.departmentId)?.name || "Operations Node";
+  }, [departments, employee?.departmentId]);
 
   // Calculations: Real-time Talent Metrics
   const avgPerformance = useMemo(() => {
@@ -228,14 +242,6 @@ function PortalContent() {
               <CardContent className="p-6 space-y-6">
                 <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">National ID Node</p>
-                    <p className="text-sm font-bold font-mono tracking-tight">{employee.nationalId || 'PENDING'}</p>
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Fiscal KRA PIN</p>
-                    <p className="text-sm font-bold font-mono uppercase tracking-tight">{employee.kraPin || 'PENDING'}</p>
-                  </div>
-                  <div>
                     <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Official Email</p>
                     <p className="text-sm font-bold truncate">{employee.email}</p>
                   </div>
@@ -244,6 +250,31 @@ function PortalContent() {
                     <p className="text-sm font-bold">{employee.phone}</p>
                   </div>
                 </div>
+
+                <div className="pt-6 border-t border-border/50">
+                  <p className="text-[10px] font-black uppercase text-primary tracking-widest mb-4 flex items-center gap-2">
+                    <Fingerprint className="size-3" /> Statutory & Compliance Matrix
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 rounded-xl bg-secondary/5 border border-border/50">
+                      <p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">National ID Node</p>
+                      <p className="text-xs font-black font-mono tracking-tighter">{employee.nationalId || 'NOT RECORDED'}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-secondary/5 border border-border/50">
+                      <p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">Fiscal KRA PIN</p>
+                      <p className="text-xs font-black font-mono uppercase tracking-tighter">{employee.kraPin || 'NOT RECORDED'}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-secondary/5 border border-border/50">
+                      <p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">NSSF Number</p>
+                      <p className="text-xs font-black font-mono tracking-tighter">{employee.nssfNumber || 'NOT RECORDED'}</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-secondary/5 border border-border/50">
+                      <p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">NHIF Number</p>
+                      <p className="text-xs font-black font-mono tracking-tighter">{employee.nhifNumber || 'NOT RECORDED'}</p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="pt-6 border-t border-border/50">
                   <p className="text-[10px] font-black uppercase text-primary tracking-widest mb-3 flex items-center gap-2">
                     <Heart className="size-3" /> Kin Verification Node
@@ -251,7 +282,7 @@ function PortalContent() {
                   <div className="p-4 rounded-2xl bg-secondary/10 border border-dashed border-border flex items-center justify-between group hover:bg-secondary/20 transition-all">
                     <div>
                       <p className="text-xs font-black uppercase">{employee.nextOfKin?.name || 'NOT DEFINED'}</p>
-                      <p className="text-[9px] text-muted-foreground font-bold uppercase mt-0.5">{employee.nextOfKin?.relation || 'Guardian'}</p>
+                      <p className="text-[9px] text-muted-foreground font-bold uppercase mt-0.5">{employee.nextOfKin?.relation || 'Guardian Node'}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-xs font-mono font-black text-primary">{employee.nextOfKin?.phone || '...'}</p>
@@ -272,21 +303,33 @@ function PortalContent() {
                 <div className="grid grid-cols-2 gap-6">
                   <div className="flex items-start gap-3 p-4 rounded-2xl bg-primary/5 border border-primary/10">
                     <MapPin className="size-5 text-primary shrink-0" />
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-[9px] font-black uppercase text-primary tracking-widest">Active Branch</p>
-                      <p className="text-xs font-black uppercase mt-1">
+                      <p className="text-xs font-black uppercase mt-1 truncate">
                         {branches?.find(b => b.id === employee.branchId)?.name || 'Central Hub'}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-start gap-3 p-4 rounded-2xl bg-accent/5 border border-accent/10">
                     <LayoutGrid className="size-5 text-accent shrink-0" />
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-[9px] font-black uppercase text-accent tracking-widest">Dept. Node</p>
-                      <p className="text-xs font-black uppercase mt-1">{employee.departmentId || 'Operations'}</p>
+                      <p className="text-xs font-black uppercase mt-1 truncate">{resolvedDeptName}</p>
                     </div>
                   </div>
                 </div>
+                
+                <div className="grid grid-cols-2 gap-6 pt-2">
+                  <div className="p-4 rounded-2xl bg-secondary/5 border border-border/50">
+                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Contract Basis</p>
+                    <p className="text-xs font-black uppercase">{employee.employmentType || 'Permanent'}</p>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-secondary/5 border border-border/50">
+                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Effective Date</p>
+                    <p className="text-xs font-black uppercase">{employee.hireDate ? format(new Date(employee.hireDate), 'dd MMM yyyy') : '...'}</p>
+                  </div>
+                </div>
+
                 <div className="p-6 rounded-2xl bg-secondary/5 border border-dashed border-border flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="size-12 rounded-full bg-background border flex items-center justify-center shadow-lg">

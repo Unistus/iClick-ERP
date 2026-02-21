@@ -33,7 +33,8 @@ import {
   Calendar,
   AlertTriangle,
   ArrowRight,
-  Info
+  Info,
+  Filter
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { createPayrollRun } from "@/lib/hr/hr.service";
@@ -79,7 +80,7 @@ export default function PayrollCommandPage() {
     return {
       gross: runs.reduce((sum, r) => sum + (r.totalGross || 0), 0),
       count: runs.length,
-      lastRun: latest ? format(latest.createdAt?.toDate ? latest.createdAt.toDate() : new Date(), 'dd MMM yy') : "N/A"
+      lastRun: latest ? (latest.createdAt?.toDate ? format(latest.createdAt.toDate(), 'dd MMM yy') : "Just now") : "N/A"
     };
   }, [runs]);
 
@@ -180,7 +181,8 @@ export default function PayrollCommandPage() {
                   <div className="text-2xl font-black font-headline">LOCKED</div>
                   <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Statutory Sync: OK</p>
                 </CardContent>
-              </div>
+              </Card>
+            </div>
 
             {/* RUNS LEDGER */}
             <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
@@ -224,7 +226,7 @@ export default function PayrollCommandPage() {
                             </div>
                             <div className="flex flex-col">
                               <span className="text-xs font-black uppercase tracking-tight text-foreground/90">{run.runNumber}</span>
-                              <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter opacity-60">Created: {format(run.createdAt?.toDate ? run.createdAt.toDate() : new Date(), 'dd MMM')}</span>
+                              <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-tighter opacity-60">Created: {run.createdAt?.toDate ? format(run.createdAt.toDate(), 'dd MMM') : 'Just now'}</span>
                             </div>
                           </div>
                         </TableCell>

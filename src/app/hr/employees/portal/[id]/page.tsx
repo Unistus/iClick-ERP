@@ -135,7 +135,6 @@ function PortalContent() {
   }, [reviews]);
 
   const attendanceRate = useMemo(() => {
-    // Simple mock calculation for portal display
     return 94.2;
   }, []);
 

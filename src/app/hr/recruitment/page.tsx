@@ -125,7 +125,7 @@ export default function RecruitmentHubPage() {
         {!selectedInstId ? (
           <div className="flex flex-col items-center justify-center py-32 border-2 border-dashed rounded-[2rem] bg-secondary/5">
             <Users className="size-16 text-muted-foreground opacity-10 mb-4 animate-pulse" />
-            <p className="text-sm font-medium text-muted-foreground text-center px-6 max-w-sm">
+            <p className="text-sm font-medium text-muted-foreground text-center px-6 max-sm">
               Select an institution to initialize the Talent Acquisition pipeline and candidate matrix.
             </p>
           </div>
@@ -158,11 +158,11 @@ export default function RecruitmentHubPage() {
                 <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12"><Zap className="size-24 text-primary" /></div>
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase tracking-widest text-primary">Time-To-Hire</span></CardHeader>
                 <CardContent className="pb-4"><div className="text-2xl font-black font-headline">14.2 DAYS</div></CardContent>
-              </Card>
+              </div>
             </div>
 
             <div className="grid lg:grid-cols-12 gap-6">
-              {/* MAIN CONTENT AREA */}
+              {/* MAIN AREA */}
               <div className="lg:col-span-8 space-y-6">
                 <div className="flex gap-1 p-1 bg-secondary/20 rounded-xl w-fit">
                   <Button variant="ghost" size="sm" onClick={() => setActiveTab('jobs')} className={cn("h-9 px-6 text-[10px] font-black uppercase tracking-widest", activeTab === 'jobs' ? "bg-background shadow-sm text-primary" : "opacity-50")}>Job Registry</Button>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { 
   LineChart, 
   TrendingUp, 
@@ -16,7 +16,8 @@ import {
   Activity,
   Users,
   Target,
-  BadgeCent
+  BadgeCent,
+  Plus
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

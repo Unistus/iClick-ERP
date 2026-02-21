@@ -57,7 +57,8 @@ import {
   GraduationCap,
   HandCoins,
   Smartphone,
-  SmartphoneNfc
+  SmartphoneNfc,
+  PlayCircle
 } from "lucide-react";
 import { format, differenceInDays, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -485,7 +486,7 @@ function PortalContent() {
                     <TableRow key={a.id} className="h-14 hover:bg-secondary/5 border-b-border/30">
                       <TableCell className="pl-8 text-[11px] font-mono font-black text-foreground/70">{a.timestamp?.toDate ? format(a.timestamp.toDate(), 'dd MMM HH:mm:ss') : '...'}</TableCell>
                       <TableCell className="text-center">
-                        <Badge variant="outline" className={cn("text-[8px] h-5 px-3 font-black uppercase border-none ring-1", a.type === 'In' ? 'bg-emerald-500/10 text-emerald-500' : a.type.includes('Break') ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive')}>{a.type.toUpperCase()}</Badge>
+                        <Badge variant="outline" className={cn("text-[8px] h-5 px-3 font-black uppercase border-none ring-1", a.type === 'In' ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : a.type.includes('Break') ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive')}>{a.type.toUpperCase()}</Badge>
                       </TableCell>
                       <TableCell className="text-[10px] font-black uppercase tracking-tight opacity-60">{a.location || 'MANAGED HUB'}</TableCell>
                       <TableCell className="text-right pr-8 text-[9px] font-black uppercase text-emerald-500/60 flex items-center justify-end gap-1.5 mt-4"><ShieldCheck className="size-3" /> GPS VERIFIED</TableCell>

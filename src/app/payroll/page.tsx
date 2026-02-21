@@ -18,7 +18,8 @@ import {
   PieChart,
   Users,
   ShieldCheck,
-  Calendar
+  Calendar,
+  ChevronRight
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -132,13 +133,14 @@ export default function PayrollDashboard() {
                   <div className="text-2xl font-black font-headline">LOCKED</div>
                   <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Regulatory Sync: OK</p>
                 </CardContent>
-              </div>
+              </Card>
+            </div>
 
             <div className="grid gap-6 lg:grid-cols-12">
               <Card className="lg:col-span-8 border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
                 <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6 flex flex-row items-center justify-between">
                   <div className="space-y-0.5">
-                    <CardTitle className="text-sm font-black uppercase tracking-widest">Recent Processing Log</CardTitle>
+                    <CardTitle className="text-sm font-bold uppercase tracking-widest">Recent Processing Log</CardTitle>
                     <CardDescription className="text-[10px]">Audit trail of finalized remuneration cycles.</CardDescription>
                   </div>
                   <Badge variant="outline" className="text-[8px] h-5 px-3 bg-background font-black border-primary/20 text-primary">REAL-TIME DATA</Badge>

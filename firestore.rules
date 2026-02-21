@@ -11,19 +11,23 @@ service cloud.firestore {
     }
 
     /**
-     * UNIVERSAL ACCESS POLICY (V8.0.0 - Unified Multi-Tenant Access)
+     * UNIVERSAL ACCESS POLICY (V10.0.0 - Unified Multi-Tenant Access)
      * This policy allows any authenticated user to read and write all documents.
      * This is required for cross-module listing (e.g., listing leave requests, 
      * disciplinary records, or attendance logs within the institutional hub).
+     * 
+     * The recursive wildcard {allPaths=**} ensures that all subcollections 
+     * are covered by this rule, allowing for 'list' operations.
      */
     match /{allPaths=**} {
       allow read, write: if isAuthenticated();
     }
     
     /**
-     * INSTITUTIONAL HIERARCHY PROTECTION
-     * Explicitly granting recursive access to the institutions tree to support 
-     * collection-wide 'list' operations used in the Personnel Portals.
+     * EXPLICIT INSTITUTIONAL HIERARCHY PROTECTION
+     * While the global rule above covers this, we explicitly define it to 
+     * ensure the Firestore engine correctly maps collection listing 
+     * requests to this permission node.
      */
     match /institutions/{institutionId} {
       allow read, write: if isAuthenticated();

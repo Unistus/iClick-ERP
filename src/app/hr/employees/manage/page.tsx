@@ -37,7 +37,8 @@ import {
   LogOut, 
   Edit2,
   Zap,
-  RefreshCw
+  RefreshCw,
+  Activity
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
@@ -563,7 +564,7 @@ function EmployeeManagementForm() {
             className="h-12 px-16 font-black uppercase text-xs shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-3 border-none ring-2 ring-primary/20"
           >
             {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} 
-            {editingId ? 'Update Master Node' : 'Commit Registration'}
+            {editingId ? 'Update Master Node' : 'Commit To Workforce'}
           </Button>
         </div>
       </form>

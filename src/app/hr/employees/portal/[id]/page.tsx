@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, Suspense, useEffect } from 'react';
@@ -59,6 +58,13 @@ import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { recordAttendance, submitLeaveRequest } from "@/lib/hr/hr.service";
 import { toast } from "@/hooks/use-toast";
 
@@ -261,7 +267,6 @@ function PortalContent() {
     );
   }
 
-  // CRITICAL FIX: Handle case where employee document is null (not found or inaccessible)
   if (!employee) {
     return (
       <div className="h-[60vh] flex flex-col items-center justify-center gap-4 text-center px-6">

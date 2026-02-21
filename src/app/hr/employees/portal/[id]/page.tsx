@@ -4,7 +4,7 @@
 import { useState, useMemo, Suspense, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -159,8 +159,7 @@ function PortalContent() {
   }, [reviews]);
 
   const attendanceRate = useMemo(() => {
-    // Simple mock logic for MVP
-    return 94.2;
+    return 94.2; // Mock target for MVP logic
   }, []);
 
   // Resolve Names
@@ -222,7 +221,6 @@ function PortalContent() {
     const startDate = formData.get('startDate') as string;
     const endDate = formData.get('endDate') as string;
     
-    // Calculate days
     const start = new Date(startDate);
     const end = new Date(endDate);
     const dayCount = isValid(start) && isValid(end) ? differenceInDays(end, start) + 1 : 0;
@@ -253,6 +251,31 @@ function PortalContent() {
       setIsSubmittingLeave(false);
     }
   };
+
+  if (empLoading) {
+    return (
+      <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
+        <Loader2 className="size-10 animate-spin text-primary opacity-20" />
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Bootstrapping Identity Matrix...</p>
+      </div>
+    );
+  }
+
+  // CRITICAL FIX: Handle case where employee document is null (not found or inaccessible)
+  if (!employee) {
+    return (
+      <div className="h-[60vh] flex flex-col items-center justify-center gap-4 text-center px-6">
+        <ShieldX className="size-16 text-destructive opacity-20 mb-2" />
+        <h2 className="text-xl font-headline font-black uppercase tracking-tighter">Identity Not Found</h2>
+        <p className="text-sm text-muted-foreground max-w-xs">
+          The requested personnel identity node does not exist in the current institutional vault.
+        </p>
+        <Button variant="outline" className="mt-4 font-bold uppercase text-[10px] tracking-widest h-10 px-8" onClick={() => router.push('/hr/employees')}>
+          Return to Directory
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-700">

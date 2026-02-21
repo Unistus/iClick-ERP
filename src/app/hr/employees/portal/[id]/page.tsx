@@ -35,7 +35,9 @@ import {
   Clock,
   Landmark,
   Loader2,
-  UserCog
+  UserCog,
+  LayoutGrid,
+  Plus
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -246,7 +248,7 @@ function PortalContent() {
                           {l.leaveType}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-[10px] font-mono font-bold opacity-70 uppercase">{l.startDate} to {l.endDate}</TableCell>
+                      <TableCell className="text-[10px] font-mono font-bold uppercase tracking-tighter opacity-70">{l.startDate} to {l.endDate}</TableCell>
                       <TableCell className="text-[11px] italic opacity-60 truncate max-w-[250px]">"{l.reason}"</TableCell>
                       <TableCell className="text-right pr-6">
                         <Badge variant="outline" className={cn(

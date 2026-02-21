@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, Suspense, useEffect } from 'react';
@@ -50,12 +51,15 @@ import {
   LogIn,
   ShieldX,
   Award,
-  FileCheck
+  FileCheck,
+  ArrowRight
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, differenceInDays, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { recordAttendance } from "@/lib/hr/hr.service";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { recordAttendance, submitLeaveRequest } from "@/lib/hr/hr.service";
 import { toast } from "@/hooks/use-toast";
 
 function PortalContent() {
@@ -68,9 +72,11 @@ function PortalContent() {
   const employeeId = params.id as string;
   const selectedInstId = searchParams.get('instId') || "";
 
-  // Attendance Modal State
+  // UI State
   const [isClockModalOpen, setIsClockModalOpen] = useState(false);
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [isClocking, setIsClocking] = useState(false);
+  const [isSubmittingLeave, setIsSubmittingLeave] = useState(false);
 
   // Data Fetching: Employee Core Profile
   const empRef = useMemoFirebase(() => {
@@ -140,7 +146,7 @@ function PortalContent() {
   }, [db, selectedInstId, employee?.branchId]);
   const { data: departments } = useCollection(deptsRef);
 
-  // Performance Logic
+  // Metrics Calculation
   const avgPerformance = useMemo(() => {
     if (!reviews?.length) return 0;
     return reviews.reduce((sum, r) => sum + (r.score || 0), 0) / reviews.length;
@@ -151,6 +157,11 @@ function PortalContent() {
     const met = reviews.filter(r => r.kraAchieved).length;
     return (met / reviews.length) * 100;
   }, [reviews]);
+
+  const attendanceRate = useMemo(() => {
+    // Simple mock logic for MVP
+    return 94.2;
+  }, []);
 
   // Resolve Names
   const resolvedDeptName = useMemo(() => {
@@ -202,24 +213,46 @@ function PortalContent() {
     }
   };
 
-  if (empLoading) {
-    return (
-      <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
-        <Loader2 className="size-10 animate-spin text-primary opacity-20" />
-        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground animate-pulse">Synchronizing Identity Hub...</p>
-      </div>
-    );
-  }
+  const handleLeaveSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedInstId || isSubmittingLeave || !employee) return;
+    setIsSubmittingLeave(true);
 
-  if (!employee) {
-    return (
-      <div className="h-[60vh] flex flex-col items-center justify-center gap-4 text-center px-6">
-        <ShieldX className="size-12 text-destructive opacity-20" />
-        <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Identity Node Not Found</p>
-        <Button variant="outline" size="sm" onClick={() => router.push('/hr/employees')} className="mt-4">Return to Directory</Button>
-      </div>
-    );
-  }
+    const formData = new FormData(e.currentTarget);
+    const startDate = formData.get('startDate') as string;
+    const endDate = formData.get('endDate') as string;
+    
+    // Calculate days
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const dayCount = isValid(start) && isValid(end) ? differenceInDays(end, start) + 1 : 0;
+
+    if (dayCount <= 0) {
+      toast({ variant: "destructive", title: "Invalid Dates", description: "End date must be after start date." });
+      setIsSubmittingLeave(false);
+      return;
+    }
+
+    const data = {
+      employeeId: employee.id,
+      employeeName: `${employee.firstName} ${employee.lastName}`,
+      leaveType: formData.get('leaveType') as string,
+      startDate,
+      endDate,
+      days: dayCount.toString(),
+      reason: formData.get('reason') as string,
+    };
+
+    try {
+      await submitLeaveRequest(db, selectedInstId, data);
+      toast({ title: "Requisition Submitted", description: "Request is now in the management queue." });
+      setIsLeaveModalOpen(false);
+    } catch (err) {
+      toast({ variant: "destructive", title: "Submission Failed" });
+    } finally {
+      setIsSubmittingLeave(false);
+    }
+  };
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-700">
@@ -446,7 +479,7 @@ function PortalContent() {
                   <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">Absence History</CardTitle>
                   <CardDescription className="text-[10px]">Lifecycle of institutional leave requisitions.</CardDescription>
                 </div>
-                <Button size="sm" className="h-9 px-6 gap-2 font-black uppercase text-[10px] shadow-lg bg-primary hover:bg-primary/90" onClick={() => router.push('/hr/leave')}>
+                <Button size="sm" className="h-9 px-6 gap-2 font-black uppercase text-[10px] shadow-lg bg-primary hover:bg-primary/90" onClick={() => setIsLeaveModalOpen(true)}>
                   <Plus className="size-3.5" /> Raise Request
                 </Button>
               </CardHeader>
@@ -701,6 +734,78 @@ function PortalContent() {
           <div className="bg-primary/5 p-4 text-[9px] text-muted-foreground text-center border-t border-primary/10">
             <ShieldCheck className="size-3 text-emerald-500 inline mr-1.5" /> All events are geo-tagged and hashed for institutional audit.
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* DYNAMIC LEAVE REQUEST DIALOG */}
+      <Dialog open={isLeaveModalOpen} onOpenChange={setIsLeaveModalOpen}>
+        <DialogContent className="max-w-md shadow-2xl ring-1 ring-border rounded-3xl">
+          <form onSubmit={handleLeaveSubmit}>
+            <DialogHeader>
+              <div className="flex items-center gap-2 mb-2">
+                <CalendarDays className="size-5 text-primary" />
+                <DialogTitle className="text-lg font-bold uppercase">Raise Absence Requisition</DialogTitle>
+              </div>
+              <DialogDescription className="text-xs uppercase font-black tracking-tight text-primary">Self-Service Identity Node: {employee.firstName} {employee.lastName}</DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid gap-4 py-4 text-xs">
+              <div className="space-y-2">
+                <Label className="uppercase font-bold tracking-widest opacity-60 text-primary">Eligibility Category</Label>
+                <Select name="leaveType" required>
+                  <SelectTrigger className="h-11 font-black uppercase border-none ring-1 ring-border bg-secondary/5">
+                    <SelectValue placeholder="Select Entitlement..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {leaveMatrix.map(lt => (
+                      <SelectItem key={lt.id} value={lt.name} className="text-[10px] font-black uppercase">
+                        {lt.name} ({lt.remaining} Days Remaining)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center gap-2 mt-1 px-1">
+                  <Badge variant="outline" className="text-[7px] h-3.5 bg-primary/5 text-primary border-none font-black uppercase">
+                    {employee.gender === 'Male' ? <Mars className="size-2 mr-1" /> : <Venus className="size-2 mr-1" />}
+                    {employee.gender} Filter ACTIVE
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="uppercase font-bold tracking-widest opacity-60">Start Window</Label>
+                  <Input name="startDate" type="date" required className="h-11 bg-background" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="uppercase font-bold tracking-widest opacity-60">End Window</Label>
+                  <Input name="endDate" type="date" required className="h-11 bg-background" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="uppercase font-bold tracking-widest opacity-60">Justification / Reason</Label>
+                <Input name="reason" placeholder="Briefly explain the requirement..." required className="h-11 bg-secondary/5 border-none ring-1 ring-border" />
+              </div>
+
+              <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl flex gap-4 items-start text-primary shadow-inner">
+                <Sparkles className="size-5 shrink-0 mt-0.5 animate-pulse" />
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest">Audit Logic</p>
+                  <p className="text-[11px] leading-relaxed italic font-medium">
+                    This requisition will be routed to **Institutional Management** for review. Approval will atomically update your annual balance.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="bg-secondary/10 p-6 -mx-6 -mb-6 rounded-b-lg gap-2 border-t border-border/50">
+              <Button type="button" variant="ghost" onClick={() => setIsLeaveModalOpen(false)} className="text-xs h-11 font-black uppercase tracking-widest">Discard</Button>
+              <Button type="submit" disabled={isSubmittingLeave} className="h-11 px-10 font-bold uppercase text-[10px] shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-2">
+                {isSubmittingLeave ? <Loader2 className="size-3 animate-spin" /> : <ArrowRight className="size-4" />} Commit Request
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

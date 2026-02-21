@@ -51,7 +51,8 @@ import {
   ShieldX,
   Award,
   FileCheck,
-  ArrowRight
+  ArrowRight,
+  Sparkles
 } from "lucide-react";
 import { format, differenceInDays, isValid } from "date-fns";
 import { cn } from "@/lib/utils";

@@ -90,7 +90,13 @@ import {
   FileCheck,
   GraduationCap,
   UserSearch,
-  HandCoins
+  HandCoins,
+  Coins as PayrollIcon,
+  Banknote,
+  Cog,
+  FileBadge,
+  RefreshCw,
+  PlayCircle
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -132,6 +138,23 @@ export const navConfig: NavItem[] = [
     id: "pos"
   },
   {
+    title: "Payroll Engine",
+    icon: Banknote,
+    url: "/payroll",
+    pattern: /^\/payroll/,
+    id: "payroll",
+    submenus: [
+      { title: "Dashboard", icon: LayoutDashboard, url: "/payroll", id: "overview" },
+      { title: "Salary Structure", icon: Layers, url: "/payroll/structure", id: "structure" },
+      { title: "Run Processing", icon: RefreshCw, url: "/payroll/processing", id: "processing" },
+      { title: "Statutory Hub", icon: Landmark, url: "/payroll/statutory", id: "statutory" },
+      { title: "Loans & Advances", icon: HandCoins, url: "/payroll/loans", id: "loans" },
+      { title: "Payslip Vault", icon: FileBadge, url: "/payroll/payslips", id: "payslips" },
+      { title: "Payroll Setup", icon: Settings2, url: "/payroll/setup", id: "setup" },
+      { title: "Payroll Reports", icon: BarChart3, url: "/payroll/reports", id: "reports" },
+    ]
+  },
+  {
     title: "Human Resource",
     icon: Users,
     url: "/hr",
@@ -141,7 +164,6 @@ export const navConfig: NavItem[] = [
       { title: "Employee Hub", icon: UserCog, url: "/hr/employees", id: "employees" },
       { title: "Time & Attendance", icon: ClockIcon, url: "/hr/attendance", id: "attendance" },
       { title: "Recruitment (ATS)", icon: UserSearch, url: "/hr/recruitment", id: "recruitment" },
-      { title: "Payroll Command", icon: HandCoins, url: "/hr/payroll", id: "payroll" },
       { title: "Leave & Absence", icon: CalendarDays, url: "/hr/leave", id: "leave" },
       { title: "Training (LMS)", icon: GraduationCap, url: "/hr/training", id: "training" },
       { title: "HR Forecasting", icon: LineChart, url: "/hr/forecasting", id: "forecasting" },

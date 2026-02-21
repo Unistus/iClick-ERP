@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { useCollection, useFirestore, useMemoFirebase, useDoc, useUser } from "@/firebase";
 import { collection, query, orderBy, doc } from "firebase/firestore";
 import { onboardEmployee, updateEmployee } from "@/lib/hr/hr.service";
@@ -34,7 +35,9 @@ import {
   UserPlus,
   Landmark,
   ShieldAlert,
-  FileText
+  FileText,
+  LogOut,
+  Edit2
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";

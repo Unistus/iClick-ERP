@@ -1,7 +1,6 @@
-
 'use client';
 
-import { Firestore, collection, doc, serverTimestamp, addDoc, updateDoc, getDoc, runTransaction, setDoc, query, where, getDocs, limit as firestoreLimit } from 'firebase/firestore';
+import { Firestore, collection, doc, serverTimestamp, addDoc, updateDoc, getDoc, runTransaction, setDoc, query, where, getDocs, limit as firestoreLimit, increment } from 'firebase/firestore';
 import { getNextSequence } from '../sequence-service';
 
 export interface EmployeePayload {
@@ -48,6 +47,7 @@ export async function bootstrapHRFinancials(db: Firestore, institutionId: string
     { id: 'paye_liability', code: '2310', name: 'P.A.Y.E Tax Payable', type: 'Liability', subtype: 'Accrued Liabilities' },
     { id: 'statutory_deductions', code: '2320', name: 'Statutory Health & Pension', type: 'Liability', subtype: 'Accrued Liabilities' },
     { id: 'benefits_expense', code: '6030', name: 'Employee Welfare & Benefits', type: 'Expense', subtype: 'Salaries' },
+    { id: 'leave_liability', code: '2330', name: 'Leave Provision Liability', type: 'Liability', subtype: 'Accrued Liabilities' },
   ];
 
   for (const node of nodes) {
@@ -69,6 +69,8 @@ export async function bootstrapHRFinancials(db: Firestore, institutionId: string
     benefitsExpenseAccountId: 'benefits_expense',
     overtimeExpenseAccountId: 'overtime_expense',
     statutoryLiabilityAccountId: 'statutory_deductions',
+    leaveLiabilityAccountId: 'leave_liability',
+    probationPeriodDays: 90,
     updatedAt: serverTimestamp(),
   }, { merge: true });
 }
@@ -81,6 +83,7 @@ export async function onboardEmployee(db: Firestore, institutionId: string, payl
     ...payload,
     employeeId,
     leaveBalance: 21,
+    carryForwardBalance: 0,
     loyaltyScore: 100,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -97,9 +100,6 @@ export async function updateEmployee(db: Firestore, institutionId: string, emplo
   });
 }
 
-/**
- * Advanced Attendance Service with Geo and Source metadata.
- */
 export async function recordAttendance(
   db: Firestore, 
   institutionId: string, 
@@ -108,12 +108,10 @@ export async function recordAttendance(
   location?: string
 ) {
   const colRef = collection(db, 'institutions', institutionId, 'attendance');
-  
-  // Simulate metadata extraction for audit integrity
   const metadata = {
     ip: '192.168.1.42',
     source: 'Portal-Terminal',
-    gps: { lat: -1.286389, lng: 36.817223 }, // Nairobi CBD simulated
+    gps: { lat: -1.286389, lng: 36.817223 },
     device: 'Web-Chrome-Agent'
   };
 
@@ -131,13 +129,37 @@ export async function submitLeaveRequest(db: Firestore, institutionId: string, p
   return addDoc(colRef, {
     ...payload,
     status: 'Pending',
+    stage: 'Supervisor',
     createdAt: serverTimestamp(),
   });
 }
 
 export async function updateLeaveRequestStatus(db: Firestore, institutionId: string, requestId: string, status: 'Approved' | 'Declined') {
-  const ref = doc(db, 'institutions', institutionId, 'leave_requests', requestId);
-  return updateDoc(ref, {
+  const requestRef = doc(db, 'institutions', institutionId, 'leave_requests', requestId);
+  
+  if (status === 'Approved') {
+    return runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(requestRef);
+      if (!snap.exists()) throw new Error("Request not found");
+      const data = snap.data();
+
+      // Atomic Balance Deduction
+      const empRef = doc(db, 'institutions', institutionId, 'employees', data.employeeId);
+      const days = parseInt(data.days) || 0;
+      
+      transaction.update(empRef, {
+        leaveBalance: increment(-days),
+        updatedAt: serverTimestamp()
+      });
+
+      transaction.update(requestRef, {
+        status,
+        updatedAt: serverTimestamp()
+      });
+    });
+  }
+
+  return updateDoc(requestRef, {
     status,
     updatedAt: serverTimestamp()
   });

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
-import { collection, query, where, doc, orderBy } from "firebase/firestore";
+import { collection, query, where, doc, orderBy, limit } from "firebase/firestore";
 import { 
   User, 
   Briefcase, 
@@ -34,7 +34,8 @@ import {
   CheckCircle2,
   Clock,
   Landmark,
-  Loader2
+  Loader2,
+  UserCog
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";

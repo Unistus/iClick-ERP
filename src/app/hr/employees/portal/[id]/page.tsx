@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Progress } from "@/components/ui/progress";
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, query, where, doc, orderBy, limit } from "firebase/firestore";
 import { 
@@ -336,7 +337,7 @@ function PortalContent() {
                   ) : leaves.map(l => (
                     <TableRow key={l.id} className="h-16 hover:bg-secondary/5 border-b-border/30 transition-colors">
                       <TableCell className="pl-8">
-                        <Badge variant="outline" className="text-[9px] h-5 px-3 bg-primary/10 text-primary border-none font-black uppercase shadow-sm">
+                        <Badge variant="outline" className="text-[8px] h-5 px-3 bg-primary/10 text-primary border-none font-black uppercase shadow-sm">
                           {l.leaveType}
                         </Badge>
                       </TableCell>

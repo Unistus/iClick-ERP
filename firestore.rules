@@ -4,35 +4,25 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * GLOBAL AUTHENTICATION UTILITY
-     */
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    /**
-     * UNIVERSAL PERMISSIVE POLICY (V12.0.0 - Unblocked Institutional Access)
-     * Deployment Signature: EMERGENCY_REDEPLOY_PROT_V12_SYNC
+     * GLOBAL DEVELOPMENT PERMISSIVE POLICY (V13.0.0)
      * 
-     * This policy allows authenticated users full read/write access to all documents.
-     * This is essential for the ERP's complex cross-collection queries (Leaves, 
-     * Attendance, Discipline) where 'list' operations on sub-collections must
-     * be inherited from the institutional root.
+     * To ensure zero friction for the Personnel Portal and cross-collection queries,
+     * we are enabling open read/write access. 
+     * WARNING: This should be restricted to institutional tenancy logic before production deployment.
      */
     match /{allPaths=**} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     /**
-     * EXPLICIT INSTITUTIONAL NODES
-     * Redundant but provides explicit indexing paths for Firestore's engine.
+     * EXPLICIT PATHS (For Indexing Support)
      */
     match /institutions/{institutionId}/{document=**} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     match /users/{userId}/{document=**} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
   }
 }

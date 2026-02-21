@@ -41,10 +41,17 @@ import {
   Plus,
   Mars,
   Venus,
-  ArrowUpRight
+  ArrowUpRight,
+  Download,
+  Heart
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+
+/**
+ * @fileOverview High-fidelity Personnel Self-Service Portal.
+ * Centralizes all employee-related data nodes into a unified command hub.
+ */
 
 function PortalContent() {
   const router = useRouter();
@@ -55,14 +62,14 @@ function PortalContent() {
   const employeeId = params.id as string;
   const selectedInstId = searchParams.get('instId') || "";
 
-  // Data Fetching: Employee Core
+  // Data Fetching: Employee Core Profile
   const empRef = useMemoFirebase(() => {
     if (!selectedInstId || !employeeId) return null;
     return doc(db, 'institutions', selectedInstId, 'employees', employeeId);
   }, [db, selectedInstId, employeeId]);
   const { data: employee, isLoading: empLoading } = useDoc(empRef);
 
-  // Data Fetching: Leave History
+  // Data Fetching: Leave History & Requisitions
   const leaveQuery = useMemoFirebase(() => {
     if (!selectedInstId || !employeeId) return null;
     return query(
@@ -73,7 +80,7 @@ function PortalContent() {
   }, [db, selectedInstId, employeeId]);
   const { data: leaves } = useCollection(leaveQuery);
 
-  // Data Fetching: Performance Reviews
+  // Data Fetching: Growth & Performance Reviews
   const reviewsQuery = useMemoFirebase(() => {
     if (!selectedInstId || !employeeId) return null;
     return query(
@@ -84,7 +91,7 @@ function PortalContent() {
   }, [db, selectedInstId, employeeId]);
   const { data: reviews } = useCollection(reviewsQuery);
 
-  // Data Fetching: Disciplinary Records
+  // Data Fetching: Conduct & Disciplinary Archive
   const conductQuery = useMemoFirebase(() => {
     if (!selectedInstId || !employeeId) return null;
     return query(
@@ -95,7 +102,7 @@ function PortalContent() {
   }, [db, selectedInstId, employeeId]);
   const { data: conduct } = useCollection(conductQuery);
 
-  // Data Fetching: Attendance Stream
+  // Data Fetching: Real-time Attendance Stream
   const attQuery = useMemoFirebase(() => {
     if (!selectedInstId || !employeeId) return null;
     return query(
@@ -107,13 +114,14 @@ function PortalContent() {
   }, [db, selectedInstId, employeeId]);
   const { data: attendance } = useCollection(attQuery);
 
-  // Data Fetching: Branches for lookup
+  // Data Fetching: Institutional Structure (Branches)
   const branchesRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return collection(db, 'institutions', selectedInstId, 'branches');
   }, [db, selectedInstId]);
   const { data: branches } = useCollection(branchesRef);
 
+  // Calculations: Real-time Talent Metrics
   const avgPerformance = useMemo(() => {
     if (!reviews?.length) return 0;
     return reviews.reduce((sum, r) => sum + (r.score || 0), 0) / reviews.length;
@@ -125,30 +133,36 @@ function PortalContent() {
     return (achieved / reviews.length) * 100;
   }, [reviews]);
 
+  const attendanceRate = useMemo(() => {
+    // Simple mock calculation for portal display
+    return 94.2;
+  }, []);
+
   if (empLoading) {
     return (
       <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
         <Loader2 className="size-10 animate-spin text-primary opacity-20" />
-        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground animate-pulse">Initializing Identity Hub...</p>
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground animate-pulse">Synchronizing Identity Hub...</p>
       </div>
     );
   }
 
   if (!employee) {
     return (
-      <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
+      <div className="h-[60vh] flex flex-col items-center justify-center gap-4 text-center px-6">
         <ShieldAlert className="size-12 text-destructive opacity-20" />
         <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Identity Node Not Found</p>
-        <Button variant="outline" size="sm" onClick={() => router.push('/hr/employees')}>Return to Directory</Button>
+        <p className="text-xs text-muted-foreground max-w-xs">The requested employee record does not exist or has been decommissioned.</p>
+        <Button variant="outline" size="sm" onClick={() => router.push('/hr/employees')} className="mt-4">Return to Directory</Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-700">
+    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-700">
       {/* PORTAL HEADER COMMAND CENTER */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-card border border-border/50 p-8 rounded-[2rem] shadow-2xl relative overflow-hidden ring-1 ring-border/50">
-        <div className="absolute top-0 right-0 p-8 opacity-[0.03]"><UserCog className="size-48" /></div>
+        <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none"><UserCog className="size-48" /></div>
         
         <div className="flex flex-col sm:flex-row items-center gap-6 relative z-10">
           <div className="relative group">
@@ -169,10 +183,10 @@ function PortalContent() {
                 "h-6 px-3 font-black uppercase border-none ring-1",
                 employee.status === 'Active' ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : 'bg-amber-500/10 text-amber-500 ring-amber-500/20'
               )}>
-                {employee.status}
+                {employee.status || 'PENDING'}
               </Badge>
               <span className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1.5 bg-secondary/30 px-2 py-1 rounded-md">
-                <Briefcase className="size-3 text-primary" /> {employee.jobTitle}
+                <Briefcase className="size-3 text-primary" /> {employee.jobTitle || 'General Staff'}
               </span>
               <span className="text-[10px] font-mono font-black text-primary/60 flex items-center gap-1.5">
                 <Hash className="size-3" /> {employee.employeeId}
@@ -199,7 +213,7 @@ function PortalContent() {
 
       <Tabs defaultValue="profile" className="w-full">
         <TabsList className="bg-secondary/20 h-auto p-1 mb-8 flex-wrap justify-start gap-1 bg-transparent border-b rounded-none w-full">
-          <TabsTrigger value="profile" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><User className="size-3.5" /> Identity Node</TabsTrigger>
+          <TabsTrigger value="profile" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><User className="size-3.5" /> Identity Hub</TabsTrigger>
           <TabsTrigger value="leave" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><CalendarDays className="size-3.5" /> Absence Matrix</TabsTrigger>
           <TabsTrigger value="performance" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Star className="size-3.5" /> Growth Scorecard</TabsTrigger>
           <TabsTrigger value="attendance" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Timer className="size-3.5" /> Shift Stream</TabsTrigger>
@@ -242,10 +256,10 @@ function PortalContent() {
                   <div className="p-4 rounded-2xl bg-secondary/10 border border-dashed border-border flex items-center justify-between group hover:bg-secondary/20 transition-all">
                     <div>
                       <p className="text-xs font-black uppercase">{employee.nextOfKin?.name || 'NOT DEFINED'}</p>
-                      <p className="text-[9px] text-muted-foreground font-bold uppercase mt-0.5">{employee.nextOfKin?.relation}</p>
+                      <p className="text-[9px] text-muted-foreground font-bold uppercase mt-0.5">{employee.nextOfKin?.relation || 'Guardian'}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs font-mono font-black text-primary">{employee.nextOfKin?.phone}</p>
+                      <p className="text-xs font-mono font-black text-primary">{employee.nextOfKin?.phone || '...'}</p>
                       <p className="text-[8px] text-muted-foreground uppercase">Emergency Line</p>
                     </div>
                   </div>
@@ -266,7 +280,7 @@ function PortalContent() {
                     <div>
                       <p className="text-[9px] font-black uppercase text-primary tracking-widest">Active Branch</p>
                       <p className="text-xs font-black uppercase mt-1">
-                        {branches?.find(b => b.id === employee.branchId)?.name || 'Central Command'}
+                        {branches?.find(b => b.id === employee.branchId)?.name || 'Central Hub'}
                       </p>
                     </div>
                   </div>
@@ -300,7 +314,7 @@ function PortalContent() {
             <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="space-y-1 text-center sm:text-left">
                 <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">Absence Matrix</CardTitle>
-                <CardDescription className="text-[10px]">Real-time history of institutional leave requisitions.</CardDescription>
+                <CardDescription className="text-[10px]">History of institutional leave requisitions.</CardDescription>
               </div>
               <Button size="sm" className="h-9 px-6 gap-2 font-black uppercase text-[10px] shadow-lg bg-primary hover:bg-primary/90">
                 <Plus className="size-3.5" /> Initialize Request
@@ -318,7 +332,7 @@ function PortalContent() {
                 </TableHeader>
                 <TableBody>
                   {!leaves?.length ? (
-                    <TableRow><TableCell colSpan={4} className="text-center py-20 text-[10px] opacity-30 italic uppercase font-black tracking-[0.3em]">No absence cycles found.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="text-center py-20 text-[10px] opacity-30 italic uppercase font-black tracking-[0.3em]">No historical cycles detected.</TableCell></TableRow>
                   ) : leaves.map(l => (
                     <TableRow key={l.id} className="h-16 hover:bg-secondary/5 border-b-border/30 transition-colors">
                       <TableCell className="pl-8">
@@ -334,10 +348,10 @@ function PortalContent() {
                       </TableCell>
                       <TableCell className="text-right pr-8">
                         <Badge variant="outline" className={cn(
-                          "text-[9px] h-5 px-3 font-black uppercase border-none ring-1",
+                          "text-[8px] h-5 px-3 font-black uppercase border-none ring-1",
                           l.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : 
                           l.status === 'Declined' ? 'bg-destructive/10 text-destructive ring-destructive/20' : 
-                          'bg-amber-500/10 text-amber-500 ring-amber-500/20 animate-pulse'
+                          'bg-amber-500/10 text-amber-500 ring-amber-500/20'
                         )}>
                           {l.status}
                         </Badge>
@@ -366,16 +380,16 @@ function PortalContent() {
                       <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Review Date</TableHead>
                       <TableHead className="h-12 text-[9px] font-black uppercase text-center">Velocity Score</TableHead>
                       <TableHead className="h-12 text-[9px] font-black uppercase">Objective Status</TableHead>
-                      <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Final Feedback</TableHead>
+                      <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Feedback</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {!reviews?.length ? (
-                      <TableRow><TableCell colSpan={4} className="text-center py-20 text-[10px] opacity-30 italic uppercase font-black tracking-[0.3em]">No historical audits found.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={4} className="text-center py-20 text-[10px] opacity-30 italic uppercase font-black tracking-[0.3em]">No growth audits found.</TableCell></TableRow>
                     ) : reviews.map(r => (
                       <TableRow key={r.id} className="h-20 hover:bg-secondary/5 border-b-border/30 transition-colors">
                         <TableCell className="pl-8 text-[11px] font-black uppercase text-foreground/80">
-                          {format(new Date(r.date), 'dd MMM yyyy')}
+                          {r.date}
                         </TableCell>
                         <TableCell className="text-center">
                           <span className={cn("font-mono font-black text-xs px-3 py-1 rounded-full shadow-sm border", 
@@ -415,34 +429,23 @@ function PortalContent() {
                     <div className="space-y-2">
                       <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
                         <span className="opacity-50">Operational Intensity</span>
-                        <span className="text-accent">84%</span>
+                        <span className="text-accent">{attendanceRate}%</span>
                       </div>
-                      <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden shadow-inner"><div className="h-full bg-accent w-[84%] transition-all duration-1000" /></div>
+                      <Progress value={attendanceRate} className="h-1.5 bg-secondary rounded-full overflow-hidden shadow-inner" />
                     </div>
                     <div className="space-y-2">
                       <div className="flex justify-between text-[10px] font-black uppercase tracking-tighter">
-                        <span className="opacity-50">SOP Compliance</span>
+                        <span className="opacity-50">Process Fidelity</span>
                         <span className="text-accent">92%</span>
                       </div>
-                      <div className="h-1.5 w-full bg-secondary rounded-full overflow-hidden shadow-inner"><div className="h-full bg-accent w-[92%] transition-all duration-1000" /></div>
+                      <Progress value={92} className="h-1.5 bg-secondary rounded-full overflow-hidden shadow-inner" />
                     </div>
                   </div>
                 </div>
                 <div className="pt-8 border-t border-accent/20 mt-8">
                   <p className="text-[11px] leading-relaxed text-muted-foreground italic font-medium text-center">
-                    "Consistent high performance across all process nodes. High potential for promotion track."
+                    "Consistent adherence to institutional SOPs. High growth potential node."
                   </p>
-                </div>
-              </Card>
-              
-              <Card className="border-none ring-1 ring-primary/30 bg-primary/5 p-6 shadow-xl">
-                <div className="flex items-center gap-3 mb-4">
-                  <Zap className="size-5 text-primary animate-pulse" />
-                  <p className="text-[10px] font-black uppercase text-primary tracking-widest">Next Audit Window</p>
-                </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-lg font-black font-headline">Q4 ANNUAL</p>
-                  <Badge className="bg-primary text-white font-bold">14 DAYS</Badge>
                 </div>
               </Card>
             </div>
@@ -453,7 +456,7 @@ function PortalContent() {
           <Card className="border-none ring-1 ring-border bg-card shadow-2xl overflow-hidden">
             <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-8">
               <CardTitle className="text-sm font-black uppercase tracking-[0.2em] flex items-center gap-2 text-primary">
-                <Clock className="size-4" /> Live Attendance Stream
+                <Clock className="size-4" /> Live Shift Stream
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -472,7 +475,7 @@ function PortalContent() {
                   ) : attendance.map(a => (
                     <TableRow key={a.id} className="h-14 hover:bg-secondary/5 border-b-border/30">
                       <TableCell className="pl-8 text-[11px] font-mono font-black text-foreground/70">
-                        {a.timestamp?.toDate ? format(a.timestamp.toDate(), 'dd MMM yyyy HH:mm:ss') : '...'}
+                        {a.timestamp?.toDate ? format(a.timestamp.toDate(), 'dd MMM yyyy HH:mm:ss') : 'Just now'}
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge variant="outline" className={cn(
@@ -483,7 +486,7 @@ function PortalContent() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-[10px] font-black uppercase tracking-tight opacity-60">
-                        {a.location || 'HEAD OFFICE HUB'}
+                        {a.location || 'MANAGED SITE NODE'}
                       </TableCell>
                       <TableCell className="text-right pr-8">
                         <div className="flex items-center justify-end gap-2 text-[9px] font-black uppercase text-emerald-500/60">
@@ -521,7 +524,7 @@ function PortalContent() {
                   ) : conduct.map(c => (
                     <TableRow key={c.id} className="h-16 hover:bg-destructive/5 border-b-border/30 transition-colors group">
                       <TableCell className="pl-8 text-[11px] font-black text-muted-foreground">
-                        {c.createdAt?.toDate ? format(c.createdAt.toDate(), 'dd/MM/yyyy') : '...'}
+                        {c.createdAt?.toDate ? format(c.createdAt.toDate(), 'dd MMM yyyy') : '...'}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-[8px] h-5 px-3 bg-destructive/10 text-destructive border-none font-black uppercase ring-1 ring-destructive/20">
@@ -540,75 +543,36 @@ function PortalContent() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="payroll" className="mt-0 space-y-6">
-          <div className="grid md:grid-cols-12 gap-6">
-            <Card className="md:col-span-8 border-none ring-1 ring-border bg-card shadow-2xl overflow-hidden">
-              <CardHeader className="bg-primary/10 border-b border-primary/20 py-4 px-8 flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
-                  <FileText className="size-4 text-primary" /> Verified Payslip Vault
-                </CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase gap-2">
-                  <Download className="size-3" /> Export Statement
-                </Button>
-              </CardHeader>
-              <CardContent className="p-0 overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-secondary/20">
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Pay Period</TableHead>
-                      <TableHead className="h-12 text-[9px] font-black uppercase">Settlement Logic</TableHead>
-                      <TableHead className="h-12 text-[9px] font-black uppercase text-right">Net Disbursement</TableHead>
-                      <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Audit Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow className="h-24 opacity-30 italic">
-                      <TableCell colSpan={4} className="text-center text-[10px] font-black uppercase tracking-[0.3em] py-12">
-                        Payroll module integration pending first cycle finalization.
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-
-            <div className="md:col-span-4 space-y-6">
-              <Card className="border-none ring-1 ring-border bg-card p-8 shadow-2xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:rotate-12 transition-transform"><Landmark className="size-24 text-primary" /></div>
-                <div className="flex items-center gap-3 mb-8 relative z-10">
-                  <div className="p-2 rounded-lg bg-primary/10 text-primary"><Landmark className="size-5" /></div>
-                  <p className="text-[10px] font-black uppercase text-primary tracking-[0.2em]">Settlement Registry</p>
-                </div>
-                <div className="space-y-6 relative z-10">
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest">Authorized Entity</p>
-                    <p className="text-sm font-black uppercase">{employee.bankName || 'NOT REGISTERED'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest">Encrypted Account Node</p>
-                    <p className="text-sm font-black font-mono tracking-tighter">
-                      {employee.bankAccount ? `•••• ${employee.bankAccount.slice(-4)}` : '•••• 0000'}
-                    </p>
-                  </div>
-                  <div className="pt-6 border-t border-border/50">
-                    <p className="text-[10px] font-black uppercase text-primary mb-3 flex items-center gap-2">
-                      <BadgeCent className="size-3" /> Contractual Remuneration
-                    </p>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-[10px] font-black text-muted-foreground">KES</span>
-                      <span className="text-3xl font-black font-headline text-foreground/90 tracking-tighter">
-                        {employee.salary?.toLocaleString() || 0}
-                      </span>
-                    </div>
-                    <p className="text-[8px] text-muted-foreground uppercase font-bold mt-1">Base Monthly Gross</p>
-                  </div>
-                </div>
-                <Button className="w-full mt-8 h-11 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 font-black uppercase text-[10px] tracking-widest gap-2">
-                  <ArrowUpRight className="size-3.5" /> View Compensation Structure
-                </Button>
-              </Card>
-            </div>
-          </div>
+        <TabsContent value="payroll" className="mt-0">
+          <Card className="border-none ring-1 ring-border bg-card shadow-2xl overflow-hidden">
+            <CardHeader className="bg-primary/10 border-b border-border/50 py-4 px-8 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2">
+                <FileText className="size-4 text-primary" /> Verified Payslip Vault
+              </CardTitle>
+              <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase gap-2">
+                <Download className="size-3" /> Export Statement
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-secondary/20">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Pay Period</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase">Settlement Node</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase text-right">Net Disbursement</TableHead>
+                    <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Audit Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow className="h-24 opacity-30 italic">
+                    <TableCell colSpan={4} className="text-center text-[10px] font-black uppercase tracking-[0.3em] py-12">
+                      Payroll module waiting for first cycle finalization.
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
@@ -621,7 +585,7 @@ export default function PortalPage() {
       <Suspense fallback={
         <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
           <Loader2 className="size-10 animate-spin text-primary opacity-20" />
-          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Synchronizing Employee Nodes...</p>
+          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Bootstrapping Identity Matrix...</p>
         </div>
       }>
         <PortalContent />

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo, Suspense } from 'react';
+import { useState, useMemo, Suspense, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
-import { collection, query, where, doc, orderBy, limit } from "firebase/firestore";
+import { collection, query, where, doc, limit } from "firebase/firestore";
 import { 
   User, 
   Briefcase, 
@@ -70,13 +70,13 @@ function PortalContent() {
   }, [db, selectedInstId, employeeId]);
   const { data: employee, isLoading: empLoading } = useDoc(empRef);
 
-  // Data Fetching: Leave History & Requisitions
+  // Data Fetching: Leave History
+  // REMOVED orderBy to ensure no index-related permission issues during prototyping
   const leaveQuery = useMemoFirebase(() => {
     if (!selectedInstId || !employeeId) return null;
     return query(
       collection(db, 'institutions', selectedInstId, 'leave_requests'), 
-      where('employeeId', '==', employeeId), 
-      orderBy('createdAt', 'desc')
+      where('employeeId', '==', employeeId)
     );
   }, [db, selectedInstId, employeeId]);
   const { data: leaves } = useCollection(leaveQuery);
@@ -86,8 +86,7 @@ function PortalContent() {
     if (!selectedInstId || !employeeId) return null;
     return query(
       collection(db, 'institutions', selectedInstId, 'performance_reviews'), 
-      where('employeeId', '==', employeeId), 
-      orderBy('date', 'desc')
+      where('employeeId', '==', employeeId)
     );
   }, [db, selectedInstId, employeeId]);
   const { data: reviews } = useCollection(reviewsQuery);
@@ -97,8 +96,7 @@ function PortalContent() {
     if (!selectedInstId || !employeeId) return null;
     return query(
       collection(db, 'institutions', selectedInstId, 'disciplinary_records'), 
-      where('employeeId', '==', employeeId), 
-      orderBy('createdAt', 'desc')
+      where('employeeId', '==', employeeId)
     );
   }, [db, selectedInstId, employeeId]);
   const { data: conduct } = useCollection(conductQuery);
@@ -108,9 +106,8 @@ function PortalContent() {
     if (!selectedInstId || !employeeId) return null;
     return query(
       collection(db, 'institutions', selectedInstId, 'attendance'), 
-      where('employeeId', '==', employeeId), 
-      orderBy('timestamp', 'desc'), 
-      limit(15)
+      where('employeeId', '==', employeeId),
+      limit(20)
     );
   }, [db, selectedInstId, employeeId]);
   const { data: attendance } = useCollection(attQuery);
@@ -134,9 +131,7 @@ function PortalContent() {
     return (achieved / reviews.length) * 100;
   }, [reviews]);
 
-  const attendanceRate = useMemo(() => {
-    return 94.2;
-  }, []);
+  const attendanceRate = 94.2;
 
   if (empLoading) {
     return (
@@ -159,7 +154,7 @@ function PortalContent() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-700">
+    <div className="space-y-6 pb-20 animate-in fade-in duration-700">
       {/* PORTAL HEADER COMMAND CENTER */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-card border border-border/50 p-8 rounded-[2rem] shadow-2xl relative overflow-hidden ring-1 ring-border/50">
         <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none"><UserCog className="size-48" /></div>
@@ -323,7 +318,7 @@ function PortalContent() {
             <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader className="bg-secondary/30">
-                  <TableRow className="hover:bg-transparent">
+                  <TableRow>
                     <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Classification</TableHead>
                     <TableHead className="h-12 text-[9px] font-black uppercase">Validity Window</TableHead>
                     <TableHead className="h-12 text-[9px] font-black uppercase">Justification</TableHead>
@@ -376,7 +371,7 @@ function PortalContent() {
               <CardContent className="p-0">
                 <Table>
                   <TableHeader className="bg-secondary/20">
-                    <TableRow className="hover:bg-transparent">
+                    <TableRow>
                       <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Review Date</TableHead>
                       <TableHead className="h-12 text-[9px] font-black uppercase text-center">Velocity Score</TableHead>
                       <TableHead className="h-12 text-[9px] font-black uppercase">Objective Status</TableHead>

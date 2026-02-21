@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,24 +23,25 @@ import {
   Calendar, 
   Wallet, 
   ShieldCheck, 
-  Loader2,
-  CheckCircle2,
-  Heart,
-  Fingerprint,
-  MapPin,
-  Clock,
-  Hash,
-  Save,
-  X,
-  UserPlus,
-  Landmark,
-  ShieldAlert,
-  FileText,
-  LogOut,
-  Edit2
+  Loader2, 
+  CheckCircle2, 
+  Heart, 
+  Fingerprint, 
+  MapPin, 
+  Clock, 
+  Hash, 
+  Save, 
+  UserPlus, 
+  Landmark, 
+  ShieldAlert, 
+  LogOut, 
+  Edit2,
+  Zap,
+  RefreshCw
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
+import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 
 function EmployeeManagementForm() {
   const router = useRouter();
@@ -48,10 +49,14 @@ function EmployeeManagementForm() {
   const db = useFirestore();
   const { user } = useUser();
   
-  const selectedInstId = searchParams.get('instId') || "";
+  const urlInstId = searchParams.get('instId') || "";
   const editingId = searchParams.get('id');
 
+  const [selectedInstId, setSelectedInstId] = useState<string>(urlInstId);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Authorization & Tenancy
+  const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
   // Data Fetching: Setup Nodes from /hr/setup
   const branchesRef = useMemoFirebase(() => {
@@ -90,11 +95,11 @@ function EmployeeManagementForm() {
   }, [db, selectedInstId]);
   const { data: shiftTypes } = useCollection(shiftTypesRef);
 
-  const managersRef = useMemoFirebase(() => {
+  const staffRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return query(collection(db, 'institutions', selectedInstId, 'employees'), orderBy('lastName', 'asc'));
   }, [db, selectedInstId]);
-  const { data: staffPool } = useCollection(managersRef);
+  const { data: staffPool } = useCollection(staffRef);
 
   // Data Fetching: Editing Context
   const editingEmpRef = useMemoFirebase(() => {
@@ -103,6 +108,10 @@ function EmployeeManagementForm() {
   }, [db, selectedInstId, editingId]);
   const { data: editingEmp, isLoading: empLoading } = useDoc(editingEmpRef);
 
+  useEffect(() => {
+    if (urlInstId) setSelectedInstId(urlInstId);
+  }, [urlInstId]);
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || isProcessing) return;
@@ -110,7 +119,6 @@ function EmployeeManagementForm() {
 
     const formData = new FormData(e.currentTarget);
     const data: any = {
-      // Identity
       firstName: formData.get('firstName') as string,
       lastName: formData.get('lastName') as string,
       email: formData.get('email') as string,
@@ -120,37 +128,28 @@ function EmployeeManagementForm() {
       kraPin: formData.get('kraPin') as string,
       nssfNumber: formData.get('nssfNumber') as string,
       nhifNumber: formData.get('nhifNumber') as string,
-      
-      // Next of Kin
       nextOfKin: {
         name: formData.get('nokName') as string,
         relation: formData.get('nokRelation') as string,
         phone: formData.get('nokPhone') as string,
       },
-
-      // Job Placement
       branchId: formData.get('branchId') as string,
       departmentId: formData.get('departmentId') as string,
       reportingManagerId: formData.get('managerId') as string,
       jobTitle: formData.get('jobTitle') as string,
       jobLevelId: formData.get('jobLevelId') as string,
       shiftTypeId: formData.get('shiftTypeId') as string,
-
-      // Compliance & Terms
       hireDate: formData.get('hireDate') as string,
       employmentType: formData.get('employmentType') as string,
       probationEndDate: formData.get('probationEnd') as string,
       hasWorkPermit: formData.get('hasWorkPermit') === 'on',
       workPermitExpiry: formData.get('workPermitExpiry') as string,
-
-      // Financials
       salary: parseFloat(formData.get('salary') as string) || 0,
       payGradeId: formData.get('payGradeId') as string,
       bankName: formData.get('bankName') as string,
       bankBranch: formData.get('bankBranch') as string,
       bankAccount: formData.get('bankAccount') as string,
       taxCategory: formData.get('taxCategory') as string,
-      
       status: editingId ? (formData.get('status') as any) : 'Onboarding',
     };
 
@@ -172,7 +171,13 @@ function EmployeeManagementForm() {
     }
   };
 
-  if (empLoading) return <div className="h-screen flex items-center justify-center bg-background"><Loader2 className="size-8 animate-spin text-primary" /></div>;
+  if (empLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 className="size-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 pb-20">
@@ -183,21 +188,29 @@ function EmployeeManagementForm() {
             <ArrowLeft className="size-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-headline font-bold flex items-center gap-3">
+            <h1 className="text-2xl font-headline font-bold flex items-center gap-3 text-foreground">
               {editingId ? <Edit2 className="size-6 text-primary" /> : <UserPlus className="size-6 text-primary" />}
               {editingId ? 'Refine Identity Node' : 'Initialize Onboarding'}
             </h1>
-            <p className="text-[10px] text-muted-foreground uppercase font-black tracking-[0.2em] mt-1">Institutional Workforce Provisioning</p>
+            <p className="text-[10px] text-muted-foreground uppercase font-black tracking-[0.2em] mt-1">Workforce Provisioning Protocol</p>
           </div>
         </div>
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <Badge variant="outline" className="h-9 px-4 bg-primary/5 border-primary/20 text-primary font-black uppercase tracking-widest hidden md:flex">
-            {editingEmp?.employeeId || 'NEW_UUID'}
-          </Badge>
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <Select value={selectedInstId} onValueChange={setSelectedInstId}>
+            <SelectTrigger className="w-[240px] h-10 bg-background border-none ring-1 ring-border text-xs font-bold shadow-sm">
+              <SelectValue placeholder={instLoading ? "Validating Access..." : "Target Institution"} />
+            </SelectTrigger>
+            <SelectContent>
+              {institutions?.map(i => (
+                <SelectItem key={i.id} value={i.id} className="text-xs font-bold">{i.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          
           <Button 
             form="employee-master-form" 
             type="submit" 
-            disabled={isProcessing} 
+            disabled={isProcessing || !selectedInstId} 
             className="flex-1 md:flex-none h-10 px-8 font-black uppercase text-xs shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-2 border-none ring-2 ring-primary/20 transition-all active:scale-95"
           >
             {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} 
@@ -206,8 +219,12 @@ function EmployeeManagementForm() {
         </div>
       </div>
 
-      <form id="employee-master-form" onSubmit={handleSubmit} className="grid gap-8">
-        
+      <form 
+        id="employee-master-form" 
+        onSubmit={handleSubmit} 
+        key={editingEmp?.id || 'new-profile'}
+        className="grid gap-8 animate-in fade-in duration-500"
+      >
         {/* SECTION 1: BIOGRAPHICAL & IDENTITY */}
         <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
           <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-8">
@@ -373,14 +390,13 @@ function EmployeeManagementForm() {
 
         {/* SECTION 3: COMPLIANCE & FINANCIALS */}
         <div className="grid lg:grid-cols-2 gap-8">
-          {/* COMPLIANCE CARD */}
           <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
             <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-8">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500"><ShieldCheck className="size-5" /></div>
                 <div>
                   <CardTitle className="text-sm font-black uppercase tracking-widest">3. Compliance & Terms</CardTitle>
-                  <CardDescription className="text-[10px]">Contractual eligibility and legal eligibility.</CardDescription>
+                  <CardDescription className="text-[10px]">Contractual and legal eligibility parameters.</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -428,7 +444,6 @@ function EmployeeManagementForm() {
             </CardContent>
           </Card>
 
-          {/* FINANCIALS CARD */}
           <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
             <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-8">
               <div className="flex items-center gap-3">
@@ -523,7 +538,7 @@ function EmployeeManagementForm() {
                   <div className="space-y-1">
                     <p className="text-[10px] font-black uppercase tracking-widest text-primary">Tenancy Protocol</p>
                     <p className="text-[11px] leading-relaxed text-muted-foreground italic font-medium">
-                      "Staff state transitions trigger institutional security heartbeats. Transitioning to 'Terminated' or 'Suspended' instantly revokes all network session tokens."
+                      "Staff state transitions trigger institutional security heartbeats. Transitioning to 'Terminated' instantly revokes token access."
                     </p>
                   </div>
                 </div>
@@ -532,7 +547,7 @@ function EmployeeManagementForm() {
           </Card>
         )}
 
-        {/* BOTTOM COMMANDS - REDUNDANT BUT UX FRIENDLY */}
+        {/* BOTTOM COMMANDS */}
         <div className="flex justify-end gap-4 pt-10">
           <Button 
             type="button" 
@@ -540,15 +555,15 @@ function EmployeeManagementForm() {
             onClick={() => router.push('/hr/employees')} 
             className="h-12 px-10 font-black uppercase text-xs opacity-40 hover:opacity-100 transition-all"
           >
-            Discard All Changes
+            Discard Changes
           </Button>
           <Button 
             type="submit" 
-            disabled={isProcessing} 
+            disabled={isProcessing || !selectedInstId} 
             className="h-12 px-16 font-black uppercase text-xs shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-3 border-none ring-2 ring-primary/20"
           >
             {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} 
-            Commit To Global Workforce
+            {editingId ? 'Update Master Node' : 'Commit Registration'}
           </Button>
         </div>
       </form>

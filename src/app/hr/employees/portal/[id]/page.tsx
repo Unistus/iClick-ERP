@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, Suspense, useEffect } from 'react';
@@ -49,7 +48,9 @@ import {
   Scale,
   LogOut,
   LogIn,
-  ShieldX
+  ShieldX,
+  Award,
+  FileCheck
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";

@@ -26,6 +26,7 @@ import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase
 import { collection, query, orderBy, limit, doc, where } from "firebase/firestore";
 import { format } from "date-fns";
 import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
+import Link from 'next/link';
 
 export default function PayrollDashboard() {
   const db = useFirestore();
@@ -131,8 +132,7 @@ export default function PayrollDashboard() {
                   <div className="text-2xl font-black font-headline">LOCKED</div>
                   <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Regulatory Sync: OK</p>
                 </CardContent>
-              </Card>
-            </div>
+              </div>
 
             <div className="grid gap-6 lg:grid-cols-12">
               <Card className="lg:col-span-8 border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">

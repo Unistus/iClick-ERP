@@ -19,10 +19,13 @@ import {
   Users,
   ShieldCheck,
   Calendar,
-  ChevronRight
+  ChevronRight,
+  Zap,
+  LayoutGrid
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { useCollection, useFirestore, useMemoFirebase, useDoc } from "@/firebase";
 import { collection, query, orderBy, limit, doc, where } from "firebase/firestore";
 import { format } from "date-fns";
@@ -197,6 +200,16 @@ export default function PayrollDashboard() {
                       </Button>
                     </Link>
                   </CardContent>
+                </Card>
+
+                <Card className="bg-primary/5 border-none ring-1 ring-primary/20 p-6 rounded-2xl relative overflow-hidden">
+                  <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12"><LayoutGrid className="size-24 text-primary" /></div>
+                  <div className="flex flex-col gap-3 relative z-10">
+                    <p className="text-[10px] font-black uppercase text-primary tracking-widest">Compliance Matrix</p>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground font-medium italic">
+                      "Remuneration flows are strictly siloed by legal entity. Cross-tenant payroll processing is prohibited at the edge."
+                    </p>
+                  </div>
                 </Card>
               </div>
             </div>

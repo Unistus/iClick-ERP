@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
@@ -38,11 +38,13 @@ import {
   Edit2,
   Zap,
   RefreshCw,
-  Activity
+  Activity,
+  Timer
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
 import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
+import { addDays, format, isValid } from "date-fns";
 
 function EmployeeManagementForm() {
   const router = useRouter();
@@ -56,10 +58,19 @@ function EmployeeManagementForm() {
   const [selectedInstId, setSelectedInstId] = useState<string>(urlInstId);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Authorization & Tenancy
+  // Structural State
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("");
+  const [hireDate, setHireDate] = useState<string>("");
+
   const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
-  // Data Fetching: Setup Nodes from /hr/setup
+  // Data Fetching: Setup & Registry Nodes
+  const setupRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return doc(db, 'institutions', selectedInstId, 'settings', 'hr');
+  }, [db, selectedInstId]);
+  const { data: hrSetup } = useDoc(setupRef);
+
   const branchesRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return collection(db, 'institutions', selectedInstId, 'branches');
@@ -67,32 +78,38 @@ function EmployeeManagementForm() {
   const { data: branches } = useCollection(branchesRef);
 
   const deptsRef = useMemoFirebase(() => {
-    if (!selectedInstId) return null;
-    return collection(db, 'institutions', selectedInstId, 'departments');
-  }, [db, selectedInstId]);
+    if (!selectedInstId || !selectedBranchId) return null;
+    return collection(db, 'institutions', selectedInstId, 'branches', selectedBranchId, 'departments');
+  }, [db, selectedInstId, selectedBranchId]);
   const { data: departments } = useCollection(deptsRef);
 
   const jobLevelsRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
-    return collection(db, 'institutions', selectedInstId, 'job_levels');
+    return query(collection(db, 'institutions', selectedInstId, 'job_levels'), orderBy('createdAt', 'desc'));
   }, [db, selectedInstId]);
   const { data: jobLevels } = useCollection(jobLevelsRef);
 
+  const jobTitlesRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return query(collection(db, 'institutions', selectedInstId, 'job_titles'), orderBy('name', 'asc'));
+  }, [db, selectedInstId]);
+  const { data: jobTitles } = useCollection(jobTitlesRef);
+
   const payGradesRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
-    return collection(db, 'institutions', selectedInstId, 'pay_grades');
+    return query(collection(db, 'institutions', selectedInstId, 'pay_grades'), orderBy('createdAt', 'desc'));
   }, [db, selectedInstId]);
   const { data: payGrades } = useCollection(payGradesRef);
 
   const empTypesRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
-    return collection(db, 'institutions', selectedInstId, 'employment_types');
+    return query(collection(db, 'institutions', selectedInstId, 'employment_types'), orderBy('createdAt', 'desc'));
   }, [db, selectedInstId]);
   const { data: empTypes } = useCollection(empTypesRef);
 
   const shiftTypesRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
-    return collection(db, 'institutions', selectedInstId, 'shift_types');
+    return query(collection(db, 'institutions', selectedInstId, 'shift_types'), orderBy('createdAt', 'desc'));
   }, [db, selectedInstId]);
   const { data: shiftTypes } = useCollection(shiftTypesRef);
 
@@ -112,6 +129,22 @@ function EmployeeManagementForm() {
   useEffect(() => {
     if (urlInstId) setSelectedInstId(urlInstId);
   }, [urlInstId]);
+
+  useEffect(() => {
+    if (editingEmp) {
+      setSelectedBranchId(editingEmp.branchId || "");
+      setHireDate(editingEmp.hireDate || "");
+    }
+  }, [editingEmp]);
+
+  // PROBATION CALCULATION LOGIC
+  const calculatedProbationEnd = useMemo(() => {
+    if (!hireDate || !hrSetup?.probationPeriodDays) return null;
+    const start = new Date(hireDate);
+    if (!isValid(start)) return null;
+    const end = addDays(start, hrSetup.probationPeriodDays);
+    return format(end, 'dd MMM yyyy');
+  }, [hireDate, hrSetup?.probationPeriodDays]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -134,15 +167,15 @@ function EmployeeManagementForm() {
         relation: formData.get('nokRelation') as string,
         phone: formData.get('nokPhone') as string,
       },
-      branchId: formData.get('branchId') as string,
+      branchId: selectedBranchId,
       departmentId: formData.get('departmentId') as string,
       reportingManagerId: formData.get('managerId') as string,
       jobTitle: formData.get('jobTitle') as string,
       jobLevelId: formData.get('jobLevelId') as string,
       shiftTypeId: formData.get('shiftTypeId') as string,
-      hireDate: formData.get('hireDate') as string,
+      hireDate: hireDate,
       employmentType: formData.get('employmentType') as string,
-      probationEndDate: formData.get('probationEnd') as string,
+      probationEndDate: calculatedProbationEnd,
       hasWorkPermit: formData.get('hasWorkPermit') === 'on',
       workPermitExpiry: formData.get('workPermitExpiry') as string,
       salary: parseFloat(formData.get('salary') as string) || 0,
@@ -166,7 +199,7 @@ function EmployeeManagementForm() {
       }
       router.push('/hr/employees');
     } catch (err) {
-      toast({ variant: "destructive", title: "Persistence Error", description: "Could not sync record to cloud vault." });
+      toast({ variant: "destructive", title: "Persistence Error" });
     } finally {
       setIsProcessing(false);
     }
@@ -243,11 +276,11 @@ function EmployeeManagementForm() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="uppercase font-black text-[9px] tracking-widest opacity-60">Legal First Name</Label>
-                    <Input name="firstName" defaultValue={editingEmp?.firstName} required className="h-11 font-bold bg-secondary/5 border-none ring-1 ring-border focus-visible:ring-primary" />
+                    <Input name="firstName" defaultValue={editingEmp?.firstName} required className="h-11 font-bold bg-secondary/5 border-none ring-1 ring-border" />
                   </div>
                   <div className="space-y-2">
                     <Label className="uppercase font-black text-[9px] tracking-widest opacity-60">Legal Last Name</Label>
-                    <Input name="lastName" defaultValue={editingEmp?.lastName} required className="h-11 font-bold bg-secondary/5 border-none ring-1 ring-border focus-visible:ring-primary" />
+                    <Input name="lastName" defaultValue={editingEmp?.lastName} required className="h-11 font-bold bg-secondary/5 border-none ring-1 ring-border" />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -286,7 +319,7 @@ function EmployeeManagementForm() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="text-[9px] font-bold uppercase opacity-60">KRA PIN</Label>
-                      <Input name="kraPin" defaultValue={editingEmp?.kraPin} className="h-10 font-mono uppercase bg-background border-none ring-1 ring-border" placeholder="A00..." />
+                      <Input name="kraPin" defaultValue={editingEmp?.kraPin} className="h-10 font-mono uppercase bg-background border-none ring-1 ring-border" />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-[9px] font-bold uppercase opacity-60">NSSF Number</Label>
@@ -296,17 +329,6 @@ function EmployeeManagementForm() {
                   <div className="space-y-2">
                     <Label className="text-[9px] font-bold uppercase opacity-60">NHIF Number</Label>
                     <Input name="nhifNumber" defaultValue={editingEmp?.nhifNumber} className="h-10 font-mono bg-background border-none ring-1 ring-border" />
-                  </div>
-                </div>
-
-                <div className="bg-accent/5 p-6 rounded-3xl border border-dashed border-accent/20 space-y-4">
-                  <h4 className="text-[9px] font-black uppercase flex items-center gap-2 text-accent"><Heart className="size-3" /> Next of Kin (Emergency)</h4>
-                  <div className="grid gap-4">
-                    <Input name="nokName" defaultValue={editingEmp?.nextOfKin?.name} placeholder="Identity of Contact" className="h-10 bg-background border-none ring-1 ring-border" />
-                    <div className="grid grid-cols-2 gap-4">
-                      <Input name="nokRelation" defaultValue={editingEmp?.nextOfKin?.relation} placeholder="Relationship" className="h-10 bg-background border-none ring-1 ring-border" />
-                      <Input name="nokPhone" defaultValue={editingEmp?.nextOfKin?.phone} placeholder="Phone Line" className="h-10 bg-background border-none ring-1 ring-border" />
-                    </div>
                   </div>
                 </div>
               </div>
@@ -321,17 +343,17 @@ function EmployeeManagementForm() {
               <div className="p-2 rounded-lg bg-accent/10 text-accent"><Building className="size-5" /></div>
               <div>
                 <CardTitle className="text-sm font-black uppercase tracking-widest">2. Placement & Command Node</CardTitle>
-                <CardDescription className="text-[10px]">Institutional mapping, hierarchy, and operational role.</CardDescription>
+                <CardDescription className="text-[10px]">Institutional mapping and hierarchical alignment.</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent className="p-8 grid md:grid-cols-2 gap-12">
             <div className="space-y-6">
-              <h3 className="text-[10px] font-black uppercase text-primary tracking-widest border-b pb-2">Location & Structure</h3>
+              <h3 className="text-[10px] font-black uppercase text-primary tracking-widest border-b pb-2">Location Context</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-[9px] font-bold uppercase opacity-60">Assigned Branch</Label>
-                  <Select name="branchId" defaultValue={editingEmp?.branchId}>
+                  <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
                     <SelectTrigger className="h-11 font-bold bg-secondary/5 border-none ring-1 ring-border"><SelectValue placeholder="Pick Branch" /></SelectTrigger>
                     <SelectContent>
                       {branches?.map(b => <SelectItem key={b.id} value={b.id} className="text-[10px] font-bold uppercase">{b.name}</SelectItem>)}
@@ -340,8 +362,10 @@ function EmployeeManagementForm() {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[9px] font-bold uppercase opacity-60">Department Node</Label>
-                  <Select name="departmentId" defaultValue={editingEmp?.departmentId}>
-                    <SelectTrigger className="h-11 font-bold bg-secondary/5 border-none ring-1 ring-border"><SelectValue placeholder="Pick Dept" /></SelectTrigger>
+                  <Select name="departmentId" defaultValue={editingEmp?.departmentId} disabled={!selectedBranchId}>
+                    <SelectTrigger className="h-11 font-bold bg-secondary/5 border-none ring-1 ring-border">
+                      <SelectValue placeholder={selectedBranchId ? "Pick Dept" : "Pick Branch First"} />
+                    </SelectTrigger>
                     <SelectContent>
                       {departments?.map(d => <SelectItem key={d.id} value={d.id} className="text-[10px] font-bold uppercase">{d.name}</SelectItem>)}
                     </SelectContent>
@@ -360,10 +384,15 @@ function EmployeeManagementForm() {
             </div>
 
             <div className="space-y-6">
-              <h3 className="text-[10px] font-black uppercase text-primary tracking-widest border-b pb-2">Operational Identity</h3>
+              <h3 className="text-[10px] font-black uppercase text-primary tracking-widest border-b pb-2">Official Role</h3>
               <div className="space-y-2">
-                <Label className="text-[9px] font-bold uppercase opacity-60">Official Job Title</Label>
-                <Input name="jobTitle" defaultValue={editingEmp?.jobTitle} required placeholder="e.g. Senior Pharmacist" className="h-11 font-bold uppercase tracking-tight bg-secondary/5 border-none ring-1 ring-border" />
+                <Label className="text-[9px] font-bold uppercase opacity-60">Assigned Job Title</Label>
+                <Select name="jobTitle" defaultValue={editingEmp?.jobTitle}>
+                  <SelectTrigger className="h-11 font-bold bg-secondary/5 border-none ring-1 ring-border uppercase"><SelectValue placeholder="Select Title" /></SelectTrigger>
+                  <SelectContent>
+                    {jobTitles?.map(jt => <SelectItem key={jt.id} value={jt.name} className="text-[10px] font-bold uppercase">{jt.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -405,7 +434,14 @@ function EmployeeManagementForm() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-[9px] font-bold uppercase opacity-60">Contract Effective Date</Label>
-                  <Input name="hireDate" type="date" defaultValue={editingEmp?.hireDate} required className="h-11 bg-secondary/5 border-none ring-1 ring-border" />
+                  <Input 
+                    name="hireDate" 
+                    type="date" 
+                    value={hireDate} 
+                    onChange={(e) => setHireDate(e.target.value)}
+                    required 
+                    className="h-11 bg-secondary/5 border-none ring-1 ring-border" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[9px] font-bold uppercase opacity-60">Employment Basis</Label>
@@ -413,34 +449,29 @@ function EmployeeManagementForm() {
                     <SelectTrigger className="h-11 font-bold bg-secondary/5 border-none ring-1 ring-border"><SelectValue placeholder="Basis..." /></SelectTrigger>
                     <SelectContent>
                       {empTypes?.map(t => <SelectItem key={t.id} value={t.name} className="text-[10px] font-bold uppercase">{t.name}</SelectItem>)}
-                      {!empTypes?.length && (
-                        <>
-                          <SelectItem value="Permanent">Permanent</SelectItem>
-                          <SelectItem value="Contract">Contract</SelectItem>
-                        </>
-                      )}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               
-              <div className="space-y-2">
-                <Label className="text-[9px] font-bold uppercase opacity-60">Probation End Threshold</Label>
-                <Input name="probationEnd" type="date" defaultValue={editingEmp?.probationEndDate} className="h-11 bg-secondary/5 border-none ring-1 ring-border" />
-              </div>
-
-              <div className="p-6 bg-secondary/5 rounded-2xl border border-dashed flex flex-col gap-4 mt-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-xs font-bold">Foreign Work Permit Required?</Label>
-                    <p className="text-[9px] text-muted-foreground uppercase">Mandatory for non-citizen identity nodes.</p>
+              <div className="p-6 bg-primary/5 rounded-3xl border border-primary/10 shadow-inner flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-primary font-black uppercase text-[10px] tracking-[0.2em]">
+                  <Timer className="size-4" /> Probationary Lifecycle
+                </div>
+                <div className="flex justify-between items-end mt-2">
+                  <div>
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold">Calculated End Date</p>
+                    <p className="text-xl font-black font-headline text-foreground/90">
+                      {calculatedProbationEnd || 'Await Contract Date'}
+                    </p>
                   </div>
-                  <Switch name="hasWorkPermit" defaultChecked={editingEmp?.hasWorkPermit} />
+                  <Badge variant="outline" className="h-6 bg-background font-black border-primary/20 text-primary">
+                    {hrSetup?.probationPeriodDays || 0} DAYS FIXED
+                  </Badge>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-[9px] font-bold uppercase opacity-60">Permit Expiry Milestone</Label>
-                  <Input name="workPermitExpiry" type="date" defaultValue={editingEmp?.workPermitExpiry} className="h-10 bg-background border-none ring-1 ring-border" />
-                </div>
+                <p className="text-[9px] text-muted-foreground leading-relaxed italic mt-2">
+                  End date is dynamically derived from your Institutional Setup policy.
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -473,33 +504,6 @@ function EmployeeManagementForm() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 border-t pt-6">
-                <div className="space-y-2 col-span-2">
-                  <Label className="text-[9px] font-bold uppercase opacity-60">Settlement Bank Entity</Label>
-                  <Input name="bankName" defaultValue={editingEmp?.bankName} placeholder="e.g. KCB, Equity, Standard Chartered" className="h-11 bg-secondary/5 border-none ring-1 ring-border" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[9px] font-bold uppercase opacity-60">Account Identifier</Label>
-                  <Input name="bankAccount" defaultValue={editingEmp?.bankAccount} className="h-11 font-mono bg-secondary/5 border-none ring-1 ring-border" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[9px] font-bold uppercase opacity-60">Swift / Branch Code</Label>
-                  <Input name="bankBranch" defaultValue={editingEmp?.bankBranch} className="h-11 font-mono bg-secondary/5 border-none ring-1 ring-border" />
-                </div>
-              </div>
-
-              <div className="space-y-2 pt-2">
-                <Label className="text-[9px] font-bold uppercase opacity-60">Regulatory Taxation Class</Label>
-                <Select name="taxCategory" defaultValue={editingEmp?.taxCategory || "Standard PAYE"}>
-                  <SelectTrigger className="h-11 font-bold uppercase bg-secondary/5 border-none ring-1 ring-border"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Standard PAYE" className="text-[10px] font-bold uppercase">Standard P.A.Y.E</SelectItem>
-                    <SelectItem value="WHT 5%" className="text-[10px] font-bold uppercase">WHT (Consultancy - 5%)</SelectItem>
-                    <SelectItem value="Exempt" className="text-[10px] font-bold uppercase">Institutional Exempt</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </CardContent>
           </Card>
@@ -534,39 +538,10 @@ function EmployeeManagementForm() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="p-6 bg-primary/5 rounded-3xl border border-primary/10 flex gap-4 items-start shadow-inner">
-                  <Zap className="size-6 text-primary shrink-0 animate-pulse" />
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-primary">Tenancy Protocol</p>
-                    <p className="text-[11px] leading-relaxed text-muted-foreground italic font-medium">
-                      "Staff state transitions trigger institutional security heartbeats. Transitioning to 'Terminated' instantly revokes token access."
-                    </p>
-                  </div>
-                </div>
               </div>
             </CardContent>
           </Card>
         )}
-
-        {/* BOTTOM COMMANDS */}
-        <div className="flex justify-end gap-4 pt-10">
-          <Button 
-            type="button" 
-            variant="ghost" 
-            onClick={() => router.push('/hr/employees')} 
-            className="h-12 px-10 font-black uppercase text-xs opacity-40 hover:opacity-100 transition-all"
-          >
-            Discard Changes
-          </Button>
-          <Button 
-            type="submit" 
-            disabled={isProcessing || !selectedInstId} 
-            className="h-12 px-16 font-black uppercase text-xs shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-3 border-none ring-2 ring-primary/20"
-          >
-            {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} 
-            {editingId ? 'Update Master Node' : 'Commit To Workforce'}
-          </Button>
-        </div>
       </form>
     </div>
   );

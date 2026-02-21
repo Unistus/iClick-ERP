@@ -37,7 +37,8 @@ import {
   ShieldAlert,
   Calendar,
   Flame,
-  FileText
+  FileText,
+  Tag
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
@@ -73,6 +74,12 @@ export default function HRSetupPage() {
     return query(collection(db, 'institutions', selectedInstId, 'job_levels'), orderBy('createdAt', 'desc'));
   }, [db, selectedInstId]);
   const { data: jobLevels } = useCollection(jobLevelsRef);
+
+  const jobTitlesRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return query(collection(db, 'institutions', selectedInstId, 'job_titles'), orderBy('name', 'asc'));
+  }, [db, selectedInstId]);
+  const { data: jobTitles } = useCollection(jobTitlesRef);
 
   const payGradesRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -114,7 +121,7 @@ export default function HRSetupPage() {
     formData.forEach((value, key) => {
       if (['enableAutoOvertime', 'strictGeoFencing', 'requireManagerSignoff', 'restrictPosByShift', 'blockHolidayClockIn', 'strictOtApproval'].includes(key)) {
         updates[key] = value === 'on';
-      } else if (['lateToleranceMins', 'standardShiftHours'].includes(key)) {
+      } else if (['lateToleranceMins', 'standardShiftHours', 'probationPeriodDays'].includes(key)) {
         updates[key] = parseInt(value as string) || 0;
       } else {
         updates[key] = value;
@@ -362,6 +369,10 @@ export default function HRSetupPage() {
                       <CardContent className="p-6 space-y-6">
                         <div className="grid md:grid-cols-2 gap-8">
                           <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Standard Probation (Days)</Label>
+                              <Input name="probationPeriodDays" type="number" defaultValue={setup?.probationPeriodDays || 90} className="h-10 text-lg font-black bg-secondary/5" />
+                            </div>
                             <div className="flex items-center justify-between p-4 bg-secondary/10 rounded-xl border">
                               <div className="space-y-0.5">
                                 <Label className="text-xs font-bold">Block Holiday Clock-In</Label>
@@ -525,6 +536,36 @@ export default function HRSetupPage() {
                 <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
                   <CardHeader className="bg-secondary/10 border-b flex items-center justify-between">
                     <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                      <Tag className="size-4 text-primary" /> Official Job Titles
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="p-4 border-b bg-secondary/5">
+                      <form onSubmit={(e) => handleAddSubItem('job_titles', e)} className="flex gap-2">
+                        <Input name="name" placeholder="Job Title (e.g. Staff Nurse)" required className="h-9 text-xs" />
+                        <Button type="submit" size="sm" className="h-9 px-4 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
+                      </form>
+                    </div>
+                    <Table>
+                      <TableBody>
+                        {jobTitles?.map(t => (
+                          <TableRow key={t.id} className="h-10 hover:bg-secondary/5 group">
+                            <TableCell className="text-xs font-bold pl-6 uppercase tracking-tight">{t.name}</TableCell>
+                            <TableCell className="text-right pr-6">
+                              <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'job_titles', t.id))}>
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
+                  <CardHeader className="bg-secondary/10 border-b flex items-center justify-between">
+                    <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                       <Landmark className="size-4 text-primary" /> Institutional Pay Grades
                     </CardTitle>
                   </CardHeader>
@@ -543,7 +584,7 @@ export default function HRSetupPage() {
                           <TableRow key={g.id} className="h-12 hover:bg-secondary/5 group">
                             <TableCell className="text-xs font-black pl-6 uppercase text-primary">{g.name}</TableCell>
                             <TableCell className="text-[10px] font-mono text-muted-foreground">
-                              {currency} {g.minSalary?.toLocaleString()} — {g.maxSalary?.toLocaleString()}
+                              {g.minSalary?.toLocaleString()} — {g.maxSalary?.toLocaleString()}
                             </TableCell>
                             <TableCell className="text-right pr-6">
                               <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'pay_grades', g.id))}>

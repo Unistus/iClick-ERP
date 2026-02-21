@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -22,7 +22,8 @@ import {
   Scale,
   Zap,
   Loader2,
-  FileText
+  FileText,
+  ArrowUpRight
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
@@ -33,6 +34,11 @@ import { cn } from "@/lib/utils";
 export default function StatutoryHubPage() {
   const db = useFirestore();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
+  const [dataTimestamp, setDataTimestamp] = useState<string>("");
+
+  useEffect(() => {
+    setDataTimestamp(new Date().toLocaleTimeString());
+  }, []);
 
   const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 

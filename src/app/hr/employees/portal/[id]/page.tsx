@@ -260,7 +260,7 @@ function PortalContent() {
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-700">
-      {/* HEADER COMMAND CENTER - MOBILE READY */}
+      {/* HEADER COMMAND CENTER */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-card border border-border/50 p-6 md:p-8 rounded-[2rem] shadow-2xl relative overflow-hidden ring-1 ring-border/50">
         <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none hidden md:block"><UserCog className="size-48" /></div>
         <div className="flex flex-col sm:flex-row items-center gap-6 relative z-10 w-full lg:w-auto">
@@ -316,7 +316,7 @@ function PortalContent() {
                     <div className="p-3 rounded-xl bg-secondary/5 border border-border/50"><p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">National ID</p><p className="text-xs font-black font-mono tracking-tighter">{employee.nationalId || '...'}</p></div>
                     <div className="p-3 rounded-xl bg-secondary/5 border border-border/50"><p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">KRA PIN</p><p className="text-xs font-black font-mono uppercase tracking-tighter">{employee.kraPin || '...'}</p></div>
                     <div className="p-3 rounded-xl bg-secondary/5 border border-border/50"><p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">NSSF Node</p><p className="text-xs font-black font-mono uppercase tracking-tighter">{employee.nssfNumber || '...'}</p></div>
-                    <div className="p-3 rounded-xl bg-secondary/5 border border-border/50"><p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">NHIF Node</p><p className="text-xs font-black font-mono tracking-tighter">{employee.nhifNumber || '...'}</p></div>
+                    <div className="p-3 rounded-xl bg-secondary/5 border border-border/50"><p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">NHIF Node</p><p className="text-xs font-black font-mono uppercase tracking-tighter">{employee.nhifNumber || '...'}</p></div>
                   </div>
                 </div>
               </CardContent>
@@ -498,7 +498,7 @@ function PortalContent() {
         </TabsContent>
       </Tabs>
 
-      {/* QUICK CLOCK DIALOG - ENHANCED MOBILE LAYER */}
+      {/* QUICK CLOCK DIALOG */}
       <Dialog open={isClockModalOpen} onOpenChange={setIsClockModalOpen}>
         <DialogContent className="max-w-md shadow-2xl ring-1 ring-border rounded-3xl overflow-hidden border-none p-0">
           <div className="bg-gradient-to-br from-primary via-primary/90 to-accent p-8 text-white relative overflow-hidden">

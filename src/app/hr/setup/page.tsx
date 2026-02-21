@@ -207,7 +207,7 @@ export default function HRSetupPage() {
           <div className="flex gap-2">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
               <SelectTrigger className="w-[240px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
-                <SelectValue placeholder="Select Institution" />
+                <SelectValue placeholder={instLoading ? "Validating Access..." : "Select Institution"} />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (
@@ -493,7 +493,7 @@ export default function HRSetupPage() {
               </form>
             </TabsContent>
 
-            <TabsContent value="financial">
+            <TabsContent value="financial" className="space-y-6">
               <form onSubmit={handleSavePolicy}>
                 <Card className="border-none ring-1 ring-border shadow-2xl bg-card">
                   <CardHeader className="border-b border-border/50 bg-secondary/10">

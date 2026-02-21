@@ -215,7 +215,7 @@ export default function PayrollCommandPage() {
                   <TableBody>
                     {runsLoading ? (
                       <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse uppercase font-black">Syncing Ledger...</TableCell></TableRow>
-                    ) : runs?.length === 0 ? (
+                    ) : (!runs || runs.length === 0) ? (
                       <TableRow><TableCell colSpan={5} className="text-center py-24 text-xs text-muted-foreground uppercase font-black tracking-widest opacity-20 italic">No payroll cycles have been initialized.</TableCell></TableRow>
                     ) : runs.map((run) => (
                       <TableRow key={run.id} className="h-16 hover:bg-secondary/10 transition-colors border-b-border/30 group">
@@ -320,7 +320,7 @@ export default function PayrollCommandPage() {
 
               <DialogFooter className="bg-secondary/10 p-8 border-t gap-3">
                 <Button type="button" variant="ghost" onClick={() => setIsRunModalOpen(false)} className="h-12 font-black uppercase text-[10px] tracking-widest">Discard</Button>
-                <Button type="submit" disabled={isProcessing} className="h-12 px-12 font-black uppercase text-[10px] shadow-2xl shadow-emerald-900/40 bg-emerald-600 hover:bg-emerald-700 gap-3 border-none ring-2 ring-emerald-500/20">
+                <Button type="submit" disabled={isProcessing} className="h-12 px-12 font-black uppercase text-[10px] shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-3 border-none ring-2 ring-primary/20">
                   {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <Zap className="size-4" />} Commit Cycle
                 </Button>
               </DialogFooter>

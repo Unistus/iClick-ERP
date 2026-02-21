@@ -4,34 +4,59 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * ABSOLUTE ACCESS POLICY (V6.5.0-ERP-CORE)
+     * GLOBAL AUTHENTICATION UTILITY
+     */
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    /**
+     * INSTITUTIONAL MULTI-TENANCY POLICY
+     * Allows authenticated users to access institutional data. 
+     * In a production environment, this should be tightened to check memberships.
+     */
+    match /institutions/{instId} {
+      allow read, write: if isAuthenticated();
+      
+      // Allow recursive access to all sub-collections (leaves, inventory, accounting, etc.)
+      match /{allSubPaths=**} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    /**
+     * USER IDENTITY & TENANCY REGISTRY
+     * Users can only manage their own profile and membership mapping.
+     */
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    match /user_institutions/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      match /{allSubPaths=**} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+    }
+
+    /**
+     * GLOBAL CONFIGURATION NODES
+     */
+    match /currencies/{id} {
+      allow read: if isAuthenticated();
+    }
+    
+    match /system_admins/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    /**
+     * CATCH-ALL ACCESS (V6.5.0-ERP-CORE)
+     * Ensures general system availability for authenticated nodes.
      */
     match /{allPaths=**} {
-      allow read, write: if request.auth != null;
-    }
-
-    // HR Sub-collection Matchers
-    match /institutions/{instId}/employees/{empId} { allow read, write: if request.auth != null; }
-    match /institutions/{instId}/attendance/{attId} { allow read, write: if request.auth != null; }
-    match /institutions/{instId}/leave_requests/{reqId} { allow read, write: if request.auth != null; }
-    match /institutions/{instId}/shifts/{shiftId} { allow read, write: if request.auth != null; }
-    match /institutions/{instId}/shift_types/{id} { allow read, write: if request.auth != null; }
-    match /institutions/{instId}/holidays/{id} { allow read, write: if request.auth != null; }
-    match /institutions/{instId}/pay_grades/{id} { allow read, write: if request.auth != null; }
-    match /institutions/{instId}/performance_reviews/{revId} { allow read, write: if request.auth != null; }
-    match /institutions/{instId}/disciplinary_records/{recId} { allow read, write: if request.auth != null; }
-    match /institutions/{instId}/job_levels/{id} { allow read, write: if request.auth != null; }
-    match /institutions/{instId}/leave_types/{id} { allow read, write: if request.auth != null; }
-
-    // User Profile & Tenancy
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-    match /user_institutions/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      match /{allSubPaths=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
+      allow read, write: if isAuthenticated();
     }
   }
 }

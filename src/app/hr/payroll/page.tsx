@@ -321,7 +321,7 @@ export default function PayrollCommandPage() {
               <DialogFooter className="bg-secondary/10 p-8 border-t gap-3">
                 <Button type="button" variant="ghost" onClick={() => setIsRunModalOpen(false)} className="h-12 font-black uppercase text-[10px] tracking-widest">Discard</Button>
                 <Button type="submit" disabled={isProcessing} className="h-12 px-12 font-black uppercase text-[10px] shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-3 border-none ring-2 ring-primary/20">
-                  {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <Zap className="size-4" />} Commit Cycle
+                  {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />} Commit Cycle
                 </Button>
               </DialogFooter>
             </form>

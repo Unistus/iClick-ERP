@@ -137,15 +137,15 @@ export default function PerformanceReviewsPage() {
                         <TableHead className="h-10 text-[9px] font-black uppercase pl-6">Staff Member</TableHead>
                         <TableHead className="h-10 text-[9px] font-black uppercase">Review Date</TableHead>
                         <TableHead className="h-10 text-[9px] font-black uppercase text-center">Velocity Score</TableHead>
-                        <TableHead className="h-10 text-right text-[9px] font-black uppercase pr-6">Status</TableHead>
+                        <TableHead className="h-10 text-right pr-6 text-[9px] font-black uppercase">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {isLoading ? (
                         <TableRow><TableCell colSpan={4} className="text-center py-12 text-xs animate-pulse uppercase font-black">Syncing Scorecards...</TableCell></TableRow>
-                      ) : reviews?.length === 0 ? (
+                      ) : (!reviews || reviews.length === 0) ? (
                         <TableRow><TableCell colSpan={4} className="text-center py-20 text-xs text-muted-foreground uppercase font-bold">No performance logs.</TableCell></TableRow>
-                      ) : reviews?.map((r) => (
+                      ) : reviews.map((r) => (
                         <TableRow key={r.id} className="h-14 hover:bg-secondary/10 transition-colors border-b-border/30 group">
                           <TableCell className="pl-6 font-bold text-xs uppercase tracking-tight">
                             {employees?.find(e => e.id === r.employeeId)?.firstName || '...'}

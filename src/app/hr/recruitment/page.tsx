@@ -146,7 +146,10 @@ export default function RecruitmentHubPage() {
                 </CardContent>
               </Card>
               <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden group hover:ring-emerald-500/30 transition-all">
-                <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Onboarding Pipeline</span></CardHeader>
+                <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
+                  <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Onboarding Pipeline</span>
+                  <CheckCircle2 className="size-3 text-emerald-500 opacity-50" />
+                </CardHeader>
                 <CardContent className="pb-4">
                   <div className="text-2xl font-black font-headline text-emerald-500">{applicants?.filter(a => a.stage === 'Hired').length || 0} OFFERS</div>
                 </CardContent>
@@ -284,7 +287,7 @@ export default function RecruitmentHubPage() {
               </DialogHeader>
               <div className="p-6 space-y-6 text-xs">
                 <div className="space-y-2">
-                  <Label className="uppercase font-black text-[9px] tracking-widest opacity-60">Job Node Title</Label>
+                  <Label className="uppercase font-black text-[9px] tracking-widest opacity-60 text-primary">Job Node Title</Label>
                   <Input name="title" placeholder="e.g. Lead Pharmacist" required className="h-11 font-black bg-secondary/5 border-none ring-1 ring-border" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -312,7 +315,7 @@ export default function RecruitmentHubPage() {
               <DialogFooter className="bg-secondary/10 p-6 border-t gap-3">
                 <Button type="button" variant="ghost" onClick={() => setIsCreateJobOpen(false)} className="h-11 font-black uppercase text-[10px] tracking-widest">Discard</Button>
                 <Button type="submit" disabled={isProcessing} className="h-11 px-12 font-black uppercase text-[10px] shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-3 border-none ring-2 ring-primary/20">
-                  {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <Zap className="size-4" />} Deploy Requisition
+                  {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />} Deploy Requisition
                 </Button>
               </DialogFooter>
             </form>

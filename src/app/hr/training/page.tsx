@@ -167,7 +167,7 @@ export default function TrainingLMSPage() {
               <CardContent className="p-0 overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-secondary/20">
-                    <TableRow className="hover:bg-transparent">
+                    <TableRow>
                       <TableHead className="h-12 text-[9px] font-black uppercase pl-8 text-muted-foreground">Module Identity</TableHead>
                       <TableHead className="h-12 text-[9px] font-black uppercase text-muted-foreground">Category Node</TableHead>
                       <TableHead className="h-12 text-[9px] font-black uppercase text-center text-muted-foreground">Reward Points</TableHead>
@@ -178,7 +178,7 @@ export default function TrainingLMSPage() {
                   <TableBody>
                     {coursesLoading ? (
                       <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse uppercase font-black">Scanning LMS Hub...</TableCell></TableRow>
-                    ) : courses?.length === 0 ? (
+                    ) : (!courses || courses.length === 0) ? (
                       <TableRow><TableCell colSpan={5} className="text-center py-24 text-xs text-muted-foreground uppercase font-black tracking-widest opacity-20 italic">No training modules registered.</TableCell></TableRow>
                     ) : courses.map(c => (
                       <TableRow key={c.id} className="h-16 hover:bg-secondary/10 transition-colors border-b-border/30 group">

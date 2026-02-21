@@ -33,6 +33,7 @@ import { toast } from "@/hooks/use-toast";
 import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 import { format } from "date-fns";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 export default function LoansAdvancesPage() {
   const db = useFirestore();
@@ -206,10 +207,10 @@ export default function LoansAdvancesPage() {
               <CardContent className="p-0 overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-secondary/20">
-                    <TableRow className="hover:bg-transparent">
+                    <TableRow>
                       <TableHead className="h-12 text-[9px] font-black uppercase pl-8 text-muted-foreground">Staff Member</TableHead>
                       <TableHead className="h-12 text-[9px] font-black uppercase text-muted-foreground">Category</TableHead>
-                      <TableHead className="h-12 text-[9px] font-black uppercase text-muted-foreground text-center">Lifecycle</TableHead>
+                      <TableHead className="h-12 text-[9px] font-black uppercase text-center text-muted-foreground">Lifecycle</TableHead>
                       <TableHead className="h-12 text-[9px] font-black uppercase text-right text-muted-foreground">Monthly Deduct</TableHead>
                       <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase text-muted-foreground">Principal Bal</TableHead>
                     </TableRow>
@@ -261,7 +262,7 @@ export default function LoansAdvancesPage() {
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogContent className="max-w-md shadow-2xl ring-1 ring-border rounded-[2.5rem] overflow-hidden">
             <form onSubmit={handleIssueLoan}>
-              <DialogHeader className="bg-secondary/10 p-8 border-b">
+              <DialogHeader>
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 rounded-lg bg-primary/10 text-primary"><HandCoins className="size-5" /></div>
                   <DialogTitle className="text-sm font-black uppercase tracking-widest">Issue Staff Advance</DialogTitle>
@@ -320,7 +321,7 @@ export default function LoansAdvancesPage() {
               <DialogFooter className="bg-secondary/10 p-8 border-t gap-3">
                 <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)} className="h-12 font-black uppercase text-[10px] tracking-widest">Discard</Button>
                 <Button type="submit" disabled={isProcessing} className="h-12 px-12 font-black uppercase text-[10px] shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-3 border-none ring-2 ring-primary/20">
-                  {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <Plus className="size-4" />} Commit Advance
+                  {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />} Commit Advance
                 </Button>
               </DialogFooter>
             </form>

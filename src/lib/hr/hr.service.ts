@@ -38,6 +38,9 @@ export interface EmployeePayload {
   status: 'Active' | 'Onboarding' | 'Suspended' | 'Terminated';
 }
 
+/**
+ * Bootstraps the required HR financial nodes in the COA.
+ */
 export async function bootstrapHRFinancials(db: Firestore, institutionId: string) {
   const nodes = [
     { id: 'salaries_expense', code: '6000', name: 'Salaries & Wages', type: 'Expense', subtype: 'Salaries' },
@@ -48,6 +51,7 @@ export async function bootstrapHRFinancials(db: Firestore, institutionId: string
     { id: 'statutory_deductions', code: '2320', name: 'Statutory Health & Pension', type: 'Liability', subtype: 'Accrued Liabilities' },
     { id: 'benefits_expense', code: '6030', name: 'Employee Welfare & Benefits', type: 'Expense', subtype: 'Salaries' },
     { id: 'leave_liability', code: '2330', name: 'Leave Provision Liability', type: 'Liability', subtype: 'Accrued Liabilities' },
+    { id: 'leave_provision_expense', code: '6040', name: 'Leave Provision Expense', type: 'Expense', subtype: 'Salaries' },
   ];
 
   for (const node of nodes) {
@@ -70,6 +74,7 @@ export async function bootstrapHRFinancials(db: Firestore, institutionId: string
     overtimeExpenseAccountId: 'overtime_expense',
     statutoryLiabilityAccountId: 'statutory_deductions',
     leaveLiabilityAccountId: 'leave_liability',
+    leaveProvisionExpenseAccountId: 'leave_provision_expense',
     probationPeriodDays: 90,
     updatedAt: serverTimestamp(),
   }, { merge: true });

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -44,7 +43,10 @@ import {
   TrendingDown,
   Clock10,
   MapPin,
-  ShieldX
+  ShieldX,
+  UserSearch,
+  GraduationCap,
+  HandCoins
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
@@ -95,7 +97,7 @@ export default function HRSetupPage() {
     const formData = new FormData(e.currentTarget);
     const updates: any = {};
     formData.forEach((value, key) => {
-      if (['strictGeoFencing', 'requireManagerSignoff', 'enableAutoOvertime', 'enableLatePenalty', 'allowLeaveCarryForward', 'strictLeaveProbation'].includes(key)) {
+      if (['strictGeoFencing', 'requireManagerSignoff', 'enableAutoOvertime', 'enableLatePenalty', 'allowLeaveCarryForward', 'strictLeaveProbation', 'autoPostPayroll', 'requireATSApproval'].includes(key)) {
         updates[key] = value === 'on';
       } else if (['lateToleranceMins', 'probationPeriodDays', 'maxLeaveCarryForward', 'defaultLeaveAccrualRate'].includes(key)) {
         updates[key] = parseFloat(value as string) || 0;
@@ -110,7 +112,7 @@ export default function HRSetupPage() {
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      logSystemEvent(db, selectedInstId, user, 'HR', 'Update Policy', 'Institutional labor and leave parameters updated.');
+      logSystemEvent(db, selectedInstId, user, 'HR', 'Update Policy', 'Institutional personnel parameters updated.');
       toast({ title: "Policies Deployed" });
     } catch (err) {
       toast({ variant: "destructive", title: "Deployment Failed" });
@@ -198,7 +200,7 @@ export default function HRSetupPage() {
             </div>
             <div>
               <h1 className="text-2xl font-headline font-bold">HR Setup & Policy</h1>
-              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-[0.2em] mt-1">Personnel & Labor Rules Engine</p>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-[0.2em] mt-1">Institutional Labor Standards Node</p>
             </div>
           </div>
           
@@ -229,13 +231,14 @@ export default function HRSetupPage() {
         {!selectedInstId ? (
           <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed rounded-[2.5rem] bg-secondary/5">
             <ShieldCheck className="size-16 text-muted-foreground opacity-10 mb-4 animate-pulse" />
-            <p className="text-sm font-medium text-muted-foreground text-center">Select an institution to configure its labor perimeter.</p>
+            <p className="text-sm font-medium text-muted-foreground text-center px-6">Select an institution to configure its personnel perimeter.</p>
           </div>
         ) : (
           <Tabs defaultValue="policy" className="w-full">
             <TabsList className="bg-secondary/20 h-auto p-1 mb-6 flex-wrap justify-start gap-1 bg-transparent border-b rounded-none w-full">
               <TabsTrigger value="policy" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Timer className="size-3.5" /> Shift & Attend</TabsTrigger>
               <TabsTrigger value="leave" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><CalendarDays className="size-3.5" /> Leave Policies</TabsTrigger>
+              <TabsTrigger value="recruitment" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><UserSearch className="size-3.5" /> Recruitment</TabsTrigger>
               <TabsTrigger value="financial" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Calculator className="size-3.5" /> Payroll Ledger</TabsTrigger>
             </TabsList>
 
@@ -349,7 +352,7 @@ export default function HRSetupPage() {
               </div>
             </TabsContent>
 
-            <TabsContent value="leave">
+            <TabsContent value="leave" className="space-y-6">
               <div className="grid gap-6 lg:grid-cols-12">
                 <div className="lg:col-span-8 space-y-6">
                   <form onSubmit={handleSavePolicy} className="space-y-6">
@@ -455,6 +458,39 @@ export default function HRSetupPage() {
                   </Card>
                 </div>
               </div>
+            </TabsContent>
+
+            <TabsContent value="recruitment" className="space-y-6">
+              <form onSubmit={handleSavePolicy}>
+                <Card className="border-none ring-1 ring-border shadow-2xl bg-card">
+                  <CardHeader className="bg-secondary/10 border-b py-4 px-6">
+                    <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2 text-primary">
+                      <UserSearch className="size-4" /> Acquisition Controls
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6 grid gap-8 md:grid-cols-2">
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between p-4 bg-secondary/5 rounded-xl border">
+                        <div className="space-y-0.5">
+                          <Label className="text-xs font-bold">Require ATS Approval</Label>
+                          <p className="text-[10px] text-muted-foreground">Mandate supervisor sign-off before publishing jobs.</p>
+                        </div>
+                        <Switch name="requireATSApproval" defaultChecked={setup?.requireATSApproval} />
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <p className="text-[11px] leading-relaxed text-muted-foreground italic">
+                        Configure the standard onboarding window and vacancy visibility parameters here.
+                      </p>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="bg-secondary/5 border-t p-4 flex justify-end">
+                    <Button type="submit" disabled={isSaving} className="h-9 px-8 font-black uppercase text-[10px] gap-2 shadow-lg bg-primary">
+                      {isSaving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />} Update ATS Policy
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </form>
             </TabsContent>
 
             <TabsContent value="financial">

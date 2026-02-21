@@ -97,6 +97,44 @@ export async function onboardEmployee(db: Firestore, institutionId: string, payl
   return addDoc(colRef, data);
 }
 
+export async function createPayrollRun(db: Firestore, institutionId: string, periodId: string, userId: string) {
+  const runNumber = await getNextSequence(db, institutionId, 'payroll_run');
+  const colRef = collection(db, 'institutions', institutionId, 'payroll_runs');
+  
+  const data = {
+    runNumber,
+    periodId,
+    status: 'Draft',
+    totalGross: 0,
+    totalNet: 0,
+    totalDeductions: 0,
+    createdBy: userId,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  };
+
+  return addDoc(colRef, data);
+}
+
+export async function createJobPost(db: Firestore, institutionId: string, payload: any) {
+  const colRef = collection(db, 'institutions', institutionId, 'jobs');
+  return addDoc(colRef, {
+    ...payload,
+    status: 'Active',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+}
+
+export async function createTrainingCourse(db: Firestore, institutionId: string, payload: any) {
+  const colRef = collection(db, 'institutions', institutionId, 'courses');
+  return addDoc(colRef, {
+    ...payload,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+}
+
 export async function updateEmployee(db: Firestore, institutionId: string, employeeId: string, payload: Partial<EmployeePayload>) {
   const ref = doc(db, 'institutions', institutionId, 'employees', employeeId);
   return updateDoc(ref, {

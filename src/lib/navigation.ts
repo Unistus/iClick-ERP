@@ -87,7 +87,10 @@ import {
   CalendarCheck,
   ShieldAlert,
   Flame,
-  FileCheck
+  FileCheck,
+  GraduationCap,
+  UserSearch,
+  HandCoins
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -137,12 +140,13 @@ export const navConfig: NavItem[] = [
     submenus: [
       { title: "Employee Hub", icon: UserCog, url: "/hr/employees", id: "employees" },
       { title: "Time & Attendance", icon: ClockIcon, url: "/hr/attendance", id: "attendance" },
-      { title: "Roster & Shifts", icon: CalendarCheck, url: "/hr/shifts", id: "shifts" },
+      { title: "Recruitment (ATS)", icon: UserSearch, url: "/hr/recruitment", id: "recruitment" },
+      { title: "Payroll Command", icon: HandCoins, url: "/hr/payroll", id: "payroll" },
       { title: "Leave & Absence", icon: CalendarDays, url: "/hr/leave", id: "leave" },
-      { title: "My Leaves", icon: History, url: "/hr/my-leaves", id: "my_leaves" },
+      { title: "Training (LMS)", icon: GraduationCap, url: "/hr/training", id: "training" },
+      { title: "HR Forecasting", icon: LineChart, url: "/hr/forecasting", id: "forecasting" },
       { title: "Leave Approvals", icon: FileCheck, url: "/hr/leave-approvals", id: "leave_approvals" },
       { title: "Performance", icon: Star, url: "/hr/performance", id: "performance" },
-      { title: "My Performance", icon: TrendingUp, url: "/hr/my-performance", id: "my_performance" },
       { title: "Conduct & Discipline", icon: ShieldAlert, url: "/hr/disciplinary", id: "disciplinary" },
       { title: "HR Setup", icon: Settings2, url: "/hr/setup", id: "setup" },
     ]

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, Suspense, useEffect } from 'react';
@@ -11,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
 import { useCollection, useFirestore, useMemoFirebase, useDoc, useUser } from "@/firebase";
-import { collection, query, where, doc, limit } from "firebase/firestore";
+import { collection, query, where, doc, limit, orderBy } from "firebase/firestore";
 import { 
   User, 
   Briefcase, 
@@ -54,7 +53,11 @@ import {
   FileCheck,
   ArrowRight,
   Sparkles,
-  Coffee
+  Coffee,
+  GraduationCap,
+  HandCoins,
+  Smartphone,
+  SmartphoneNfc
 } from "lucide-react";
 import { format, differenceInDays, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -94,6 +97,18 @@ function PortalContent() {
   }, [db, selectedInstId, employeeId]);
   const { data: employee, isLoading: empLoading } = useDoc(empRef);
 
+  // Data Fetching: Payslips
+  const payslipsQuery = useMemoFirebase(() => {
+    if (!selectedInstId || !employeeId) return null;
+    return query(
+      collection(db, 'institutions', selectedInstId, 'payslips'), 
+      where('employeeId', '==', employeeId),
+      orderBy('createdAt', 'desc'),
+      limit(12)
+    );
+  }, [db, selectedInstId, employeeId]);
+  const { data: payslips } = useCollection(payslipsQuery);
+
   // Data Fetching: Global Leave Types
   const leaveTypesRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -110,6 +125,16 @@ function PortalContent() {
     );
   }, [db, selectedInstId, employeeId]);
   const { data: leaves } = useCollection(leaveQuery);
+
+  // Data Fetching: Training Enrollments
+  const trainingQuery = useMemoFirebase(() => {
+    if (!selectedInstId || !employeeId) return null;
+    return query(
+      collection(db, 'institutions', selectedInstId, 'enrollments'), 
+      where('employeeId', '==', employeeId)
+    );
+  }, [db, selectedInstId, employeeId]);
+  const { data: enrollments } = useCollection(trainingQuery);
 
   // Data Fetching: Growth & Performance Reviews
   const reviewsQuery = useMemoFirebase(() => {
@@ -166,8 +191,6 @@ function PortalContent() {
     const met = reviews.filter(r => r.kraAchieved).length;
     return (met / reviews.length) * 100;
   }, [reviews]);
-
-  const attendanceRate = 94.2;
 
   // Resolve Names
   const resolvedDeptName = useMemo(() => {
@@ -237,43 +260,45 @@ function PortalContent() {
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-700">
-      {/* HEADER COMMAND CENTER */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-card border border-border/50 p-8 rounded-[2rem] shadow-2xl relative overflow-hidden ring-1 ring-border/50">
-        <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none"><UserCog className="size-48" /></div>
-        <div className="flex flex-col sm:flex-row items-center gap-6 relative z-10">
+      {/* HEADER COMMAND CENTER - MOBILE READY */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-card border border-border/50 p-6 md:p-8 rounded-[2rem] shadow-2xl relative overflow-hidden ring-1 ring-border/50">
+        <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none hidden md:block"><UserCog className="size-48" /></div>
+        <div className="flex flex-col sm:flex-row items-center gap-6 relative z-10 w-full lg:w-auto">
           <div className="relative group">
-            <div className="size-24 rounded-3xl bg-primary/10 flex items-center justify-center text-primary font-black text-4xl uppercase shadow-inner border border-primary/20">
+            <div className="size-20 md:size-24 rounded-3xl bg-primary/10 flex items-center justify-center text-primary font-black text-3xl md:text-4xl uppercase shadow-inner border border-primary/20 transition-all group-hover:scale-105 group-hover:rotate-3">
               {employee.firstName?.[0]}{employee.lastName?.[0]}
             </div>
             <div className="absolute -bottom-2 -right-2 p-1.5 rounded-full bg-background ring-2 ring-emerald-500 shadow-lg"><CheckCircle2 className="size-4 text-emerald-500" /></div>
           </div>
-          <div className="space-y-2 text-center sm:text-left">
-            <h1 className="text-3xl font-headline font-black text-foreground tracking-tight">{employee.firstName} {employee.lastName}</h1>
+          <div className="space-y-2 text-center sm:text-left flex-1">
+            <h1 className="text-2xl md:text-3xl font-headline font-black text-foreground tracking-tight">{employee.firstName} {employee.lastName}</h1>
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
-              <Badge variant="secondary" className={cn("h-6 px-3 font-black uppercase border-none ring-1", employee.status === 'Active' ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : 'bg-amber-500/10 text-amber-500 ring-amber-500/20')}>{employee.status || 'PENDING'}</Badge>
+              <Badge variant="secondary" className={cn("h-6 px-3 font-black uppercase border-none ring-1 shadow-sm", employee.status === 'Active' ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : 'bg-amber-500/10 text-amber-500 ring-amber-500/20')}>{employee.status || 'PENDING'}</Badge>
               <span className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1.5 bg-secondary/30 px-2 py-1 rounded-md border border-border/50"><Briefcase className="size-3 text-primary" /> {employee.jobTitle}</span>
-              <Button variant="outline" size="sm" onClick={() => setIsClockModalOpen(true)} className="h-7 text-[10px] font-black uppercase gap-2 bg-primary/5 border-primary/20 text-primary hover:bg-primary/10 shadow-sm"><Clock className="size-3" /> Quick Clock</Button>
+              <Button variant="outline" size="sm" onClick={() => setIsClockModalOpen(true)} className="h-8 md:h-7 text-[10px] font-black uppercase gap-2 bg-primary/5 border-primary/20 text-primary hover:bg-primary/10 shadow-sm"><Smartphone className="size-3" /> Quick Clock</Button>
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 w-full lg:w-auto">
-          <div className="p-4 rounded-2xl bg-secondary/10 border border-border/50 text-center flex flex-col justify-center shadow-inner"><p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest mb-1">Absence Credits</p><p className="text-xl font-black text-primary">{employee.leaveBalance || 0} DAYS</p></div>
-          <div className="p-4 rounded-2xl bg-secondary/10 border border-border/50 text-center flex flex-col justify-center shadow-inner"><p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest mb-1">Audit Score</p><p className="text-xl font-black text-accent">{avgPerformance.toFixed(1)}/10</p></div>
-          <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 text-center hidden sm:flex flex-col justify-center shadow-sm"><p className="text-[8px] font-black uppercase text-primary tracking-widest mb-1">Shift Standing</p><p className="text-xl font-black text-foreground">ONLINE</p></div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full lg:w-auto">
+          <div className="p-4 rounded-2xl bg-secondary/10 border border-border/50 text-center flex flex-col justify-center shadow-inner group hover:bg-primary/5 transition-all"><p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest mb-1 group-hover:text-primary">Absence Bal</p><p className="text-xl font-black text-primary">{employee.leaveBalance || 0} D</p></div>
+          <div className="p-4 rounded-2xl bg-secondary/10 border border-border/50 text-center flex flex-col justify-center shadow-inner group hover:bg-accent/5 transition-all"><p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest mb-1 group-hover:text-accent">Audit Node</p><p className="text-xl font-black text-accent">{avgPerformance.toFixed(1)}</p></div>
+          <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 text-center hidden sm:flex flex-col justify-center shadow-sm"><p className="text-[8px] font-black uppercase text-primary tracking-widest mb-1">Status</p><p className="text-xl font-black text-foreground">LIVE</p></div>
         </div>
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="bg-secondary/20 h-auto p-1 mb-8 flex-wrap justify-start gap-1 bg-transparent border-b rounded-none w-full">
-          <TabsTrigger value="profile" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><User className="size-3.5" /> Identity Hub</TabsTrigger>
-          <TabsTrigger value="leave" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><CalendarDays className="size-3.5" /> Absence Matrix</TabsTrigger>
-          <TabsTrigger value="performance" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Star className="size-3.5" /> Growth Scorecard</TabsTrigger>
-          <TabsTrigger value="attendance" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Timer className="size-3.5" /> Shift Stream</TabsTrigger>
-          <TabsTrigger value="conduct" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><ShieldAlert className="size-3.5" /> Conduct Archive</TabsTrigger>
-          <TabsTrigger value="payroll" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><BadgeCent className="size-3.5" /> Settlement</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto custom-scrollbar -mx-4 px-4">
+          <TabsList className="bg-secondary/20 h-auto p-1 mb-8 flex-nowrap justify-start gap-1 bg-transparent border-b rounded-none w-full min-w-max">
+            <TabsTrigger value="profile" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><User className="size-3.5" /> Identity</TabsTrigger>
+            <TabsTrigger value="leave" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><CalendarDays className="size-3.5" /> Absence</TabsTrigger>
+            <TabsTrigger value="payroll" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><HandCoins className="size-3.5" /> Payslips</TabsTrigger>
+            <TabsTrigger value="training" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><GraduationCap className="size-3.5" /> Learning</TabsTrigger>
+            <TabsTrigger value="performance" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Star className="size-3.5" /> Scorecard</TabsTrigger>
+            <TabsTrigger value="attendance" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Timer className="size-3.5" /> Shifts</TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="profile" className="space-y-6 mt-0">
+        <TabsContent value="profile" className="space-y-6 mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="grid md:grid-cols-2 gap-6">
             <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
               <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6 flex flex-row items-center justify-between">
@@ -281,7 +306,7 @@ function PortalContent() {
                 {employee.gender === 'Male' ? <Mars className="size-4 text-blue-500" /> : <Venus className="size-4 text-pink-500" />}
               </CardHeader>
               <CardContent className="p-6 space-y-6">
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div><p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Official Email</p><p className="text-sm font-bold truncate">{employee.email}</p></div>
                   <div><p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Verified Phone</p><p className="text-sm font-bold">{employee.phone}</p></div>
                 </div>
@@ -290,15 +315,8 @@ function PortalContent() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-3 rounded-xl bg-secondary/5 border border-border/50"><p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">National ID</p><p className="text-xs font-black font-mono tracking-tighter">{employee.nationalId || '...'}</p></div>
                     <div className="p-3 rounded-xl bg-secondary/5 border border-border/50"><p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">KRA PIN</p><p className="text-xs font-black font-mono uppercase tracking-tighter">{employee.kraPin || '...'}</p></div>
-                    <div className="p-3 rounded-xl bg-secondary/5 border border-border/50"><p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">NSSF Node</p><p className="text-xs font-black font-mono tracking-tighter">{employee.nssfNumber || '...'}</p></div>
+                    <div className="p-3 rounded-xl bg-secondary/5 border border-border/50"><p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">NSSF Node</p><p className="text-xs font-black font-mono uppercase tracking-tighter">{employee.nssfNumber || '...'}</p></div>
                     <div className="p-3 rounded-xl bg-secondary/5 border border-border/50"><p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">NHIF Node</p><p className="text-xs font-black font-mono tracking-tighter">{employee.nhifNumber || '...'}</p></div>
-                  </div>
-                </div>
-                <div className="pt-6 border-t border-border/50">
-                  <p className="text-[10px] font-black uppercase text-primary tracking-widest mb-3 flex items-center gap-2"><Heart className="size-3" /> Kin Verification Node</p>
-                  <div className="p-4 rounded-2xl bg-secondary/10 border border-dashed border-border flex items-center justify-between">
-                    <div><p className="text-xs font-black uppercase">{employee.nextOfKin?.name || '...'}</p><p className="text-[9px] text-muted-foreground font-bold uppercase mt-0.5">{employee.nextOfKin?.relation || 'Guardian Node'}</p></div>
-                    <div className="text-right"><p className="text-xs font-mono font-black text-primary">{employee.nextOfKin?.phone || '...'}</p><p className="text-[8px] text-muted-foreground uppercase tracking-widest font-black">Emergency Line</p></div>
                   </div>
                 </div>
               </CardContent>
@@ -306,17 +324,17 @@ function PortalContent() {
             <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
               <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2"><Building className="size-4 text-accent" /> Institutional Topology</CardTitle></CardHeader>
               <CardContent className="p-6 space-y-6">
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="flex items-start gap-3 p-4 rounded-2xl bg-primary/5 border border-primary/10"><MapPin className="size-5 text-primary shrink-0" /><div className="min-w-0"><p className="text-[9px] font-black uppercase text-primary tracking-widest">Active Branch</p><p className="text-xs font-black uppercase mt-1 truncate">{resolvedBranchName}</p></div></div>
-                  <div className="flex items-start gap-3 p-4 rounded-2xl bg-accent/5 border border-accent/10"><LayoutGrid className="size-5 text-accent shrink-0" /><div className="min-w-0"><p className="text-[9px] font-black uppercase text-accent tracking-widest">Dept. Node</p><p className="text-xs font-black uppercase mt-1 truncate">{resolvedDeptName}</p></div></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="flex items-start gap-3 p-4 rounded-2xl bg-primary/5 border border-primary/10 shadow-sm"><MapPin className="size-5 text-primary shrink-0" /><div className="min-w-0"><p className="text-[9px] font-black uppercase text-primary tracking-widest">Active Branch</p><p className="text-xs font-black uppercase mt-1 truncate">{resolvedBranchName}</p></div></div>
+                  <div className="flex items-start gap-3 p-4 rounded-2xl bg-accent/5 border border-accent/10 shadow-sm"><LayoutGrid className="size-5 text-accent shrink-0" /><div className="min-w-0"><p className="text-[9px] font-black uppercase text-accent tracking-widest">Dept. Node</p><p className="text-xs font-black uppercase mt-1 truncate">{resolvedDeptName}</p></div></div>
                 </div>
-                <div className="grid grid-cols-2 gap-6 pt-2"><div className="p-4 rounded-2xl bg-secondary/5 border border-border/50"><p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Contract Basis</p><p className="text-xs font-black uppercase">{employee.employmentType}</p></div><div className="p-4 rounded-2xl bg-secondary/5 border border-border/50"><p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Effective Date</p><p className="text-xs font-black uppercase">{employee.hireDate ? format(new Date(employee.hireDate), 'dd MMM yyyy') : '...'}</p></div></div>
+                <div className="grid grid-cols-2 gap-6 pt-2"><div className="p-4 rounded-2xl bg-secondary/5 border border-border/50 shadow-inner"><p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Contract Basis</p><p className="text-xs font-black uppercase">{employee.employmentType}</p></div><div className="p-4 rounded-2xl bg-secondary/5 border border-border/50 shadow-inner"><p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Effective Date</p><p className="text-xs font-black uppercase">{employee.hireDate ? format(new Date(employee.hireDate), 'dd MMM yy') : '...'}</p></div></div>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="leave" className="mt-0 space-y-6">
+        <TabsContent value="leave" className="mt-0 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="grid gap-6 md:grid-cols-12 items-start">
             <Card className="md:col-span-4 border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
               <CardHeader className="bg-secondary/10 border-b py-4 px-6"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2"><CalendarDays className="size-4 text-primary" /> Allowed Entitlements</CardTitle></CardHeader>
@@ -354,7 +372,77 @@ function PortalContent() {
           </div>
         </TabsContent>
 
-        <TabsContent value="performance" className="mt-0 space-y-6">
+        <TabsContent value="payroll" className="mt-0 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
+            <CardHeader className="bg-secondary/10 border-b py-4 px-8 flex flex-row items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 shadow-inner"><HandCoins className="size-5" /></div>
+                <div>
+                  <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">Payslip Vault</CardTitle>
+                  <CardDescription className="text-[10px]">Your verified remuneration records.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader className="bg-secondary/30">
+                  <TableRow>
+                    <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Pay Period</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase">Gross Earnings</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase">Statutory Ded.</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase text-right pr-8">Net Payout</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {!payslips?.length ? (
+                    <TableRow><TableCell colSpan={4} className="text-center py-24 text-[10px] opacity-20 uppercase font-black italic">No finalized records in vault.</TableCell></TableRow>
+                  ) : payslips.map(ps => (
+                    <TableRow key={ps.id} className="h-16 hover:bg-emerald-500/5 transition-all group">
+                      <TableCell className="pl-8 font-black uppercase text-xs">{ps.periodName}</TableCell>
+                      <TableCell className="font-mono text-xs opacity-60">KES {ps.gross?.toLocaleString()}</TableCell>
+                      <TableCell className="font-mono text-xs text-destructive">KES {ps.deductions?.toLocaleString()}</TableCell>
+                      <TableCell className="text-right pr-8">
+                        <div className="flex items-center justify-end gap-4">
+                          <span className="font-mono font-black text-sm text-emerald-500">KES {ps.net?.toLocaleString()}</span>
+                          <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100 transition-opacity"><Download className="size-4" /></Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="training" className="mt-0 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {!enrollments?.length ? (
+              <div className="col-span-full py-20 text-center border-2 border-dashed rounded-[2.5rem] opacity-20"><GraduationCap className="size-16 mx-auto mb-4" /><p className="font-black uppercase tracking-widest text-xs">No active training enrollments.</p></div>
+            ) : enrollments.map(en => (
+              <Card key={en.id} className="border-none ring-1 ring-border shadow-xl bg-card overflow-hidden group hover:ring-primary/30 transition-all">
+                <CardHeader className="bg-primary/5 pb-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <Badge variant="secondary" className="text-[8px] font-black uppercase bg-primary/10 text-primary border-none">{en.category}</Badge>
+                    <span className="text-[8px] font-mono opacity-40 uppercase">Enrolled: {format(en.createdAt?.toDate ? en.createdAt.toDate() : new Date(), 'dd MMM')}</span>
+                  </div>
+                  <CardTitle className="text-sm font-black uppercase leading-tight tracking-tight">{en.courseName}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[8px] font-black uppercase"><span>Course Progress</span><span className="text-primary">{en.progress || 0}%</span></div>
+                    <Progress value={en.progress || 0} className="h-1 bg-secondary shadow-inner" />
+                  </div>
+                </CardContent>
+                <CardFooter className="bg-secondary/10 border-t border-border/50 p-4">
+                  <Button className="w-full h-9 font-black uppercase text-[10px] gap-2 shadow-lg bg-primary hover:bg-primary/90"><PlayCircle className="size-3.5" /> Resume Learning</Button>
+                </CardFooter>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="performance" className="mt-0 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="grid lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2 border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
               <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6 flex items-center justify-between"><CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-accent"><Star className="size-4" /> Growth History</CardTitle></CardHeader>
@@ -381,12 +469,12 @@ function PortalContent() {
                   <div className="space-y-2"><div className="flex justify-between text-[9px] font-black uppercase"><span>KRA Realization</span><span>{kraAttainment.toFixed(0)}%</span></div><Progress value={kraAttainment} className="h-1.5 bg-secondary shadow-inner" /></div>
                 </div>
               </div>
-              <div className="p-4 bg-background rounded-2xl border border-border/50 mt-8 flex items-center gap-3"><Award className="size-5 text-accent" /><p className="text-[9px] font-black uppercase leading-tight">Elite Performance Tier: ACTIVATED</p></div>
+              <div className="p-4 bg-background rounded-2xl border border-border/50 mt-8 flex items-center gap-3 shadow-md"><Award className="size-5 text-accent" /><p className="text-[9px] font-black uppercase leading-tight">Elite Performance Tier: ACTIVATED</p></div>
             </div>
           </div>
         </TabsContent>
 
-        <TabsContent value="attendance" className="mt-0">
+        <TabsContent value="attendance" className="mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <Card className="border-none ring-1 ring-border bg-card shadow-2xl overflow-hidden">
             <CardHeader className="bg-secondary/10 border-b py-4 px-8"><CardTitle className="text-sm font-black uppercase tracking-[0.2em] flex items-center gap-2 text-primary"><Timer className="size-4" /> Live Shift Stream</CardTitle></CardHeader>
             <CardContent className="p-0">
@@ -408,50 +496,33 @@ function PortalContent() {
             </CardContent>
           </Card>
         </TabsContent>
-
-        <TabsContent value="conduct" className="mt-0">
-          <Card className="border-none ring-1 ring-destructive/30 bg-card shadow-2xl overflow-hidden">
-            <CardHeader className="bg-destructive/5 border-b border-destructive/10 py-4 px-8 flex items-center justify-between"><CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-destructive"><ShieldAlert className="size-4" /> Conduct Archive</CardTitle><Badge variant="outline" className="text-[8px] bg-destructive/10 text-destructive font-black border-none uppercase">Immutable Logs</Badge></CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader className="bg-secondary/20"><TableRow><TableHead className="h-12 text-[9px] font-black uppercase pl-8">Date</TableHead><TableHead className="h-12 text-[9px] font-black uppercase">Classification</TableHead><TableHead className="h-12 text-[9px] font-black uppercase">Action Taken</TableHead><TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Details</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {!conduct?.length ? <TableRow><TableCell colSpan={4} className="text-center py-24 text-[10px] opacity-20 italic uppercase font-black">Zero violations recorded.</TableCell></TableRow> : conduct.map(c => (
-                    <TableRow key={c.id} className="h-16 hover:bg-destructive/5 border-b-border/30 transition-colors"><TableCell className="pl-8 text-[11px] font-black text-muted-foreground">{c.date}</TableCell><TableCell><Badge variant="outline" className="text-[8px] h-5 px-3 bg-destructive/10 text-destructive border-none font-black uppercase">{c.type}</Badge></TableCell><TableCell className="text-xs font-black uppercase text-foreground/80">{c.actionTaken}</TableCell><TableCell className="text-right pr-8 max-w-[400px] truncate text-[10px] italic text-muted-foreground">"{c.description}"</TableCell></TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="payroll" className="mt-0">
-          <Card className="border-none ring-1 ring-border bg-card shadow-2xl overflow-hidden">
-            <CardHeader className="bg-primary/10 border-b border-border/50 py-4 px-8 flex flex-row items-center justify-between"><CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-primary"><FileText className="size-4" /> Settlement Vault</CardTitle></CardHeader>
-            <CardContent className="p-20 text-center flex flex-col items-center justify-center space-y-4"><Scale className="size-12 text-muted-foreground opacity-10" /><p className="text-[10px] opacity-30 italic uppercase font-black">Payroll cycle pending institutional finalization.</p></CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
-      {/* QUICK CLOCK DIALOG */}
+      {/* QUICK CLOCK DIALOG - ENHANCED MOBILE LAYER */}
       <Dialog open={isClockModalOpen} onOpenChange={setIsClockModalOpen}>
-        <DialogContent className="max-w-md shadow-2xl ring-1 ring-border rounded-3xl overflow-hidden">
-          <DialogHeader className="p-0">
-            <div className="bg-secondary/10 p-6 border-b border-border/50">
-              <div className="flex items-center gap-2 mb-2"><Timer className="size-5 text-primary animate-pulse" /><DialogTitle className="text-sm font-black uppercase tracking-widest">Shift Hub</DialogTitle></div>
-              <DialogDescription className="text-[10px] uppercase font-bold text-muted-foreground">Node: {resolvedBranchName}</DialogDescription>
+        <DialogContent className="max-w-md shadow-2xl ring-1 ring-border rounded-3xl overflow-hidden border-none p-0">
+          <div className="bg-gradient-to-br from-primary via-primary/90 to-accent p-8 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10"><SmartphoneNfc className="size-32 rotate-12" /></div>
+            <div className="flex items-center gap-3 mb-6 relative z-10">
+              <div className="p-2 rounded-xl bg-white/20 backdrop-blur-md shadow-inner"><Clock className="size-5" /></div>
+              <div>
+                <h3 className="text-lg font-black uppercase tracking-widest">Mobile Shift Node</h3>
+                <p className="text-[10px] font-bold uppercase opacity-70">Identity: {employee.firstName} {employee.lastName}</p>
+              </div>
             </div>
-          </DialogHeader>
-          <div className="py-8 text-center space-y-2">
-            <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-[0.3em]">Network Time</p>
-            <p className="text-5xl font-black font-headline tracking-tighter text-primary">{format(new Date(), 'HH:mm')}</p>
+            <div className="text-center py-4 relative z-10">
+              <p className="text-[10px] font-black uppercase opacity-60 tracking-[0.4em] mb-2">Network Time (EAT)</p>
+              <p className="text-6xl font-black font-headline tracking-tighter drop-shadow-2xl">{format(new Date(), 'HH:mm')}</p>
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 px-6 pb-6">
-            <Button onClick={() => handleClockAction('In')} disabled={isClocking} className="h-14 font-black uppercase text-xs bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-900/20 group"><LogIn className="size-4 mr-2" /> Start Shift</Button>
-            <Button onClick={() => handleClockAction('Out')} disabled={isClocking} className="h-14 font-black uppercase text-xs bg-destructive hover:bg-destructive/90 shadow-xl shadow-destructive/20 group"><LogOut className="size-4 mr-2" /> End Shift</Button>
-            <Button onClick={() => handleClockAction('BreakStart')} disabled={isClocking} className="h-14 font-black uppercase text-xs bg-primary hover:bg-primary/90 col-span-2 shadow-xl"><Coffee className="size-4 mr-2" /> Take Breather</Button>
+          <div className="p-8 bg-card space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <Button onClick={() => handleClockAction('In')} disabled={isClocking} className="h-16 font-black uppercase text-xs bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-900/20 rounded-2xl group transition-all active:scale-95"><LogIn className="size-5 mr-2 group-hover:translate-x-1 transition-transform" /> Clock In</Button>
+              <Button onClick={() => handleClockAction('Out')} disabled={isClocking} className="h-16 font-black uppercase text-xs bg-destructive hover:bg-destructive/90 shadow-xl shadow-destructive/20 rounded-2xl group transition-all active:scale-95"><LogOut className="size-5 mr-2 group-hover:-translate-x-1 transition-transform" /> Clock Out</Button>
+              <Button onClick={() => handleClockAction('BreakStart')} disabled={isClocking} className="h-16 font-black uppercase text-xs bg-primary hover:bg-primary/90 col-span-2 shadow-xl rounded-2xl flex flex-col items-center justify-center gap-1 transition-all active:scale-95"><Coffee className="size-5" /> <span>Take Breather</span></Button>
+            </div>
+            <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 text-center"><p className="text-[9px] text-muted-foreground font-medium italic flex items-center justify-center gap-2"><ShieldCheck className="size-3 text-emerald-500" /> GPS & Biometric handshake verified from {resolvedBranchName}.</p></div>
           </div>
-          <div className="bg-primary/5 p-4 text-[9px] text-muted-foreground text-center border-t border-primary/10"><ShieldCheck className="size-3 text-emerald-500 inline mr-1.5" /> GPS geo-fenced. Ingress verified from {resolvedBranchName}.</div>
         </DialogContent>
       </Dialog>
 

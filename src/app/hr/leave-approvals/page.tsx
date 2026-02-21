@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -6,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, query, orderBy, where, doc } from "firebase/firestore";
+import { collection, query, where, doc } from "firebase/firestore";
 import { 
   FileCheck, 
   Search, 
@@ -39,12 +40,12 @@ export default function LeaveApprovalsPage() {
   const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
   // 1. Fetch pending leave requests
+  // QUERY OPTIMIZATION: Removed orderBy to prevent index-related permission failures
   const pendingQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return query(
       collection(db, 'institutions', selectedInstId, 'leave_requests'), 
-      where('status', '==', 'Pending'),
-      orderBy('createdAt', 'desc')
+      where('status', '==', 'Pending')
     );
   }, [db, selectedInstId]);
   const { data: requests, isLoading } = useCollection(pendingQuery);

@@ -152,9 +152,9 @@ export default function PayrollDashboard() {
                   <div className="divide-y divide-border/10">
                     {runsLoading ? (
                       <div className="p-12 text-center text-xs animate-pulse font-black uppercase">Syncing Ledger...</div>
-                    ) : recentRuns?.length === 0 ? (
+                    ) : !recentRuns || recentRuns.length === 0 ? (
                       <div className="p-12 text-center text-xs text-muted-foreground uppercase font-bold opacity-30 italic">No cycles processed in this institution node.</div>
-                    ) : recentRuns?.map((run) => (
+                    ) : recentRuns.map((run) => (
                       <div key={run.id} className="p-4 flex items-center justify-between hover:bg-secondary/5 transition-colors">
                         <div className="flex items-center gap-4">
                           <div className="size-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner"><Activity className="size-5" /></div>

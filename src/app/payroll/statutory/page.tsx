@@ -29,6 +29,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 export default function StatutoryHubPage() {
   const db = useFirestore();
@@ -93,7 +94,7 @@ export default function StatutoryHubPage() {
         {!selectedInstId ? (
           <div className="flex flex-col items-center justify-center py-32 border-2 border-dashed rounded-[2.5rem] bg-secondary/5">
             <Scale className="size-16 text-muted-foreground opacity-10 mb-4 animate-pulse" />
-            <p className="text-sm font-medium text-muted-foreground text-center">Select an institution to access verified tax and pension summaries.</p>
+            <p className="text-sm font-medium text-muted-foreground text-center px-6">Select an institution to access verified tax and pension summaries.</p>
           </div>
         ) : (
           <div className="space-y-6 animate-in fade-in duration-700">
@@ -158,7 +159,7 @@ export default function StatutoryHubPage() {
                   <TableBody>
                     {runsLoading ? (
                       <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse font-black uppercase">Polling Compliances...</TableCell></TableRow>
-                    ) : runs?.length === 0 ? (
+                    ) : !runs || runs.length === 0 ? (
                       <TableRow><TableCell colSpan={5} className="text-center py-24 text-xs text-muted-foreground uppercase font-black tracking-widest opacity-20 italic">No finalized cycles available for filing.</TableCell></TableRow>
                     ) : runs.map((run) => (
                       <TableRow key={run.id} className="h-16 hover:bg-secondary/10 transition-colors border-b-border/30 group">

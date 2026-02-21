@@ -77,7 +77,7 @@ function PortalContent() {
   }, [db, selectedInstId, employeeId]);
   const { data: employee, isLoading: empLoading } = useDoc(empRef);
 
-  // Data Fetching: Global Leave Types (from setup)
+  // Data Fetching: Global Leave Types
   const leaveTypesRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return collection(db, 'institutions', selectedInstId, 'leave_types');
@@ -117,6 +117,7 @@ function PortalContent() {
   // Data Fetching: Real-time Attendance Stream
   const attQuery = useMemoFirebase(() => {
     if (!selectedInstId || !employeeId) return null;
+    // Note: removed orderBy temporarily to avoid index requirements during initial build
     return query(
       collection(db, 'institutions', selectedInstId, 'attendance'), 
       where('employeeId', '==', employeeId),
@@ -138,6 +139,18 @@ function PortalContent() {
   }, [db, selectedInstId, employee?.branchId]);
   const { data: departments } = useCollection(deptsRef);
 
+  // Performance Logic
+  const avgPerformance = useMemo(() => {
+    if (!reviews?.length) return 0;
+    return reviews.reduce((sum, r) => sum + (r.score || 0), 0) / reviews.length;
+  }, [reviews]);
+
+  const kraAttainment = useMemo(() => {
+    if (!reviews?.length) return 0;
+    const met = reviews.filter(r => r.kraAchieved).length;
+    return (met / reviews.length) * 100;
+  }, [reviews]);
+
   // Resolve Names
   const resolvedDeptName = useMemo(() => {
     if (!departments || !employee?.departmentId) return "Operations Node";
@@ -153,7 +166,6 @@ function PortalContent() {
   const leaveMatrix = useMemo(() => {
     if (!allLeaveTypes || !employee) return [];
     
-    // Filter types by gender
     const eligible = allLeaveTypes.filter(lt => 
       lt.genderApplicability === 'All' || 
       lt.genderApplicability === employee.gender
@@ -257,7 +269,7 @@ function PortalContent() {
           </div>
           <div className="p-4 rounded-2xl bg-secondary/10 border border-border/50 text-center flex flex-col justify-center">
             <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest mb-1">Audit Score</p>
-            <p className="text-xl font-black text-accent">{(reviews?.length ? reviews.reduce((s, r) => s + r.score, 0) / reviews.length : 0).toFixed(1)}/10</p>
+            <p className="text-xl font-black text-accent">{avgPerformance.toFixed(1)}/10</p>
           </div>
           <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 text-center hidden sm:flex flex-col justify-center">
             <p className="text-[8px] font-black uppercase text-primary tracking-widest mb-1">Status</p>
@@ -276,7 +288,6 @@ function PortalContent() {
           <TabsTrigger value="payroll" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><BadgeCent className="size-3.5" /> Settlement</TabsTrigger>
         </TabsList>
 
-        {/* PROFILE TAB */}
         <TabsContent value="profile" className="space-y-6 mt-0">
           <div className="grid md:grid-cols-2 gap-6">
             <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
@@ -392,7 +403,6 @@ function PortalContent() {
           </div>
         </TabsContent>
 
-        {/* LEAVE TAB: ABSENCE MATRIX */}
         <TabsContent value="leave" className="mt-0 space-y-6">
           <div className="grid gap-6 md:grid-cols-12 items-start">
             <Card className="md:col-span-4 border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
@@ -479,7 +489,6 @@ function PortalContent() {
           </div>
         </TabsContent>
 
-        {/* PERFORMANCE TAB */}
         <TabsContent value="performance" className="mt-0 space-y-6">
           <div className="grid lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2 border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
@@ -535,7 +544,6 @@ function PortalContent() {
           </div>
         </TabsContent>
 
-        {/* ATTENDANCE TAB */}
         <TabsContent value="attendance" className="mt-0">
           <Card className="border-none ring-1 ring-border bg-card shadow-2xl overflow-hidden">
             <CardHeader className="bg-secondary/10 border-b py-4 px-8">
@@ -583,7 +591,6 @@ function PortalContent() {
           </Card>
         </TabsContent>
 
-        {/* CONDUCT TAB */}
         <TabsContent value="conduct" className="mt-0">
           <Card className="border-none ring-1 ring-destructive/30 bg-card shadow-2xl overflow-hidden">
             <CardHeader className="bg-destructive/5 border-b border-destructive/10 py-4 px-8 flex items-center justify-between">
@@ -625,7 +632,6 @@ function PortalContent() {
           </Card>
         </TabsContent>
 
-        {/* PAYROLL TAB */}
         <TabsContent value="payroll" className="mt-0">
           <Card className="border-none ring-1 ring-border bg-card shadow-2xl overflow-hidden">
             <CardHeader className="bg-primary/10 border-b border-border/50 py-4 px-8 flex flex-row items-center justify-between">

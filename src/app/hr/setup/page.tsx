@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,7 +41,10 @@ import {
   Tag,
   Activity,
   History,
-  TrendingDown
+  TrendingDown,
+  Clock10,
+  MapPin,
+  ShieldX
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
@@ -54,7 +58,7 @@ export default function HRSetupPage() {
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
-
+  
   // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instColRef);
@@ -128,6 +132,21 @@ export default function HRSetupPage() {
     }
   };
 
+  const handleAddShiftType = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedInstId) return;
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      name: formData.get('name'),
+      startTime: formData.get('startTime'),
+      endTime: formData.get('endTime'),
+      createdAt: serverTimestamp()
+    };
+    addDocumentNonBlocking(collection(db, 'institutions', selectedInstId, 'shift_types'), data);
+    e.currentTarget.reset();
+    toast({ title: "Shift Profile Registered" });
+  };
+
   const handleAddSubItem = (col: string, e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId) return;
@@ -178,7 +197,7 @@ export default function HRSetupPage() {
               <Settings2 className="size-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-headline font-bold text-foreground">HR Setup & Policy</h1>
+              <h1 className="text-2xl font-headline font-bold">HR Setup & Policy</h1>
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-[0.2em] mt-1">Personnel & Labor Rules Engine</p>
             </div>
           </div>
@@ -219,6 +238,116 @@ export default function HRSetupPage() {
               <TabsTrigger value="leave" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><CalendarDays className="size-3.5" /> Leave Policies</TabsTrigger>
               <TabsTrigger value="financial" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Calculator className="size-3.5" /> Payroll Ledger</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="policy" className="space-y-6">
+              <div className="grid gap-6 lg:grid-cols-12">
+                <div className="lg:col-span-8 space-y-6">
+                  <form onSubmit={handleSavePolicy}>
+                    <Card className="border-none ring-1 ring-border shadow-2xl bg-card">
+                      <CardHeader className="bg-secondary/10 border-b py-4 px-6 flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-primary">
+                            <ShieldCheck className="size-4" /> Shift Governance
+                          </CardTitle>
+                          <CardDescription className="text-[10px]">Real-time check-in and out rules.</CardDescription>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-6 grid gap-8 md:grid-cols-2">
+                        <div className="space-y-6">
+                          <div className="flex items-center justify-between p-4 bg-secondary/5 rounded-xl border border-border/50">
+                            <div className="space-y-0.5">
+                              <Label className="text-xs font-bold flex items-center gap-2">
+                                <MapPin className="size-3 text-primary" /> Strict Geo-fencing
+                              </Label>
+                              <p className="text-[9px] text-muted-foreground leading-snug">Block clock-ins outside authorized branch radius.</p>
+                            </div>
+                            <Switch name="strictGeoFencing" defaultChecked={setup?.strictGeoFencing} />
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase text-primary tracking-widest opacity-60">Arrival Grace Period (Mins)</Label>
+                            <Input name="lateToleranceMins" type="number" defaultValue={setup?.lateToleranceMins || 15} className="h-10 font-black bg-secondary/5" />
+                            <p className="text-[9px] text-muted-foreground italic">Time permitted after shift start before 'Late' flag is raised.</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-6">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label className="text-xs font-bold">Late Penalty Loop</Label>
+                              <p className="text-[10px] text-muted-foreground">Auto-trigger deduction logic for chronic tardiness.</p>
+                            </div>
+                            <Switch name="enableLatePenalty" defaultChecked={setup?.enableLatePenalty} />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                              <Label className="text-xs font-bold">Overtime Autopilot</Label>
+                              <p className="text-[10px] text-muted-foreground">Auto-calculate OT based on check-out timestamps.</p>
+                            </div>
+                            <Switch name="enableAutoOvertime" defaultChecked={setup?.enableAutoOvertime} />
+                          </div>
+                        </div>
+                      </CardContent>
+                      <CardFooter className="bg-secondary/5 border-t p-4 flex justify-end">
+                        <Button type="submit" disabled={isSaving} className="h-9 px-8 font-black uppercase text-[10px] gap-2 shadow-lg bg-primary">
+                          {isSaving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />} Deploy Attendance Policies
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  </form>
+
+                  <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
+                    <CardHeader className="bg-secondary/10 border-b flex flex-row items-center justify-between">
+                      <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+                        <Clock10 className="size-4 text-accent" /> Institutional Shift Roster
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <div className="p-4 border-b bg-secondary/5">
+                        <form onSubmit={handleAddShiftType} className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                          <Input name="name" placeholder="Shift Name (e.g. Day)" required className="h-9 text-xs" />
+                          <Input name="startTime" type="time" required className="h-9 text-xs" />
+                          <Input name="endTime" type="time" required className="h-9 text-xs" />
+                          <Button type="submit" size="sm" className="h-9 font-bold uppercase text-[10px] shadow-sm"><Plus className="size-3 mr-1" /> Register</Button>
+                        </form>
+                      </div>
+                      <Table>
+                        <TableBody>
+                          {shiftTypes?.map(st => (
+                            <TableRow key={st.id} className="h-12 hover:bg-secondary/5 group border-b-border/30">
+                              <TableCell className="text-xs font-black pl-8 uppercase tracking-tight">{st.name}</TableCell>
+                              <TableCell className="text-center">
+                                <Badge variant="secondary" className="text-[8px] h-4 bg-accent/10 text-accent border-none font-black uppercase">{st.startTime} → {st.endTime}</Badge>
+                              </TableCell>
+                              <TableCell className="text-right pr-8">
+                                <Button variant="ghost" size="icon" className="size-7 text-destructive opacity-0 group-hover:opacity-100 transition-all" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'shift_types', st.id))}>
+                                  <Trash2 className="size-3.5" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="lg:col-span-4 space-y-6">
+                  <Card className="bg-accent/5 border-none ring-1 ring-accent/20 p-8 rounded-[2rem] relative overflow-hidden group shadow-md">
+                    <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:rotate-6 transition-transform"><Clock10 className="size-32 text-accent" /></div>
+                    <div className="flex flex-col gap-4 relative z-10">
+                      <div className="flex items-center gap-2">
+                        <Zap className="size-5 text-accent" />
+                        <p className="text-[10px] font-black uppercase text-accent tracking-[0.2em]">Efficiency Engine</p>
+                      </div>
+                      <p className="text-[11px] leading-relaxed text-muted-foreground font-medium italic">
+                        "Institutional shift profiles are used to benchmark employee arrival times. These templates drive the **Workforce Pulse** dashboard and automated payroll deductions."
+                      </p>
+                    </div>
+                  </Card>
+                </div>
+              </div>
+            </TabsContent>
 
             <TabsContent value="leave">
               <div className="grid gap-6 lg:grid-cols-12">

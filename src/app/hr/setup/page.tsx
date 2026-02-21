@@ -218,7 +218,7 @@ export default function HRSetupPage() {
             <Button 
               size="sm" 
               variant="outline" 
-              className="gap-2 h-10 text-[10px] font-black uppercase border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/5"
+              className="gap-2 h-9 text-[10px] font-black uppercase border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/5"
               disabled={!selectedInstId || isBootstrapping}
               onClick={handleBootstrap}
             >

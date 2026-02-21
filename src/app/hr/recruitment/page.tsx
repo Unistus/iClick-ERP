@@ -125,7 +125,7 @@ export default function RecruitmentHubPage() {
         {!selectedInstId ? (
           <div className="flex flex-col items-center justify-center py-32 border-2 border-dashed rounded-[2rem] bg-secondary/5">
             <Users className="size-16 text-muted-foreground opacity-10 mb-4 animate-pulse" />
-            <p className="text-sm font-medium text-muted-foreground text-center px-6 max-sm">
+            <p className="text-sm font-medium text-muted-foreground text-center px-6">
               Select an institution to initialize the Talent Acquisition pipeline and candidate matrix.
             </p>
           </div>
@@ -158,7 +158,7 @@ export default function RecruitmentHubPage() {
                 <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12"><Zap className="size-24 text-primary" /></div>
                 <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase tracking-widest text-primary">Time-To-Hire</span></CardHeader>
                 <CardContent className="pb-4"><div className="text-2xl font-black font-headline">14.2 DAYS</div></CardContent>
-              </div>
+              </Card>
             </div>
 
             <div className="grid lg:grid-cols-12 gap-6">
@@ -275,7 +275,7 @@ export default function RecruitmentHubPage() {
         )}
 
         {/* CREATE JOB DIALOG */}
-        <Dialog open={isCreateJobOpen} onOpenChange={setIsCreateJobOpen}>
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateJobOpen}>
           <DialogContent className="max-w-md shadow-2xl ring-1 ring-border rounded-[2rem] overflow-hidden">
             <form onSubmit={handleCreateJob}>
               <DialogHeader className="bg-secondary/10 p-6 border-b">

@@ -508,7 +508,7 @@ function PortalContent() {
               <div className="p-2 rounded-xl bg-white/20 backdrop-blur-md shadow-inner"><Clock className="size-5" /></div>
               <div>
                 <h3 className="text-lg font-black uppercase tracking-widest">Mobile Shift Node</h3>
-                <p className="text-[10px] font-bold uppercase opacity-70">Identity: {employee.firstName} {employee.lastName}</p>
+                <p className="text-[10px] font-bold uppercase opacity-70">Identity: {employee?.firstName} {employee?.lastName}</p>
               </div>
             </div>
             <div className="text-center py-4 relative z-10">
@@ -539,7 +539,9 @@ function PortalContent() {
               <div className="space-y-2">
                 <Label className="uppercase font-bold tracking-widest opacity-60 text-primary">Eligibility Category</Label>
                 <Select name="leaveType" required>
-                  <SelectTrigger className="h-11 font-black uppercase border-none ring-1 ring-border bg-secondary/5"><SelectValue placeholder="Select Entitlement..." /></SelectTrigger>
+                  <SelectTrigger className="h-11 font-black uppercase border-none ring-1 ring-border bg-secondary/5">
+                    <SelectValue placeholder="Select Entitlement..." />
+                  </SelectTrigger>
                   <SelectContent>{leaveMatrix.map(lt => <SelectItem key={lt.id} value={lt.name} className="text-[10px] font-black uppercase">{lt.name} ({lt.remaining} Days Remaining)</SelectItem>)}</SelectContent>
                 </Select>
               </div>
@@ -548,7 +550,14 @@ function PortalContent() {
                 <div className="space-y-2"><Label className="uppercase font-bold tracking-widest opacity-60">End Window</Label><Input name="endDate" type="date" required className="h-11 bg-background" /></div>
               </div>
               <div className="space-y-2"><Label className="uppercase font-bold tracking-widest opacity-60">Justification / Reason</Label><Input name="reason" placeholder="Briefly explain the requirement..." required className="h-11 bg-secondary/5 border-none ring-1 ring-border" /></div>
-              <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl flex gap-4 items-start text-primary shadow-inner"><Sparkles className="size-5 shrink-0 mt-0.5 animate-pulse" /><div className="space-y-1"><p className="text-[10px] font-black uppercase tracking-widest">Audit Logic</p><p className="text-[11px] leading-relaxed italic font-medium">Approval will atomically update your annual balance.</p></div></div>
+              
+              <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl flex gap-4 items-start text-primary shadow-inner">
+                <Sparkles className="size-5 shrink-0 mt-0.5 animate-pulse" />
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest">Audit Logic</p>
+                  <p className="text-[11px] leading-relaxed italic font-medium">Approval will atomically update your annual balance.</p>
+                </div>
+              </div>
             </div>
             <DialogFooter className="bg-secondary/10 p-6 -mx-6 -mb-6 rounded-b-lg gap-2 border-t border-border/50">
               <Button type="button" variant="ghost" onClick={() => setIsLeaveModalOpen(false)} className="text-xs h-11 font-black uppercase tracking-widest">Discard</Button>

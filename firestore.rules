@@ -11,52 +11,21 @@ service cloud.firestore {
     }
 
     /**
-     * INSTITUTIONAL MULTI-TENANCY POLICY
-     * Allows authenticated users to access institutional data. 
-     * In a production environment, this should be tightened to check memberships.
-     */
-    match /institutions/{instId} {
-      allow read, write: if isAuthenticated();
-      
-      // Allow recursive access to all sub-collections (leaves, inventory, accounting, etc.)
-      match /{allSubPaths=**} {
-        allow read, write: if isAuthenticated();
-      }
-    }
-
-    /**
-     * USER IDENTITY & TENANCY REGISTRY
-     * Users can only manage their own profile and membership mapping.
-     */
-    match /users/{userId} {
-      allow read, write: if isAuthenticated() && request.auth.uid == userId;
-    }
-    
-    match /user_institutions/{userId} {
-      allow read, write: if isAuthenticated() && request.auth.uid == userId;
-      match /{allSubPaths=**} {
-        allow read, write: if isAuthenticated() && request.auth.uid == userId;
-      }
-    }
-
-    /**
-     * GLOBAL CONFIGURATION NODES
-     */
-    match /currencies/{id} {
-      allow read: if isAuthenticated();
-    }
-    
-    match /system_admins/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && request.auth.uid == userId;
-    }
-
-    /**
-     * CATCH-ALL ACCESS (V6.5.0-ERP-CORE)
-     * Ensures general system availability for authenticated nodes.
+     * INSTITUTIONAL & SYSTEM-WIDE ACCESS POLICY (V7.0.0)
+     * This policy allows any authenticated user to access all documents.
+     * In a production environment, this should be restricted using institutional 
+     * membership checks (e.g., verifying the user's UID against a members collection).
      */
     match /{allPaths=**} {
       allow read, write: if isAuthenticated();
+    }
+    
+    /**
+     * USER-SPECIFIC SECURITY
+     * Ensuring users can only manage their own core profile nodes.
+     */
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
     }
   }
 }

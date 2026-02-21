@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -38,7 +39,9 @@ import {
   Calendar,
   Flame,
   FileText,
-  Tag
+  Tag,
+  Activity,
+  History
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
@@ -119,10 +122,10 @@ export default function HRSetupPage() {
     const formData = new FormData(e.currentTarget);
     const updates: any = {};
     formData.forEach((value, key) => {
-      if (['enableAutoOvertime', 'strictGeoFencing', 'requireManagerSignoff', 'restrictPosByShift', 'blockHolidayClockIn', 'strictOtApproval'].includes(key)) {
+      if (['enableAutoOvertime', 'strictGeoFencing', 'requireManagerSignoff', 'restrictPosByShift', 'blockHolidayClockIn', 'strictOtApproval', 'enableLatePenalty'].includes(key)) {
         updates[key] = value === 'on';
-      } else if (['lateToleranceMins', 'standardShiftHours', 'probationPeriodDays'].includes(key)) {
-        updates[key] = parseInt(value as string) || 0;
+      } else if (['lateToleranceMins', 'standardShiftHours', 'probationPeriodDays', 'otThresholdHours', 'penaltyRate'].includes(key)) {
+        updates[key] = parseFloat(value as string) || 0;
       } else {
         updates[key] = value;
       }
@@ -282,6 +285,13 @@ export default function HRSetupPage() {
                             </div>
                             <Switch name="restrictPosByShift" defaultChecked={setup?.restrictPosByShift} />
                           </div>
+                          <div className="flex items-center justify-between p-4 bg-destructive/5 rounded-xl border border-destructive/10">
+                            <div className="space-y-0.5">
+                              <Label className="text-xs font-bold text-destructive">Late Penalty Logic</Label>
+                              <p className="text-[10px] text-muted-foreground">Auto-deduct penalty from payroll for late arrivals.</p>
+                            </div>
+                            <Switch name="enableLatePenalty" defaultChecked={setup?.enableLatePenalty} />
+                          </div>
                         </div>
                         <div className="space-y-6 pt-2">
                           <div className="flex items-center justify-between">
@@ -297,6 +307,10 @@ export default function HRSetupPage() {
                               <p className="text-[10px] text-muted-foreground">Manual attendance edits require admin approval.</p>
                             </div>
                             <Switch name="requireManagerSignoff" defaultChecked={setup?.requireManagerSignoff} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase opacity-60">Penalty Rate (KES/Instance)</Label>
+                            <Input name="penaltyRate" type="number" defaultValue={setup?.penaltyRate || 500} className="h-9 bg-secondary/5" />
                           </div>
                         </div>
                       </CardContent>
@@ -389,6 +403,10 @@ export default function HRSetupPage() {
                             </div>
                           </div>
                           <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label className="text-[10px] font-black uppercase opacity-60">OT Rate Multiplier</Label>
+                              <Input name="otMultiplier" type="number" step="0.1" defaultValue={setup?.otMultiplier || 1.5} className="h-9 bg-secondary/5" />
+                            </div>
                             <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Overtime Approver Role</Label>
                             <Select name="otApproverRole" defaultValue={setup?.otApproverRole || "Reporting Manager"}>
                               <SelectTrigger className="h-10 font-bold uppercase text-[10px]"><SelectValue /></SelectTrigger>
@@ -534,14 +552,14 @@ export default function HRSetupPage() {
             <TabsContent value="structure">
               <div className="grid gap-6 lg:grid-cols-2">
                 <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
-                  <CardHeader className="bg-secondary/10 border-b flex items-center justify-between">
+                  <CardHeader className="bg-secondary/10 border-b">
                     <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                       <Tag className="size-4 text-primary" /> Official Job Titles
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-0">
                     <div className="p-4 border-b bg-secondary/5">
-                      <form onSubmit={(e) => handleAddSubItem('job_titles', e)} className="flex gap-2">
+                      <form onSubmit={(e) => handleAddCategory} className="flex gap-2">
                         <Input name="name" placeholder="Job Title (e.g. Staff Nurse)" required className="h-9 text-xs" />
                         <Button type="submit" size="sm" className="h-9 px-4 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
                       </form>
@@ -564,7 +582,7 @@ export default function HRSetupPage() {
                 </Card>
 
                 <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
-                  <CardHeader className="bg-secondary/10 border-b flex items-center justify-between">
+                  <CardHeader className="bg-secondary/10 border-b">
                     <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                       <Landmark className="size-4 text-primary" /> Institutional Pay Grades
                     </CardTitle>
@@ -588,66 +606,6 @@ export default function HRSetupPage() {
                             </TableCell>
                             <TableCell className="text-right pr-6">
                               <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'pay_grades', g.id))}>
-                                <Trash2 className="size-3.5" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
-                  <CardHeader className="bg-secondary/10 border-b">
-                    <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                      <GraduationCap className="size-4 text-primary" /> Seniority & Level Node
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="p-4 border-b bg-secondary/5">
-                      <form onSubmit={(e) => handleAddSubItem('job_levels', e)} className="flex gap-2">
-                        <Input name="name" placeholder="Level Title (e.g. L4 Manager)" required className="h-9 text-xs" />
-                        <Button type="submit" size="sm" className="h-9 px-4 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
-                      </form>
-                    </div>
-                    <Table>
-                      <TableBody>
-                        {jobLevels?.map(l => (
-                          <TableRow key={l.id} className="h-10 hover:bg-secondary/5 group">
-                            <TableCell className="text-xs font-bold pl-6 uppercase tracking-tight">{l.name}</TableCell>
-                            <TableCell className="text-right pr-6">
-                              <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'job_levels', l.id))}>
-                                <Trash2 className="size-3.5" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-
-                <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
-                  <CardHeader className="bg-secondary/10 border-b">
-                    <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-                      <FileText className="size-4 text-accent" /> Employment Types
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="p-4 border-b bg-secondary/5">
-                      <form onSubmit={(e) => handleAddSubItem('employment_types', e)} className="flex gap-2">
-                        <Input name="name" placeholder="Basis (e.g. Permanent)" required className="h-9 text-xs" />
-                        <Button type="submit" size="sm" className="h-9 px-4 font-bold uppercase text-[10px]"><Plus className="size-3 mr-1" /> Add</Button>
-                      </form>
-                    </div>
-                    <Table>
-                      <TableBody>
-                        {empTypes?.map(t => (
-                          <TableRow key={t.id} className="h-10 hover:bg-secondary/5 group">
-                            <TableCell className="text-xs font-bold pl-6 uppercase tracking-tight">{t.name}</TableCell>
-                            <TableCell className="text-right pr-6">
-                              <Button variant="ghost" size="icon" className="size-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={() => deleteDocumentNonBlocking(doc(db, 'institutions', selectedInstId, 'employment_types', t.id))}>
                                 <Trash2 className="size-3.5" />
                               </Button>
                             </TableCell>

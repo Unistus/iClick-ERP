@@ -4,18 +4,23 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * GLOBAL PERMISSIVE POLICY (V16.0.0)
+     * GLOBAL PERMISSIVE POLICY (V17.0.0)
      * 
-     * This policy allows unrestricted access to all document paths for both read and write.
-     * We are using explicit path matching for the institutions collection to ensure
-     * that the 'list' method is correctly authorized for all sub-collections.
-     * 
-     * Version 16.0.0: Optimized for multi-tenant ERP development.
+     * This policy allows unrestricted access to all document paths.
+     * We are using explicit path matching for HR, Sales, and Admin nodes to ensure
+     * that 'list' methods are correctly authorized for deep multi-tenant queries.
      */
     
     match /institutions/{instId} {
       allow read, write: if true;
       
+      match /{allSubPaths=**} {
+        allow read, write: if true;
+      }
+    }
+
+    match /users/{userId} {
+      allow read, write: if true;
       match /{allSubPaths=**} {
         allow read, write: if true;
       }

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, Suspense, useEffect } from 'react';
@@ -52,7 +53,8 @@ import {
   Award,
   FileCheck,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Coffee
 } from "lucide-react";
 import { format, differenceInDays, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -165,9 +167,7 @@ function PortalContent() {
     return (met / reviews.length) * 100;
   }, [reviews]);
 
-  const attendanceRate = useMemo(() => {
-    return 94.2; // Mock target for MVP logic
-  }, []);
+  const attendanceRate = 94.2;
 
   // Resolve Names
   const resolvedDeptName = useMemo(() => {
@@ -180,37 +180,23 @@ function PortalContent() {
     return branches.find(b => b.id === employee.branchId)?.name || "Central Hub";
   }, [branches, employee?.branchId]);
 
-  // LEAVE LOGIC: Calculate usage per type
+  // LEAVE LOGIC
   const leaveMatrix = useMemo(() => {
     if (!allLeaveTypes || !employee) return [];
-    
-    const eligible = allLeaveTypes.filter(lt => 
-      lt.genderApplicability === 'All' || 
-      lt.genderApplicability === employee.gender
-    );
-
+    const eligible = allLeaveTypes.filter(lt => lt.genderApplicability === 'All' || lt.genderApplicability === employee.gender);
     return eligible.map(type => {
-      const approved = leaves?.filter(l => l.leaveType === type.name && l.status === 'Approved')
-        .reduce((sum, l) => sum + (parseInt(l.days) || 0), 0) || 0;
-      
-      const pending = leaves?.filter(l => l.leaveType === type.name && l.status === 'Pending')
-        .reduce((sum, l) => sum + (parseInt(l.days) || 0), 0) || 0;
-
-      return {
-        ...type,
-        used: approved,
-        requested: pending,
-        remaining: (type.daysPerYear || 0) - approved
-      };
+      const approved = leaves?.filter(l => l.leaveType === type.name && l.status === 'Approved').reduce((sum, l) => sum + (parseInt(l.days) || 0), 0) || 0;
+      const pending = leaves?.filter(l => l.leaveType === type.name && l.status === 'Pending').reduce((sum, l) => sum + (parseInt(l.days) || 0), 0) || 0;
+      return { ...type, used: approved, requested: pending, remaining: (type.daysPerYear || 0) - approved };
     });
   }, [allLeaveTypes, employee, leaves]);
 
-  const handleClockAction = async (type: 'In' | 'Out') => {
+  const handleClockAction = async (type: 'In' | 'Out' | 'BreakStart' | 'BreakEnd') => {
     if (!selectedInstId || isClocking) return;
     setIsClocking(true);
     try {
       await recordAttendance(db, selectedInstId, employeeId, type, resolvedBranchName);
-      toast({ title: `Successfully Clocked ${type}` });
+      toast({ title: `Shift Event Logged: ${type}` });
       setIsClockModalOpen(false);
     } catch (err) {
       toast({ variant: "destructive", title: "Clock Error" });
@@ -223,34 +209,21 @@ function PortalContent() {
     e.preventDefault();
     if (!selectedInstId || isSubmittingLeave || !employee) return;
     setIsSubmittingLeave(true);
-
     const formData = new FormData(e.currentTarget);
     const startDate = formData.get('startDate') as string;
     const endDate = formData.get('endDate') as string;
-    
     const start = new Date(startDate);
     const end = new Date(endDate);
     const dayCount = isValid(start) && isValid(end) ? differenceInDays(end, start) + 1 : 0;
-
     if (dayCount <= 0) {
-      toast({ variant: "destructive", title: "Invalid Dates", description: "End date must be after start date." });
+      toast({ variant: "destructive", title: "Invalid Dates" });
       setIsSubmittingLeave(false);
       return;
     }
-
-    const data = {
-      employeeId: employee.id,
-      employeeName: `${employee.firstName} ${employee.lastName}`,
-      leaveType: formData.get('leaveType') as string,
-      startDate,
-      endDate,
-      days: dayCount.toString(),
-      reason: formData.get('reason') as string,
-    };
-
+    const data = { employeeId: employee.id, employeeName: `${employee.firstName} ${employee.lastName}`, leaveType: formData.get('leaveType') as string, startDate, endDate, days: dayCount.toString(), reason: formData.get('reason') as string };
     try {
       await submitLeaveRequest(db, selectedInstId, data);
-      toast({ title: "Requisition Submitted", description: "Request is now in the management queue." });
+      toast({ title: "Requisition Submitted" });
       setIsLeaveModalOpen(false);
     } catch (err) {
       toast({ variant: "destructive", title: "Submission Failed" });
@@ -259,85 +232,34 @@ function PortalContent() {
     }
   };
 
-  if (empLoading) {
-    return (
-      <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
-        <Loader2 className="size-10 animate-spin text-primary opacity-20" />
-        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Bootstrapping Identity Matrix...</p>
-      </div>
-    );
-  }
-
-  if (!employee) {
-    return (
-      <div className="h-[60vh] flex flex-col items-center justify-center gap-4 text-center px-6">
-        <ShieldX className="size-16 text-destructive opacity-20 mb-2" />
-        <h2 className="text-xl font-headline font-black uppercase tracking-tighter">Identity Not Found</h2>
-        <p className="text-sm text-muted-foreground max-w-xs">
-          The requested personnel identity node does not exist in the current institutional vault.
-        </p>
-        <Button variant="outline" className="mt-4 font-bold uppercase text-[10px] tracking-widest h-10 px-8" onClick={() => router.push('/hr/employees')}>
-          Return to Directory
-        </Button>
-      </div>
-    );
-  }
+  if (empLoading) return <div className="h-[60vh] flex flex-col items-center justify-center gap-4"><Loader2 className="size-10 animate-spin text-primary opacity-20" /><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Bootstrapping Identity Matrix...</p></div>;
+  if (!employee) return <div className="h-[60vh] flex flex-col items-center justify-center gap-4 text-center px-6"><ShieldX className="size-16 text-destructive opacity-20 mb-2" /><h2 className="text-xl font-headline font-black uppercase tracking-tighter">Identity Not Found</h2><Button variant="outline" className="mt-4 font-bold uppercase text-[10px] tracking-widest h-10 px-8" onClick={() => router.push('/hr/employees')}>Return to Directory</Button></div>;
 
   return (
     <div className="space-y-6 pb-20 animate-in fade-in duration-700">
-      {/* PORTAL HEADER COMMAND CENTER */}
+      {/* HEADER COMMAND CENTER */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 bg-card border border-border/50 p-8 rounded-[2rem] shadow-2xl relative overflow-hidden ring-1 ring-border/50">
         <div className="absolute top-0 right-0 p-8 opacity-[0.03] pointer-events-none"><UserCog className="size-48" /></div>
-        
         <div className="flex flex-col sm:flex-row items-center gap-6 relative z-10">
           <div className="relative group">
-            <div className="size-24 rounded-3xl bg-primary/10 flex items-center justify-center text-primary font-black text-4xl uppercase shadow-inner border border-primary/20 transition-all group-hover:scale-105 group-hover:rotate-3">
+            <div className="size-24 rounded-3xl bg-primary/10 flex items-center justify-center text-primary font-black text-4xl uppercase shadow-inner border border-primary/20">
               {employee.firstName?.[0]}{employee.lastName?.[0]}
             </div>
-            <div className="absolute -bottom-2 -right-2 p-1.5 rounded-full bg-background ring-2 ring-emerald-500 shadow-lg">
-              <CheckCircle2 className="size-4 text-emerald-500" />
-            </div>
+            <div className="absolute -bottom-2 -right-2 p-1.5 rounded-full bg-background ring-2 ring-emerald-500 shadow-lg"><CheckCircle2 className="size-4 text-emerald-500" /></div>
           </div>
-          
           <div className="space-y-2 text-center sm:text-left">
-            <h1 className="text-3xl font-headline font-black text-foreground tracking-tight">
-              {employee.firstName} {employee.lastName}
-            </h1>
+            <h1 className="text-3xl font-headline font-black text-foreground tracking-tight">{employee.firstName} {employee.lastName}</h1>
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
-              <Badge variant="secondary" className={cn(
-                "h-6 px-3 font-black uppercase border-none ring-1",
-                employee.status === 'Active' ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : 'bg-amber-500/10 text-amber-500 ring-amber-500/20'
-              )}>
-                {employee.status || 'PENDING'}
-              </Badge>
-              <span className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1.5 bg-secondary/30 px-2 py-1 rounded-md border border-border/50">
-                <Briefcase className="size-3 text-primary" /> {employee.jobTitle || 'General Staff'}
-              </span>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setIsClockModalOpen(true)}
-                className="h-7 text-[10px] font-black uppercase gap-2 bg-primary/5 border-primary/20 text-primary hover:bg-primary/10 shadow-sm"
-              >
-                <Clock className="size-3" /> Quick Clock
-              </Button>
+              <Badge variant="secondary" className={cn("h-6 px-3 font-black uppercase border-none ring-1", employee.status === 'Active' ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : 'bg-amber-500/10 text-amber-500 ring-amber-500/20')}>{employee.status || 'PENDING'}</Badge>
+              <span className="text-[10px] font-bold uppercase text-muted-foreground flex items-center gap-1.5 bg-secondary/30 px-2 py-1 rounded-md border border-border/50"><Briefcase className="size-3 text-primary" /> {employee.jobTitle}</span>
+              <Button variant="outline" size="sm" onClick={() => setIsClockModalOpen(true)} className="h-7 text-[10px] font-black uppercase gap-2 bg-primary/5 border-primary/20 text-primary hover:bg-primary/10 shadow-sm"><Clock className="size-3" /> Quick Clock</Button>
             </div>
           </div>
         </div>
-
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 w-full lg:w-auto">
-          <div className="p-4 rounded-2xl bg-secondary/10 border border-border/50 text-center flex flex-col justify-center shadow-inner">
-            <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest mb-1">Absence Credits</p>
-            <p className="text-xl font-black text-primary">{employee.leaveBalance || 0} DAYS</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-secondary/10 border border-border/50 text-center flex flex-col justify-center shadow-inner">
-            <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest mb-1">Audit Score</p>
-            <p className="text-xl font-black text-accent">{avgPerformance.toFixed(1)}/10</p>
-          </div>
-          <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 text-center hidden sm:flex flex-col justify-center shadow-sm">
-            <p className="text-[8px] font-black uppercase text-primary tracking-widest mb-1">Shift Standing</p>
-            <p className="text-xl font-black text-foreground">ONLINE</p>
-          </div>
+          <div className="p-4 rounded-2xl bg-secondary/10 border border-border/50 text-center flex flex-col justify-center shadow-inner"><p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest mb-1">Absence Credits</p><p className="text-xl font-black text-primary">{employee.leaveBalance || 0} DAYS</p></div>
+          <div className="p-4 rounded-2xl bg-secondary/10 border border-border/50 text-center flex flex-col justify-center shadow-inner"><p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest mb-1">Audit Score</p><p className="text-xl font-black text-accent">{avgPerformance.toFixed(1)}/10</p></div>
+          <div className="p-4 rounded-2xl bg-primary/5 border border-primary/10 text-center hidden sm:flex flex-col justify-center shadow-sm"><p className="text-[8px] font-black uppercase text-primary tracking-widest mb-1">Shift Standing</p><p className="text-xl font-black text-foreground">ONLINE</p></div>
         </div>
       </div>
 
@@ -355,112 +277,40 @@ function PortalContent() {
           <div className="grid md:grid-cols-2 gap-6">
             <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
               <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6 flex flex-row items-center justify-between">
-                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
-                  <User className="size-4 text-primary" /> Biographical Core
-                </CardTitle>
+                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2"><User className="size-4 text-primary" /> Biographical Core</CardTitle>
                 {employee.gender === 'Male' ? <Mars className="size-4 text-blue-500" /> : <Venus className="size-4 text-pink-500" />}
               </CardHeader>
               <CardContent className="p-6 space-y-6">
                 <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Official Email</p>
-                    <p className="text-sm font-bold truncate">{employee.email}</p>
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Verified Phone</p>
-                    <p className="text-sm font-bold">{employee.phone}</p>
-                  </div>
+                  <div><p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Official Email</p><p className="text-sm font-bold truncate">{employee.email}</p></div>
+                  <div><p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Verified Phone</p><p className="text-sm font-bold">{employee.phone}</p></div>
                 </div>
-
                 <div className="pt-6 border-t border-border/50">
-                  <p className="text-[10px] font-black uppercase text-primary tracking-widest mb-4 flex items-center gap-2">
-                    <Fingerprint className="size-3" /> Statutory & Compliance Matrix
-                  </p>
+                  <p className="text-[10px] font-black uppercase text-primary tracking-widest mb-4 flex items-center gap-2"><Fingerprint className="size-3" /> Statutory Matrix</p>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 rounded-xl bg-secondary/5 border border-border/50">
-                      <p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">National ID</p>
-                      <p className="text-xs font-black font-mono tracking-tighter">{employee.nationalId || 'NOT RECORDED'}</p>
-                    </div>
-                    <div className="p-3 rounded-xl bg-secondary/5 border border-border/50">
-                      <p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">KRA PIN</p>
-                      <p className="text-xs font-black font-mono uppercase tracking-tighter">{employee.kraPin || 'NOT RECORDED'}</p>
-                    </div>
-                    <div className="p-3 rounded-xl bg-secondary/5 border border-border/50">
-                      <p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">NSSF Node</p>
-                      <p className="text-xs font-black font-mono tracking-tighter">{employee.nssfNumber || 'NOT RECORDED'}</p>
-                    </div>
-                    <div className="p-3 rounded-xl bg-secondary/5 border border-border/50">
-                      <p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">NHIF Node</p>
-                      <p className="text-xs font-black font-mono tracking-tighter">{employee.nhifNumber || 'NOT RECORDED'}</p>
-                    </div>
+                    <div className="p-3 rounded-xl bg-secondary/5 border border-border/50"><p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">National ID</p><p className="text-xs font-black font-mono tracking-tighter">{employee.nationalId || '...'}</p></div>
+                    <div className="p-3 rounded-xl bg-secondary/5 border border-border/50"><p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">KRA PIN</p><p className="text-xs font-black font-mono uppercase tracking-tighter">{employee.kraPin || '...'}</p></div>
+                    <div className="p-3 rounded-xl bg-secondary/5 border border-border/50"><p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">NSSF Node</p><p className="text-xs font-black font-mono tracking-tighter">{employee.nssfNumber || '...'}</p></div>
+                    <div className="p-3 rounded-xl bg-secondary/5 border border-border/50"><p className="text-[8px] font-black uppercase text-muted-foreground opacity-50 mb-1">NHIF Node</p><p className="text-xs font-black font-mono tracking-tighter">{employee.nhifNumber || '...'}</p></div>
                   </div>
                 </div>
-
                 <div className="pt-6 border-t border-border/50">
-                  <p className="text-[10px] font-black uppercase text-primary tracking-widest mb-3 flex items-center gap-2">
-                    <Heart className="size-3" /> Kin Verification Node
-                  </p>
-                  <div className="p-4 rounded-2xl bg-secondary/10 border border-dashed border-border flex items-center justify-between group hover:bg-secondary/20 transition-all">
-                    <div>
-                      <p className="text-xs font-black uppercase">{employee.nextOfKin?.name || 'NOT DEFINED'}</p>
-                      <p className="text-[9px] text-muted-foreground font-bold uppercase mt-0.5">{employee.nextOfKin?.relation || 'Guardian Node'}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs font-mono font-black text-primary">{employee.nextOfKin?.phone || '...'}</p>
-                      <p className="text-[8px] text-muted-foreground uppercase tracking-widest font-black">Emergency Line</p>
-                    </div>
+                  <p className="text-[10px] font-black uppercase text-primary tracking-widest mb-3 flex items-center gap-2"><Heart className="size-3" /> Kin Verification Node</p>
+                  <div className="p-4 rounded-2xl bg-secondary/10 border border-dashed border-border flex items-center justify-between">
+                    <div><p className="text-xs font-black uppercase">{employee.nextOfKin?.name || '...'}</p><p className="text-[9px] text-muted-foreground font-bold uppercase mt-0.5">{employee.nextOfKin?.relation || 'Guardian Node'}</p></div>
+                    <div className="text-right"><p className="text-xs font-mono font-black text-primary">{employee.nextOfKin?.phone || '...'}</p><p className="text-[8px] text-muted-foreground uppercase tracking-widest font-black">Emergency Line</p></div>
                   </div>
                 </div>
               </CardContent>
             </Card>
-
             <Card className="border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
-              <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6">
-                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
-                  <Building className="size-4 text-accent" /> Institutional Topology
-                </CardTitle>
-              </CardHeader>
+              <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2"><Building className="size-4 text-accent" /> Institutional Topology</CardTitle></CardHeader>
               <CardContent className="p-6 space-y-6">
                 <div className="grid grid-cols-2 gap-6">
-                  <div className="flex items-start gap-3 p-4 rounded-2xl bg-primary/5 border border-primary/10">
-                    <MapPin className="size-5 text-primary shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-[9px] font-black uppercase text-primary tracking-widest">Active Branch</p>
-                      <p className="text-xs font-black uppercase mt-1 truncate">{resolvedBranchName}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3 p-4 rounded-2xl bg-accent/5 border border-accent/10">
-                    <LayoutGrid className="size-5 text-accent shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-[9px] font-black uppercase text-accent tracking-widest">Dept. Node</p>
-                      <p className="text-xs font-black uppercase mt-1 truncate">{resolvedDeptName}</p>
-                    </div>
-                  </div>
+                  <div className="flex items-start gap-3 p-4 rounded-2xl bg-primary/5 border border-primary/10"><MapPin className="size-5 text-primary shrink-0" /><div className="min-w-0"><p className="text-[9px] font-black uppercase text-primary tracking-widest">Active Branch</p><p className="text-xs font-black uppercase mt-1 truncate">{resolvedBranchName}</p></div></div>
+                  <div className="flex items-start gap-3 p-4 rounded-2xl bg-accent/5 border border-accent/10"><LayoutGrid className="size-5 text-accent shrink-0" /><div className="min-w-0"><p className="text-[9px] font-black uppercase text-accent tracking-widest">Dept. Node</p><p className="text-xs font-black uppercase mt-1 truncate">{resolvedDeptName}</p></div></div>
                 </div>
-                
-                <div className="grid grid-cols-2 gap-6 pt-2">
-                  <div className="p-4 rounded-2xl bg-secondary/5 border border-border/50">
-                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Contract Basis</p>
-                    <p className="text-xs font-black uppercase">{employee.employmentType || 'Permanent'}</p>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-secondary/5 border border-border/50">
-                    <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Effective Date</p>
-                    <p className="text-xs font-black uppercase">{employee.hireDate ? format(new Date(employee.hireDate), 'dd MMM yyyy') : '...'}</p>
-                  </div>
-                </div>
-
-                <div className="p-6 rounded-2xl bg-secondary/5 border border-dashed border-border flex items-center justify-between shadow-inner">
-                  <div className="flex items-center gap-4">
-                    <div className="size-12 rounded-full bg-background border flex items-center justify-center shadow-lg">
-                      <UserCog className="size-6 text-primary opacity-40" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Command Hierarchy</p>
-                      <p className="text-xs font-bold text-foreground/90">Institutional Supervisor: ACTIVE</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="size-4 text-muted-foreground opacity-20" />
-                </div>
+                <div className="grid grid-cols-2 gap-6 pt-2"><div className="p-4 rounded-2xl bg-secondary/5 border border-border/50"><p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Contract Basis</p><p className="text-xs font-black uppercase">{employee.employmentType}</p></div><div className="p-4 rounded-2xl bg-secondary/5 border border-border/50"><p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-widest mb-1">Effective Date</p><p className="text-xs font-black uppercase">{employee.hireDate ? format(new Date(employee.hireDate), 'dd MMM yyyy') : '...'}</p></div></div>
               </CardContent>
             </Card>
           </div>
@@ -469,85 +319,32 @@ function PortalContent() {
         <TabsContent value="leave" className="mt-0 space-y-6">
           <div className="grid gap-6 md:grid-cols-12 items-start">
             <Card className="md:col-span-4 border-none ring-1 ring-border bg-card shadow-xl overflow-hidden">
-              <CardHeader className="bg-secondary/10 border-b py-4 px-6">
-                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
-                  <CalendarDays className="size-4 text-primary" /> Allowed Entitlements
-                </CardTitle>
-              </CardHeader>
+              <CardHeader className="bg-secondary/10 border-b py-4 px-6"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2"><CalendarDays className="size-4 text-primary" /> Allowed Entitlements</CardTitle></CardHeader>
               <CardContent className="p-0">
                 <div className="divide-y divide-border/30">
                   {leaveMatrix.map((type) => (
                     <div key={type.id} className="p-4 space-y-3 hover:bg-primary/5 transition-colors group">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-black uppercase tracking-tight">{type.name}</span>
-                        <Badge variant="outline" className="text-[8px] h-4 bg-primary/5 border-none font-black text-primary">
-                          {type.daysPerYear} DAYS/YR
-                        </Badge>
-                      </div>
-                      <div className="space-y-1.5">
-                        <div className="flex justify-between text-[8px] font-black uppercase tracking-widest">
-                          <span className="opacity-40">Consumed (Approved)</span>
-                          <span className="text-primary">{type.used} of {type.daysPerYear}</span>
-                        </div>
-                        <Progress value={(type.used / (type.daysPerYear || 1)) * 100} className="h-1 bg-secondary shadow-inner" />
-                        {type.requested > 0 && (
-                          <div className="flex items-center gap-1.5 text-[7px] font-black uppercase text-amber-500/70">
-                            <Clock className="size-2" /> {type.requested} Days Pending Review
-                          </div>
-                        )}
-                      </div>
+                      <div className="flex justify-between items-center"><span className="text-xs font-black uppercase tracking-tight">{type.name}</span><Badge variant="outline" className="text-[8px] h-4 bg-primary/5 border-none font-black text-primary">{type.daysPerYear} DAYS/YR</Badge></div>
+                      <div className="space-y-1.5"><div className="flex justify-between text-[8px] font-black uppercase tracking-widest"><span className="opacity-40">Consumed</span><span className="text-primary">{type.used} of {type.daysPerYear}</span></div><Progress value={(type.used / (type.daysPerYear || 1)) * 100} className="h-1 bg-secondary shadow-inner" /></div>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
-
             <Card className="md:col-span-8 border-none ring-1 ring-border bg-card shadow-2xl overflow-hidden">
               <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-8 flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">Absence History</CardTitle>
-                  <CardDescription className="text-[10px]">Lifecycle of institutional leave requisitions.</CardDescription>
-                </div>
-                <Button size="sm" className="h-9 px-6 gap-2 font-black uppercase text-[10px] shadow-lg bg-primary hover:bg-primary/90" onClick={() => setIsLeaveModalOpen(true)}>
-                  <Plus className="size-3.5" /> Raise Request
-                </Button>
+                <div><CardTitle className="text-sm font-black uppercase tracking-[0.2em]">Absence History</CardTitle></div>
+                <Button size="sm" className="h-9 px-6 gap-2 font-black uppercase text-[10px] shadow-lg bg-primary hover:bg-primary/90" onClick={() => setIsLeaveModalOpen(true)}><Plus className="size-3.5" /> Raise Request</Button>
               </CardHeader>
               <CardContent className="p-0 overflow-x-auto">
                 <Table>
-                  <TableHeader className="bg-secondary/30">
-                    <TableRow>
-                      <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Category</TableHead>
-                      <TableHead className="h-12 text-[9px] font-black uppercase">Validity Window</TableHead>
-                      <TableHead className="h-12 text-[9px] font-black uppercase">Justification</TableHead>
-                      <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Workflow Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
+                  <TableHeader className="bg-secondary/30"><TableRow><TableHead className="h-12 text-[9px] font-black uppercase pl-8">Category</TableHead><TableHead className="h-12 text-[9px] font-black uppercase">Validity Window</TableHead><TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Workflow Status</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {!leaves?.length ? (
-                      <TableRow><TableCell colSpan={4} className="text-center py-20 text-[10px] opacity-30 italic uppercase font-black tracking-[0.3em]">No historical cycles detected.</TableCell></TableRow>
-                    ) : leaves.map(l => (
+                    {!leaves?.length ? <TableRow><TableCell colSpan={3} className="text-center py-20 text-[10px] opacity-30 italic uppercase font-black">No cycles detected.</TableCell></TableRow> : leaves.map(l => (
                       <TableRow key={l.id} className="h-16 hover:bg-secondary/5 border-b-border/30 transition-colors">
-                        <TableCell className="pl-8">
-                          <Badge variant="secondary" className="text-[8px] h-5 px-3 bg-primary/10 text-primary border-none font-black uppercase shadow-sm">
-                            {l.leaveType}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-[11px] font-mono font-black uppercase tracking-tighter text-foreground/70">
-                          {l.startDate} <span className="mx-1.5 opacity-20">→</span> {l.endDate}
-                        </TableCell>
-                        <TableCell className="text-[11px] italic opacity-60 truncate max-w-[200px]">
-                          "{l.reason}"
-                        </TableCell>
-                        <TableCell className="text-right pr-8">
-                          <Badge variant="outline" className={cn(
-                            "text-[8px] h-5 px-3 font-black uppercase border-none ring-1",
-                            l.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : 
-                            l.status === 'Declined' ? 'bg-destructive/10 text-destructive ring-destructive/20' : 
-                            'bg-amber-500/10 text-amber-500 ring-amber-500/20 animate-pulse'
-                          )}>
-                            {l.status}
-                          </Badge>
-                        </TableCell>
+                        <TableCell className="pl-8"><Badge variant="secondary" className="text-[8px] h-5 px-3 bg-primary/10 text-primary border-none font-black uppercase">{l.leaveType}</Badge></TableCell>
+                        <TableCell className="text-[11px] font-mono font-black uppercase tracking-tighter text-foreground/70">{l.startDate} → {l.endDate}</TableCell>
+                        <TableCell className="text-right pr-8"><Badge variant="outline" className={cn("text-[8px] h-5 px-3 font-black uppercase border-none ring-1", l.status === 'Approved' ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : l.status === 'Declined' ? 'bg-destructive/10 text-destructive ring-destructive/20' : 'bg-amber-500/10 text-amber-500 ring-amber-500/20 animate-pulse')}>{l.status}</Badge></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -560,33 +357,15 @@ function PortalContent() {
         <TabsContent value="performance" className="mt-0 space-y-6">
           <div className="grid lg:grid-cols-3 gap-6">
             <Card className="lg:col-span-2 border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
-              <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6 flex items-center justify-between">
-                <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-accent">
-                  <Star className="size-4" /> Growth History
-                </CardTitle>
-              </CardHeader>
+              <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6 flex items-center justify-between"><CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-accent"><Star className="size-4" /> Growth History</CardTitle></CardHeader>
               <CardContent className="p-0">
                 <Table>
-                  <TableHeader className="bg-secondary/20">
-                    <TableRow>
-                      <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Review Date</TableHead>
-                      <TableHead className="h-12 text-[9px] font-black uppercase text-center">Score</TableHead>
-                      <TableHead className="h-12 text-[9px] font-black uppercase">Feedback Summary</TableHead>
-                    </TableRow>
-                  </TableHeader>
+                  <TableHeader className="bg-secondary/20"><TableRow><TableHead className="h-12 text-[9px] font-black uppercase pl-8">Review Date</TableHead><TableHead className="h-12 text-[9px] font-black uppercase text-center">Score</TableHead><TableHead className="h-12 text-[9px] font-black uppercase">Feedback Summary</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {!reviews?.length ? (
-                      <TableRow><TableCell colSpan={3} className="text-center py-20 text-[10px] opacity-30 italic uppercase font-black tracking-[0.3em]">No audits found.</TableCell></TableRow>
-                    ) : reviews.map(r => (
+                    {!reviews?.length ? <TableRow><TableCell colSpan={3} className="text-center py-20 text-[10px] opacity-30 italic uppercase font-black">No audits found.</TableCell></TableRow> : reviews.map(r => (
                       <TableRow key={r.id} className="h-20 hover:bg-secondary/5 border-b-border/30 transition-colors">
                         <TableCell className="pl-8 text-[11px] font-black uppercase text-foreground/80">{r.date}</TableCell>
-                        <TableCell className="text-center">
-                          <span className={cn("font-mono font-black text-xs px-3 py-1 rounded-full border", 
-                            r.score >= 8 ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"
-                          )}>
-                            {r.score} / 10
-                          </span>
-                        </TableCell>
+                        <TableCell className="text-center"><span className={cn("font-mono font-black text-xs px-3 py-1 rounded-full border", r.score >= 8 ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500")}>{r.score} / 10</span></TableCell>
                         <TableCell className="text-right pr-8 italic text-muted-foreground text-[10px] truncate max-w-[250px]">"{r.feedback}"</TableCell>
                       </TableRow>
                     ))}
@@ -598,69 +377,30 @@ function PortalContent() {
               <div className="space-y-6">
                 <p className="text-[10px] font-black uppercase text-primary tracking-widest">Process Velocity</p>
                 <div className="space-y-6">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-[9px] font-black uppercase">
-                      <span className="opacity-50 tracking-tighter">Evaluation Average</span>
-                      <span className="text-primary">{avgPerformance.toFixed(1)} / 10</span>
-                    </div>
-                    <Progress value={avgPerformance * 10} className="h-1.5 bg-secondary shadow-inner" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-[9px] font-black uppercase">
-                      <span className="opacity-50 tracking-tighter">KRA Realization</span>
-                      <span className="text-accent">{kraAttainment.toFixed(0)}%</span>
-                    </div>
-                    <Progress value={kraAttainment} className="h-1.5 bg-secondary shadow-inner" />
-                  </div>
+                  <div className="space-y-2"><div className="flex justify-between text-[9px] font-black uppercase"><span>Performance</span><span>{avgPerformance.toFixed(1)}</span></div><Progress value={avgPerformance * 10} className="h-1.5 bg-secondary shadow-inner" /></div>
+                  <div className="space-y-2"><div className="flex justify-between text-[9px] font-black uppercase"><span>KRA Realization</span><span>{kraAttainment.toFixed(0)}%</span></div><Progress value={kraAttainment} className="h-1.5 bg-secondary shadow-inner" /></div>
                 </div>
               </div>
-              <div className="p-4 bg-background rounded-2xl border border-border/50 mt-8 flex items-center gap-3">
-                <Award className="size-5 text-accent" />
-                <p className="text-[9px] font-black uppercase leading-tight">Elite Performance Tier: ACTIVATED</p>
-              </div>
+              <div className="p-4 bg-background rounded-2xl border border-border/50 mt-8 flex items-center gap-3"><Award className="size-5 text-accent" /><p className="text-[9px] font-black uppercase leading-tight">Elite Performance Tier: ACTIVATED</p></div>
             </div>
           </div>
         </TabsContent>
 
         <TabsContent value="attendance" className="mt-0">
           <Card className="border-none ring-1 ring-border bg-card shadow-2xl overflow-hidden">
-            <CardHeader className="bg-secondary/10 border-b py-4 px-8">
-              <CardTitle className="text-sm font-black uppercase tracking-[0.2em] flex items-center gap-2 text-primary">
-                <Timer className="size-4" /> Live Shift Stream
-              </CardTitle>
-            </CardHeader>
+            <CardHeader className="bg-secondary/10 border-b py-4 px-8"><CardTitle className="text-sm font-black uppercase tracking-[0.2em] flex items-center gap-2 text-primary"><Timer className="size-4" /> Live Shift Stream</CardTitle></CardHeader>
             <CardContent className="p-0">
               <Table>
-                <TableHeader className="bg-secondary/20">
-                  <TableRow>
-                    <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Timestamp</TableHead>
-                    <TableHead className="h-12 text-[9px] font-black uppercase text-center">Direction</TableHead>
-                    <TableHead className="h-12 text-[9px] font-black uppercase">Institutional Node</TableHead>
-                    <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Proof</TableHead>
-                  </TableRow>
-                </TableHeader>
+                <TableHeader className="bg-secondary/20"><TableRow><TableHead className="h-12 text-[9px] font-black uppercase pl-8">Timestamp</TableHead><TableHead className="h-12 text-[9px] font-black uppercase text-center">Direction</TableHead><TableHead className="h-12 text-[9px] font-black uppercase">Institutional Node</TableHead><TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Proof</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {!attendance?.length ? (
-                    <TableRow><TableCell colSpan={4} className="text-center py-20 text-[10px] opacity-30 italic uppercase font-black">No shift activity recorded.</TableCell></TableRow>
-                  ) : attendance.map(a => (
+                  {!attendance?.length ? <TableRow><TableCell colSpan={4} className="text-center py-20 text-[10px] opacity-30 italic uppercase font-black">No shift activity recorded.</TableCell></TableRow> : attendance.map(a => (
                     <TableRow key={a.id} className="h-14 hover:bg-secondary/5 border-b-border/30">
-                      <TableCell className="pl-8 text-[11px] font-mono font-black text-foreground/70">
-                        {a.timestamp?.toDate ? format(a.timestamp.toDate(), 'dd MMM HH:mm:ss') : '...'}
-                      </TableCell>
+                      <TableCell className="pl-8 text-[11px] font-mono font-black text-foreground/70">{a.timestamp?.toDate ? format(a.timestamp.toDate(), 'dd MMM HH:mm:ss') : '...'}</TableCell>
                       <TableCell className="text-center">
-                        <Badge variant="outline" className={cn(
-                          "text-[8px] h-5 px-3 font-black uppercase border-none ring-1",
-                          a.type === 'In' ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : 'bg-destructive/10 text-destructive ring-destructive/20'
-                        )}>
-                          SHIFT {a.type.toUpperCase()}
-                        </Badge>
+                        <Badge variant="outline" className={cn("text-[8px] h-5 px-3 font-black uppercase border-none ring-1", a.type === 'In' ? 'bg-emerald-500/10 text-emerald-500' : a.type.includes('Break') ? 'bg-primary/10 text-primary' : 'bg-destructive/10 text-destructive')}>{a.type.toUpperCase()}</Badge>
                       </TableCell>
-                      <TableCell className="text-[10px] font-black uppercase tracking-tight opacity-60">
-                        {a.location || 'MANAGED SITE NODE'}
-                      </TableCell>
-                      <TableCell className="text-right pr-8 text-[9px] font-black uppercase text-emerald-500/60 flex items-center justify-end gap-1.5 mt-4">
-                        <ShieldCheck className="size-3" /> GPS VERIFIED
-                      </TableCell>
+                      <TableCell className="text-[10px] font-black uppercase tracking-tight opacity-60">{a.location || 'MANAGED HUB'}</TableCell>
+                      <TableCell className="text-right pr-8 text-[9px] font-black uppercase text-emerald-500/60 flex items-center justify-end gap-1.5 mt-4"><ShieldCheck className="size-3" /> GPS VERIFIED</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -671,38 +411,13 @@ function PortalContent() {
 
         <TabsContent value="conduct" className="mt-0">
           <Card className="border-none ring-1 ring-destructive/30 bg-card shadow-2xl overflow-hidden">
-            <CardHeader className="bg-destructive/5 border-b border-destructive/10 py-4 px-8 flex items-center justify-between">
-              <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-destructive">
-                <ShieldAlert className="size-4" /> Conduct & Compliance Archive
-              </CardTitle>
-              <Badge variant="outline" className="text-[8px] bg-destructive/10 text-destructive font-black border-none uppercase">Immutable Logs</Badge>
-            </CardHeader>
+            <CardHeader className="bg-destructive/5 border-b border-destructive/10 py-4 px-8 flex items-center justify-between"><CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-destructive"><ShieldAlert className="size-4" /> Conduct Archive</CardTitle><Badge variant="outline" className="text-[8px] bg-destructive/10 text-destructive font-black border-none uppercase">Immutable Logs</Badge></CardHeader>
             <CardContent className="p-0">
               <Table>
-                <TableHeader className="bg-secondary/20">
-                  <TableRow>
-                    <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Incident Date</TableHead>
-                    <TableHead className="h-12 text-[9px] font-black uppercase">Classification</TableHead>
-                    <TableHead className="h-12 text-[9px] font-black uppercase">Action Taken</TableHead>
-                    <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Contextual Details</TableHead>
-                  </TableRow>
-                </TableHeader>
+                <TableHeader className="bg-secondary/20"><TableRow><TableHead className="h-12 text-[9px] font-black uppercase pl-8">Date</TableHead><TableHead className="h-12 text-[9px] font-black uppercase">Classification</TableHead><TableHead className="h-12 text-[9px] font-black uppercase">Action Taken</TableHead><TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Details</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {!conduct?.length ? (
-                    <TableRow><TableCell colSpan={4} className="text-center py-24 text-[10px] opacity-20 italic uppercase font-black">Zero compliance violations recorded.</TableCell></TableRow>
-                  ) : conduct.map(c => (
-                    <TableRow key={c.id} className="h-16 hover:bg-destructive/5 border-b-border/30 group transition-colors">
-                      <TableCell className="pl-8 text-[11px] font-black text-muted-foreground">{c.date}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-[8px] h-5 px-3 bg-destructive/10 text-destructive border-none font-black uppercase ring-1 ring-destructive/20">
-                          {c.type}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs font-black uppercase text-foreground/80">{c.actionTaken}</TableCell>
-                      <TableCell className="text-right pr-8 max-w-[400px] truncate text-[10px] italic text-muted-foreground">
-                        "{c.description}"
-                      </TableCell>
-                    </TableRow>
+                  {!conduct?.length ? <TableRow><TableCell colSpan={4} className="text-center py-24 text-[10px] opacity-20 italic uppercase font-black">Zero violations recorded.</TableCell></TableRow> : conduct.map(c => (
+                    <TableRow key={c.id} className="h-16 hover:bg-destructive/5 border-b-border/30 transition-colors"><TableCell className="pl-8 text-[11px] font-black text-muted-foreground">{c.date}</TableCell><TableCell><Badge variant="outline" className="text-[8px] h-5 px-3 bg-destructive/10 text-destructive border-none font-black uppercase">{c.type}</Badge></TableCell><TableCell className="text-xs font-black uppercase text-foreground/80">{c.actionTaken}</TableCell><TableCell className="text-right pr-8 max-w-[400px] truncate text-[10px] italic text-muted-foreground">"{c.description}"</TableCell></TableRow>
                   ))}
                 </TableBody>
               </Table>
@@ -712,127 +427,60 @@ function PortalContent() {
 
         <TabsContent value="payroll" className="mt-0">
           <Card className="border-none ring-1 ring-border bg-card shadow-2xl overflow-hidden">
-            <CardHeader className="bg-primary/10 border-b border-border/50 py-4 px-8 flex flex-row items-center justify-between">
-              <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-primary">
-                <FileText className="size-4" /> Verified Settlement Vault
-              </CardTitle>
-              <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase gap-2 hover:bg-primary/5 transition-all"><Download className="size-3" /> Export Payslips</Button>
-            </CardHeader>
-            <CardContent className="p-20 text-center flex flex-col items-center justify-center space-y-4">
-              <Scale className="size-12 text-muted-foreground opacity-10" />
-              <p className="text-[10px] opacity-30 italic uppercase font-black tracking-[0.3em]">
-                Payroll cycle pending institutional finalization.
-              </p>
-            </CardContent>
+            <CardHeader className="bg-primary/10 border-b border-border/50 py-4 px-8 flex flex-row items-center justify-between"><CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-primary"><FileText className="size-4" /> Settlement Vault</CardTitle></CardHeader>
+            <CardContent className="p-20 text-center flex flex-col items-center justify-center space-y-4"><Scale className="size-12 text-muted-foreground opacity-10" /><p className="text-[10px] opacity-30 italic uppercase font-black">Payroll cycle pending institutional finalization.</p></CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
       {/* QUICK CLOCK DIALOG */}
       <Dialog open={isClockModalOpen} onOpenChange={setIsClockModalOpen}>
-        <DialogContent className="max-w-xs shadow-2xl ring-1 ring-border rounded-3xl overflow-hidden">
+        <DialogContent className="max-w-md shadow-2xl ring-1 ring-border rounded-3xl overflow-hidden">
           <DialogHeader className="p-0">
             <div className="bg-secondary/10 p-6 border-b border-border/50">
-              <div className="flex items-center gap-2 mb-2">
-                <Timer className="size-5 text-primary animate-pulse" />
-                <DialogTitle className="text-sm font-black uppercase tracking-widest">Shift Hub</DialogTitle>
-              </div>
-              <DialogDescription className="text-[10px] uppercase font-bold text-muted-foreground">Location Node: {resolvedBranchName}</DialogDescription>
+              <div className="flex items-center gap-2 mb-2"><Timer className="size-5 text-primary animate-pulse" /><DialogTitle className="text-sm font-black uppercase tracking-widest">Shift Hub</DialogTitle></div>
+              <DialogDescription className="text-[10px] uppercase font-bold text-muted-foreground">Node: {resolvedBranchName}</DialogDescription>
             </div>
           </DialogHeader>
-          <div className="py-10 text-center space-y-2">
-            <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-[0.3em]">Local Network Time</p>
+          <div className="py-8 text-center space-y-2">
+            <p className="text-[9px] font-black uppercase text-muted-foreground opacity-50 tracking-[0.3em]">Network Time</p>
             <p className="text-5xl font-black font-headline tracking-tighter text-primary">{format(new Date(), 'HH:mm')}</p>
           </div>
           <div className="grid grid-cols-2 gap-3 px-6 pb-6">
-            <Button 
-              onClick={() => handleClockAction('In')} 
-              disabled={isClocking} 
-              className="h-14 font-black uppercase text-xs bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-900/20 group"
-            >
-              <LogIn className="size-4 mr-2 group-hover:translate-x-1 transition-transform" /> Start
-            </Button>
-            <Button 
-              onClick={() => handleClockAction('Out')} 
-              disabled={isClocking} 
-              className="h-14 font-black uppercase text-xs bg-destructive hover:bg-destructive/90 shadow-xl shadow-destructive/20 group"
-            >
-              <LogOut className="size-4 mr-2 group-hover:-translate-x-1 transition-transform" /> End
-            </Button>
+            <Button onClick={() => handleClockAction('In')} disabled={isClocking} className="h-14 font-black uppercase text-xs bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-900/20 group"><LogIn className="size-4 mr-2" /> Start Shift</Button>
+            <Button onClick={() => handleClockAction('Out')} disabled={isClocking} className="h-14 font-black uppercase text-xs bg-destructive hover:bg-destructive/90 shadow-xl shadow-destructive/20 group"><LogOut className="size-4 mr-2" /> End Shift</Button>
+            <Button onClick={() => handleClockAction('BreakStart')} disabled={isClocking} className="h-14 font-black uppercase text-xs bg-primary hover:bg-primary/90 col-span-2 shadow-xl"><Coffee className="size-4 mr-2" /> Take Breather</Button>
           </div>
-          <div className="bg-primary/5 p-4 text-[9px] text-muted-foreground text-center border-t border-primary/10">
-            <ShieldCheck className="size-3 text-emerald-500 inline mr-1.5" /> All events are geo-tagged and hashed for institutional audit.
-          </div>
+          <div className="bg-primary/5 p-4 text-[9px] text-muted-foreground text-center border-t border-primary/10"><ShieldCheck className="size-3 text-emerald-500 inline mr-1.5" /> GPS geo-fenced. Ingress verified from {resolvedBranchName}.</div>
         </DialogContent>
       </Dialog>
 
-      {/* DYNAMIC LEAVE REQUEST DIALOG */}
+      {/* LEAVE REQUEST DIALOG */}
       <Dialog open={isLeaveModalOpen} onOpenChange={setIsLeaveModalOpen}>
         <DialogContent className="max-w-md shadow-2xl ring-1 ring-border rounded-3xl">
           <form onSubmit={handleLeaveSubmit}>
             <DialogHeader>
-              <div className="flex items-center gap-2 mb-2">
-                <CalendarDays className="size-5 text-primary" />
-                <DialogTitle className="text-lg font-bold uppercase">Raise Absence Requisition</DialogTitle>
-              </div>
-              <DialogDescription className="text-xs uppercase font-black tracking-tight text-primary">Self-Service Identity Node: {employee.firstName} {employee.lastName}</DialogDescription>
+              <div className="flex items-center gap-2 mb-2"><CalendarDays className="size-5 text-primary" /><DialogTitle className="text-lg font-bold uppercase">Raise Absence Requisition</DialogTitle></div>
+              <DialogDescription className="text-xs uppercase font-black tracking-tight text-primary">Self-Service Identity Node</DialogDescription>
             </DialogHeader>
-            
             <div className="grid gap-4 py-4 text-xs">
               <div className="space-y-2">
                 <Label className="uppercase font-bold tracking-widest opacity-60 text-primary">Eligibility Category</Label>
                 <Select name="leaveType" required>
-                  <SelectTrigger className="h-11 font-black uppercase border-none ring-1 ring-border bg-secondary/5">
-                    <SelectValue placeholder="Select Entitlement..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {leaveMatrix.map(lt => (
-                      <SelectItem key={lt.id} value={lt.name} className="text-[10px] font-black uppercase">
-                        {lt.name} ({lt.remaining} Days Remaining)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                  <SelectTrigger className="h-11 font-black uppercase border-none ring-1 ring-border bg-secondary/5"><SelectValue placeholder="Select Entitlement..." /></SelectTrigger>
+                  <SelectContent>{leaveMatrix.map(lt => <SelectItem key={lt.id} value={lt.name} className="text-[10px] font-black uppercase">{lt.name} ({lt.remaining} Days Remaining)</SelectItem>)}</SelectContent>
                 </Select>
-                <div className="flex items-center gap-2 mt-1 px-1">
-                  <Badge variant="outline" className="text-[7px] h-3.5 bg-primary/5 text-primary border-none font-black uppercase">
-                    {employee.gender === 'Male' ? <Mars className="size-2 mr-1" /> : <Venus className="size-2 mr-1" />}
-                    {employee.gender} Filter ACTIVE
-                  </Badge>
-                </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="uppercase font-bold tracking-widest opacity-60">Start Window</Label>
-                  <Input name="startDate" type="date" required className="h-11 bg-background" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="uppercase font-bold tracking-widest opacity-60">End Window</Label>
-                  <Input name="endDate" type="date" required className="h-11 bg-background" />
-                </div>
+                <div className="space-y-2"><Label className="uppercase font-bold tracking-widest opacity-60">Start Window</Label><Input name="startDate" type="date" required className="h-11 bg-background" /></div>
+                <div className="space-y-2"><Label className="uppercase font-bold tracking-widest opacity-60">End Window</Label><Input name="endDate" type="date" required className="h-11 bg-background" /></div>
               </div>
-
-              <div className="space-y-2">
-                <Label className="uppercase font-bold tracking-widest opacity-60">Justification / Reason</Label>
-                <Input name="reason" placeholder="Briefly explain the requirement..." required className="h-11 bg-secondary/5 border-none ring-1 ring-border" />
-              </div>
-
-              <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl flex gap-4 items-start text-primary shadow-inner">
-                <Sparkles className="size-5 shrink-0 mt-0.5 animate-pulse" />
-                <div className="space-y-1">
-                  <p className="text-[10px] font-black uppercase tracking-widest">Audit Logic</p>
-                  <p className="text-[11px] leading-relaxed italic font-medium">
-                    This requisition will be routed to **Institutional Management** for review. Approval will atomically update your annual balance.
-                  </p>
-                </div>
-              </div>
+              <div className="space-y-2"><Label className="uppercase font-bold tracking-widest opacity-60">Justification / Reason</Label><Input name="reason" placeholder="Briefly explain the requirement..." required className="h-11 bg-secondary/5 border-none ring-1 ring-border" /></div>
+              <div className="p-4 bg-primary/5 border border-primary/10 rounded-xl flex gap-4 items-start text-primary shadow-inner"><Sparkles className="size-5 shrink-0 mt-0.5 animate-pulse" /><div className="space-y-1"><p className="text-[10px] font-black uppercase tracking-widest">Audit Logic</p><p className="text-[11px] leading-relaxed italic font-medium">Approval will atomically update your annual balance.</p></div></div>
             </div>
-
             <DialogFooter className="bg-secondary/10 p-6 -mx-6 -mb-6 rounded-b-lg gap-2 border-t border-border/50">
               <Button type="button" variant="ghost" onClick={() => setIsLeaveModalOpen(false)} className="text-xs h-11 font-black uppercase tracking-widest">Discard</Button>
-              <Button type="submit" disabled={isSubmittingLeave} className="h-11 px-10 font-bold uppercase text-[10px] shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-2">
-                {isSubmittingLeave ? <Loader2 className="size-3 animate-spin" /> : <ArrowRight className="size-4" />} Commit Request
-              </Button>
+              <Button type="submit" disabled={isSubmittingLeave} className="h-11 px-10 font-bold uppercase text-[10px] shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-2">{isSubmittingLeave ? <Loader2 className="size-3 animate-spin" /> : <ArrowRight className="size-4" />} Commit Request</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -844,12 +492,7 @@ function PortalContent() {
 export default function PortalPage() {
   return (
     <DashboardLayout>
-      <Suspense fallback={
-        <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
-          <Loader2 className="size-10 animate-spin text-primary opacity-20" />
-          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Bootstrapping Identity Matrix...</p>
-        </div>
-      }>
+      <Suspense fallback={<div className="h-[60vh] flex flex-col items-center justify-center gap-4"><Loader2 className="size-10 animate-spin text-primary opacity-20" /><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Bootstrapping Identity Matrix...</p></div>}>
         <PortalContent />
       </Suspense>
     </DashboardLayout>

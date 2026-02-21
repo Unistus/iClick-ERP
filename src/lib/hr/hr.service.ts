@@ -91,7 +91,7 @@ export async function onboardEmployee(db: Firestore, institutionId: string, payl
   const data = {
     ...payload,
     employeeId,
-    leaveBalance: 0,
+    leaveBalance: 21, // Default allocation
     loyaltyScore: 100,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

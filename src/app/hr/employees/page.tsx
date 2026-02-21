@@ -49,6 +49,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/hooks/use-toast";
 import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 import { cn } from "@/lib/utils";
+import Link from 'next/link';
 
 export default function EmployeeDirectoryPage() {
   const db = useFirestore();
@@ -140,7 +141,7 @@ export default function EmployeeDirectoryPage() {
               </Card>
               <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm relative overflow-hidden">
                 <div className="absolute -right-4 -bottom-4 opacity-10"><ShieldCheck className="size-24" /></div>
-                <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase tracking-widest">Identity Sync</span></CardHeader>
+                <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase tracking-widest text-primary">Identity Sync</span></CardHeader>
                 <CardContent className="pb-4"><div className="text-xl font-black font-headline">LOCKED</div></CardContent>
               </Card>
             </div>
@@ -230,7 +231,7 @@ export default function EmployeeDirectoryPage() {
                               <DropdownMenuItem className="text-xs gap-3 font-bold" onClick={() => router.push(`/hr/employees/manage?instId=${selectedInstId}&id=${emp.id}`)}>
                                 <Edit2 className="size-3.5 text-primary" /> Refine Identity Node
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="text-xs gap-3 font-bold">
+                              <DropdownMenuItem className="text-xs gap-3 font-bold" onClick={() => router.push(`/hr/employees/portal/${emp.id}?instId=${selectedInstId}`)}>
                                 <UserCog className="size-3.5 text-accent" /> Personnel Self-Service Portal
                               </DropdownMenuItem>
                               <DropdownMenuItem className="text-xs gap-3 font-bold">

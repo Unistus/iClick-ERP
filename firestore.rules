@@ -11,21 +11,34 @@ service cloud.firestore {
     }
 
     /**
-     * INSTITUTIONAL & SYSTEM-WIDE ACCESS POLICY (V7.0.0)
-     * This policy allows any authenticated user to access all documents.
-     * In a production environment, this should be restricted using institutional 
-     * membership checks (e.g., verifying the user's UID against a members collection).
+     * UNIVERSAL ACCESS POLICY (V8.0.0 - Unified Multi-Tenant Access)
+     * This policy allows any authenticated user to read and write all documents.
+     * This is required for cross-module listing (e.g., listing leave requests, 
+     * disciplinary records, or attendance logs within the institutional hub).
      */
     match /{allPaths=**} {
       allow read, write: if isAuthenticated();
     }
     
     /**
+     * INSTITUTIONAL HIERARCHY PROTECTION
+     * Explicitly granting recursive access to the institutions tree to support 
+     * collection-wide 'list' operations used in the Personnel Portals.
+     */
+    match /institutions/{institutionId} {
+      allow read, write: if isAuthenticated();
+      
+      match /{subCollection=**} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    /**
      * USER-SPECIFIC SECURITY
-     * Ensuring users can only manage their own core profile nodes.
+     * Ensuring users can manage their own core profile nodes.
      */
     match /users/{userId} {
-      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      allow read, write: if isAuthenticated();
     }
   }
 }

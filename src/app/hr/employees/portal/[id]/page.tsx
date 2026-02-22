@@ -111,6 +111,17 @@ function PortalContent() {
   }, [db, selectedInstId, employeeId]);
   const { data: payslips } = useCollection(payslipsQuery);
 
+  // Data Fetching: Loans & Advances for specific employee
+  const loansQuery = useMemoFirebase(() => {
+    if (!selectedInstId || !employeeId) return null;
+    return query(
+      collection(db, 'institutions', selectedInstId, 'loans'), 
+      where('employeeId', '==', employeeId),
+      orderBy('createdAt', 'desc')
+    );
+  }, [db, selectedInstId, employeeId]);
+  const { data: loans } = useCollection(loansQuery);
+
   // Data Fetching: Global Leave Types
   const leaveTypesRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -284,6 +295,7 @@ function PortalContent() {
             <TabsTrigger value="profile" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><User className="size-3.5" /> Identity</TabsTrigger>
             <TabsTrigger value="leave" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><CalendarDays className="size-3.5" /> Absence</TabsTrigger>
             <TabsTrigger value="payroll" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><HandCoins className="size-3.5" /> Payslips</TabsTrigger>
+            <TabsTrigger value="loans" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Wallet className="size-3.5" /> Loans</TabsTrigger>
             <TabsTrigger value="training" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><GraduationCap className="size-3.5" /> Learning</TabsTrigger>
             <TabsTrigger value="performance" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Star className="size-3.5" /> Scorecard</TabsTrigger>
             <TabsTrigger value="attendance" className="text-xs font-black uppercase tracking-widest gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Timer className="size-3.5" /> Shifts</TabsTrigger>
@@ -401,7 +413,7 @@ function PortalContent() {
                           <CheckCircle2 className="size-2 mr-1.5" /> VERIFIED SLIP
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right font-mono font-black text-sm text-emerald-500">
+                      <TableCell className="text-right font-mono text-xs font-black text-emerald-500">
                         KES {ps.netSalary?.toLocaleString()}
                       </TableCell>
                       <TableCell className="text-right pr-8">
@@ -413,6 +425,61 @@ function PortalContent() {
                       </TableCell>
                     </TableRow>
                   ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="loans" className="mt-0 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
+            <CardHeader className="bg-secondary/10 border-b py-4 px-8 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500 shadow-inner"><Wallet className="size-5" /></div>
+                <div>
+                  <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">Financial Advances & Arrears</CardTitle>
+                  <CardDescription className="text-[10px]">Active credit recoupment and settlement plans.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader className="bg-secondary/30">
+                  <TableRow>
+                    <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Credit Node</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase">Status</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase text-right">Settlement Arrears</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase text-right">Monthly Recovery</TableHead>
+                    <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Lifecycle</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {!loans?.length ? (
+                    <TableRow><TableCell colSpan={5} className="text-center py-24 text-[10px] opacity-20 uppercase font-black italic">No financial liabilities detected.</TableCell></TableRow>
+                  ) : loans.map(l => {
+                    const progress = ((l.principal - l.balance) / l.principal) * 100;
+                    return (
+                      <TableRow key={l.id} className="h-20 hover:bg-amber-500/5 transition-all group border-b-border/30">
+                        <TableCell className="pl-8">
+                          <p className="text-xs font-black uppercase tracking-tight">{l.type || 'Staff Advance'}</p>
+                          <p className="text-[8px] text-muted-foreground font-mono uppercase">Issued: {l.createdAt?.toDate ? format(l.createdAt.toDate(), 'dd MMM yy') : '...'}</p>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={cn("text-[8px] h-5 px-2 uppercase font-black border-none ring-1", l.status === 'Active' ? 'bg-amber-500/10 text-amber-500 ring-amber-500/20' : 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20')}>{l.status}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <p className="text-xs font-black font-mono text-primary">KES {l.balance?.toLocaleString()}</p>
+                          <Progress value={progress} className="h-1 mt-1 w-32 ml-auto" />
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs font-bold text-destructive">
+                          - KES {l.monthlyRecovery?.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right pr-8">
+                          <span className="text-[10px] font-black uppercase opacity-40">{progress.toFixed(0)}% SETTLED</span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -510,7 +577,7 @@ function PortalContent() {
               </div>
             </div>
             <div className="text-center py-4 relative z-10">
-              <p className="text-[10px] font-black uppercase opacity-60 tracking-[0.4em] mb-2">Network Time (EAT)</p>
+              <p className="text-[9px] font-black uppercase opacity-60 tracking-[0.4em] mb-2">Network Time (EAT)</p>
               <p className="text-6xl font-black font-headline tracking-tighter drop-shadow-2xl">{format(new Date(), 'HH:mm')}</p>
             </div>
           </div>

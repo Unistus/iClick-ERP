@@ -165,9 +165,18 @@ export function calculateNetSalary(
 
 export async function processLoanRepayment(db: Firestore, institutionId: string, loanId: string, amount: number) {
   const ref = doc(db, 'institutions', institutionId, 'loans', loanId);
-  return updateDoc(ref, {
-    balance: increment(-amount),
-    updatedAt: serverTimestamp()
+  return runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(ref);
+    if (!snap.exists()) return;
+    const loan = snap.data();
+    const newBalance = Math.max(0, (loan.balance || 0) - amount);
+    const newStatus = newBalance <= 0 ? 'Cleared' : 'Active';
+    
+    transaction.update(ref, {
+      balance: newBalance,
+      status: newStatus,
+      updatedAt: serverTimestamp()
+    });
   });
 }
 
@@ -274,7 +283,7 @@ export async function createPayrollRun(db: Firestore, institutionId: string, per
   }
 
   await batch.commit();
-  return newRun;
+  return { id: newRun.id, ...newRun };
 }
 
 /**
@@ -321,7 +330,7 @@ export async function finalizeAndPostPayroll(db: Firestore, institutionId: strin
       transaction.set(doc(payslipVault), {
         ...item,
         slipNumber,
-        periodId: run.periodId,
+        periodName: run.periodId, // Using periodId as name for MVP
         runId: runId,
         institutionId,
         createdAt: serverTimestamp()
@@ -337,8 +346,10 @@ export async function finalizeAndPostPayroll(db: Firestore, institutionId: strin
       loansSnap.docs.forEach(lDoc => {
         const loan = lDoc.data();
         const deduct = loan.monthlyRecovery || 0;
+        const newBalance = Math.max(0, (loan.balance || 0) - deduct);
         transaction.update(lDoc.ref, {
-          balance: increment(-deduct),
+          balance: newBalance,
+          status: newBalance <= 0 ? 'Cleared' : 'Active',
           updatedAt: serverTimestamp()
         });
       });
@@ -357,7 +368,7 @@ export async function finalizeAndPostPayroll(db: Firestore, institutionId: strin
           { accountId: setup.netPayableAccountId, amount: totalNet, type: 'Credit' },
           // CR: PAYE Liability
           { accountId: setup.payeAccountId, amount: totalPAYE, type: 'Credit' },
-          // CR: NSSF/SHA/Housing (Grouped for MVP simplicity)
+          // CR: NSSF/SHA/Housing
           { accountId: setup.statutoryLiabilityAccountId || setup.payeAccountId, amount: totalNSSF + totalSHA + totalHousing, type: 'Credit' },
         ]
       });
@@ -369,6 +380,10 @@ export async function finalizeAndPostPayroll(db: Firestore, institutionId: strin
       totalGross,
       totalNet,
       totalDeductions: totalGross - totalNet,
+      totalPAYE,
+      totalNSSF,
+      totalSHA,
+      totalHousing,
       updatedAt: serverTimestamp()
     });
   });

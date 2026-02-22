@@ -1,6 +1,8 @@
 'use client';
 
-import { Firestore, collection, doc, serverTimestamp, getDoc, setDoc, query, where, getDocs, writeBatch, increment, addDoc, deleteDoc } from 'firebase/firestore';
+import { Firestore, collection, doc, serverTimestamp, getDoc, setDoc, query, where, getDocs, writeBatch, increment, addDoc, deleteDoc, runTransaction } from 'firebase/firestore';
+import { getNextSequence } from '../sequence-service';
+import { postJournalEntry } from '../accounting/journal.service';
 
 /**
  * @fileOverview Core logic for the Payroll Engine.
@@ -96,7 +98,6 @@ export async function bootstrapPayrollFinancials(db: Firestore, institutionId: s
 
 /**
  * Calculates full payroll breakdown based on institutional statutory settings.
- * Now factors in dynamic recurring earnings and deductions.
  */
 export function calculateNetSalary(
   basicPay: number, 
@@ -206,4 +207,169 @@ export async function assignEmployeeDeduction(db: Firestore, institutionId: stri
 export async function removeEmployeeDeduction(db: Firestore, institutionId: string, employeeId: string, assignmentId: string) {
   const ref = doc(db, 'institutions', institutionId, 'employees', employeeId, 'deductions', assignmentId);
   return deleteDoc(ref);
+}
+
+/**
+ * Orchestration service to initialize a payroll cycle and generate its draft worksheet.
+ */
+export async function createPayrollRun(db: Firestore, institutionId: string, periodId: string, userId: string) {
+  const runNumber = await getNextSequence(db, institutionId, 'payroll_run');
+  const runRef = collection(db, 'institutions', institutionId, 'payroll_runs');
+  
+  // 1. Create the Master Run Record
+  const newRun = await addDoc(runRef, {
+    runNumber,
+    periodId,
+    status: 'Draft',
+    totalGross: 0,
+    totalNet: 0,
+    totalDeductions: 0,
+    createdBy: userId,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+
+  // 2. Fetch Active Employees
+  const employeesSnap = await getDocs(query(
+    collection(db, 'institutions', institutionId, 'employees'),
+    where('status', '==', 'Active')
+  ));
+
+  // 3. Fetch Statutory Settings
+  const setupSnap = await getDoc(doc(db, 'institutions', institutionId, 'settings', 'payroll'));
+  const settings = setupSnap.data() as StatutorySettings;
+
+  // 4. Populate Run Items (Draft Computation)
+  const batch = writeBatch(db);
+  const itemsRef = collection(db, 'institutions', institutionId, 'payroll_runs', newRun.id, 'items');
+
+  for (const empDoc of employeesSnap.docs) {
+    const emp = { id: empDoc.id, ...empDoc.data() } as any;
+    
+    // Fetch recurring components for this specific employee
+    const [earningsSnap, deductionsSnap, loansSnap] = await Promise.all([
+      getDocs(collection(db, 'institutions', institutionId, 'employees', emp.id, 'earnings')),
+      getDocs(collection(db, 'institutions', institutionId, 'employees', emp.id, 'deductions')),
+      getDocs(query(collection(db, 'institutions', institutionId, 'loans'), where('employeeId', '==', emp.id), where('status', '==', 'Active')))
+    ]);
+
+    const recurringEarnings = earningsSnap.docs.map(d => ({ type: { isTaxable: true, isPensionable: true } as any, amount: d.data().amount }));
+    const recurringDeductions = deductionsSnap.docs.map(d => ({ type: { isStatutory: false } as any, amount: d.data().amount }));
+    
+    // Add loan repayments to custom deductions
+    loansSnap.docs.forEach(d => {
+      recurringDeductions.push({ type: { isStatutory: false } as any, amount: d.data().monthlyRecovery || 0 });
+    });
+
+    const computation = calculateNetSalary(emp.salary || 0, settings, recurringEarnings, recurringDeductions);
+
+    batch.set(doc(itemsRef), {
+      employeeId: emp.id,
+      employeeName: `${emp.firstName} ${emp.lastName}`,
+      basicPay: emp.salary || 0,
+      ...computation,
+      status: 'Computed',
+      createdAt: serverTimestamp()
+    });
+  }
+
+  await batch.commit();
+  return newRun;
+}
+
+/**
+ * Orchestration service to finalize and post a payroll cycle.
+ * Generates payslips and auto-posts to General Ledger.
+ */
+export async function finalizeAndPostPayroll(db: Firestore, institutionId: string, runId: string) {
+  const runRef = doc(db, 'institutions', institutionId, 'payroll_runs', runId);
+  const itemsRef = collection(db, 'institutions', institutionId, 'payroll_runs', runId, 'items');
+  const setupRef = doc(db, 'institutions', institutionId, 'settings', 'payroll');
+  
+  return runTransaction(db, async (transaction) => {
+    const [runSnap, setupSnap, itemsSnap] = await Promise.all([
+      transaction.get(runRef),
+      transaction.get(setupRef),
+      getDocs(itemsRef)
+    ]);
+
+    if (!runSnap.exists()) throw new Error("Run not found");
+    const run = runSnap.data();
+    const setup = setupSnap.data();
+
+    // 1. Accumulate Totals
+    let totalGross = 0;
+    let totalNet = 0;
+    let totalPAYE = 0;
+    let totalNSSF = 0;
+    let totalSHA = 0;
+    let totalHousing = 0;
+
+    const payslipVault = collection(db, 'institutions', institutionId, 'payslips');
+
+    for (const itemDoc of itemsSnap.docs) {
+      const item = itemDoc.data();
+      totalGross += item.gross;
+      totalNet += item.netSalary;
+      totalPAYE += item.paye;
+      totalNSSF += item.nssf;
+      totalSHA += item.sha;
+      totalHousing += item.housingLevy;
+
+      // 2. Generate Immutable Payslip
+      const slipNumber = `PS-${Date.now()}-${item.employeeId.slice(0, 4)}`;
+      transaction.set(doc(payslipVault), {
+        ...item,
+        slipNumber,
+        periodId: run.periodId,
+        runId: runId,
+        institutionId,
+        createdAt: serverTimestamp()
+      });
+
+      // 3. Process Loan Deductions
+      const loansSnap = await getDocs(query(
+        collection(db, 'institutions', institutionId, 'loans'), 
+        where('employeeId', '==', item.employeeId), 
+        where('status', '==', 'Active')
+      ));
+      
+      loansSnap.docs.forEach(lDoc => {
+        const loan = lDoc.data();
+        const deduct = loan.monthlyRecovery || 0;
+        transaction.update(lDoc.ref, {
+          balance: increment(-deduct),
+          updatedAt: serverTimestamp()
+        });
+      });
+    }
+
+    // 4. Auto-Post to Ledger (Double Entry)
+    if (setup?.autoPostToLedger) {
+      await postJournalEntry(db, institutionId, {
+        date: new Date(),
+        description: `Payroll Run Finalization: ${run.runNumber}`,
+        reference: run.runNumber,
+        items: [
+          // DR: Salaries Expense
+          { accountId: setup.basicSalaryExpenseId, amount: totalGross, type: 'Debit' },
+          // CR: Net Salaries Payable
+          { accountId: setup.netPayableAccountId, amount: totalNet, type: 'Credit' },
+          // CR: PAYE Liability
+          { accountId: setup.payeAccountId, amount: totalPAYE, type: 'Credit' },
+          // CR: NSSF/SHA/Housing (Grouped for MVP simplicity)
+          { accountId: setup.statutoryLiabilityAccountId || setup.payeAccountId, amount: totalNSSF + totalSHA + totalHousing, type: 'Credit' },
+        ]
+      });
+    }
+
+    // 5. Update Master Run Record
+    transaction.update(runRef, {
+      status: 'Posted',
+      totalGross,
+      totalNet,
+      totalDeductions: totalGross - totalNet,
+      updatedAt: serverTimestamp()
+    });
+  });
 }

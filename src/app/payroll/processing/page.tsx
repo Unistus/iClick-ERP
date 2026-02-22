@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -28,10 +27,13 @@ import {
   FileText,
   BadgeCent,
   TrendingUp,
-  AlertCircle
+  AlertCircle,
+  Eye,
+  ArrowLeft,
+  Lock
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { createPayrollRun } from "@/lib/hr/hr.service";
+import { createPayrollRun, finalizeAndPostPayroll } from "@/lib/payroll/payroll.service";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -43,6 +45,7 @@ export default function PayrollProcessingPage() {
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isRunModalOpen, setIsRunModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
   const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
@@ -60,13 +63,14 @@ export default function PayrollProcessingPage() {
   }, [db, selectedInstId]);
   const { data: activePeriods } = useCollection(periodsQuery);
 
-  const settingsRef = useMemoFirebase(() => {
-    if (!selectedInstId) return null;
-    return doc(db, 'institutions', selectedInstId, 'settings', 'global');
-  }, [db, selectedInstId]);
-  const { data: settings } = useDoc(settingsRef);
+  // Data Fetching: Run Items (Worksheet)
+  const itemsQuery = useMemoFirebase(() => {
+    if (!selectedInstId || !selectedRunId) return null;
+    return collection(db, 'institutions', selectedInstId, 'payroll_runs', selectedRunId, 'items');
+  }, [db, selectedInstId, selectedRunId]);
+  const { data: worksheetItems, isLoading: itemsLoading } = useCollection(itemsQuery);
 
-  const currency = settings?.general?.currencySymbol || "KES";
+  const selectedRun = runs?.find(r => r.id === selectedRunId);
 
   const handleInitializeRun = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -77,15 +81,92 @@ export default function PayrollProcessingPage() {
     const periodId = formData.get('periodId') as string;
 
     try {
-      await createPayrollRun(db, selectedInstId, periodId, user.uid);
+      const newRun = await createPayrollRun(db, selectedInstId, periodId, user.uid);
       toast({ title: "Remuneration Cycle Initialized", description: "Computing statutory and net pay nodes..." });
       setIsRunModalOpen(false);
+      if (newRun) setSelectedRunId(newRun.id);
     } catch (err) {
       toast({ variant: "destructive", title: "Initialization Failed" });
     } finally {
       setIsProcessing(false);
     }
   };
+
+  const handlePostRun = async () => {
+    if (!selectedInstId || !selectedRunId || isProcessing) return;
+    setIsProcessing(true);
+    try {
+      await finalizeAndPostPayroll(db, selectedInstId, selectedRunId);
+      toast({ title: "Payroll Run Posted", description: "Ledger updated and payslips generated." });
+      setSelectedRunId(null);
+    } catch (err) {
+      toast({ variant: "destructive", title: "Posting Failed" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  if (selectedRunId) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => setSelectedRunId(null)} className="rounded-full">
+              <ArrowLeft className="size-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-headline font-bold">Audit Worksheet</h1>
+              <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-1">Reviewing: {selectedRun?.runNumber}</p>
+            </div>
+            {selectedRun?.status === 'Draft' && (
+              <Button 
+                onClick={handlePostRun} 
+                disabled={isProcessing} 
+                className="ml-auto gap-2 px-8 font-black uppercase text-xs h-10 shadow-xl bg-emerald-600 hover:bg-emerald-700"
+              >
+                {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <Lock className="size-4" />} Finalize & Post to Ledger
+              </Button>
+            )}
+          </div>
+
+          <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
+            <CardHeader className="bg-secondary/10 border-b border-border/50 flex flex-row items-center justify-between py-4">
+              <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em]">Personnel Net Settlement Matrix</CardTitle>
+              <Badge variant="secondary" className="text-[8px] bg-primary/10 text-primary uppercase font-black">Period: {selectedRun?.periodId}</Badge>
+            </CardHeader>
+            <CardContent className="p-0 overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-secondary/20">
+                  <TableRow>
+                    <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Employee</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase text-right">Gross</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase text-right">PAYE</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase text-right">Statutory</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase text-right">Custom Ded.</TableHead>
+                    <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Net Pay</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {itemsLoading ? (
+                    <TableRow><TableCell colSpan={6} className="text-center py-12 text-xs animate-pulse">Computing Matrix...</TableCell></TableRow>
+                  ) : worksheetItems?.map(item => (
+                    <TableRow key={item.id} className="h-14 hover:bg-secondary/5 border-b-border/30">
+                      <TableCell className="pl-8 font-bold text-xs uppercase tracking-tight">{item.employeeName}</TableCell>
+                      <TableCell className="text-right font-mono text-xs opacity-60">{item.gross?.toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-mono text-xs text-destructive">{item.paye?.toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-mono text-xs text-destructive">{(item.nssf + item.sha + item.housingLevy)?.toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-mono text-xs text-destructive">{item.customDeductions?.toLocaleString()}</TableCell>
+                      <TableCell className="text-right pr-8 font-mono text-xs font-black text-emerald-500">{item.netSalary?.toLocaleString()}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -96,15 +177,15 @@ export default function PayrollProcessingPage() {
               <RefreshCw className="size-6" />
             </div>
             <div>
-              <h1 className="text-3xl font-headline font-bold text-foreground">Processing Hub</h1>
-              <p className="text-[10px] text-muted-foreground uppercase font-black tracking-[0.2em] mt-1">Multi-stage Lifecycle Control</p>
+              <h1 className="text-3xl font-headline font-bold text-foreground">Settlement Hub</h1>
+              <p className="text-[10px] text-muted-foreground uppercase font-black tracking-[0.2em] mt-1">Institutional Remuneration Lifecycle</p>
             </div>
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
               <SelectTrigger className="w-[240px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
-                <SelectValue placeholder={instLoading ? "Validating Access..." : "Select Institution"} />
+                <SelectValue placeholder={instLoading ? "Authorizing..." : "Select Institution"} />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (
@@ -114,7 +195,7 @@ export default function PayrollProcessingPage() {
             </Select>
 
             <Button size="sm" className="gap-2 h-10 px-6 text-xs font-bold uppercase shadow-lg bg-emerald-600 hover:bg-emerald-700" disabled={!selectedInstId} onClick={() => setIsRunModalOpen(true)}>
-              <Plus className="size-4" /> Start Cycle
+              <Plus className="size-4" /> New Cycle
             </Button>
           </div>
         </div>
@@ -127,33 +208,25 @@ export default function PayrollProcessingPage() {
         ) : (
           <div className="space-y-6 animate-in fade-in duration-700">
             <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
-              <CardHeader className="py-4 px-6 border-b border-border/50 bg-secondary/10 flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="space-y-0.5">
-                  <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">Institutional Run Ledger</CardTitle>
-                  <CardDescription className="text-[10px]">Real-time synchronization with HR and Sales nodes.</CardDescription>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="text-[10px] font-bold uppercase text-primary border-primary/20 bg-primary/5 h-8 px-4">
-                    {runs?.length || 0} Historical Cycles
-                  </Badge>
-                </div>
+              <CardHeader className="py-4 px-6 border-b border-border/50 bg-secondary/10">
+                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em]">Institutional Run Registry</CardTitle>
               </CardHeader>
               <CardContent className="p-0 overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-secondary/20">
                     <TableRow>
                       <TableHead className="h-12 text-[9px] font-black uppercase pl-8 text-muted-foreground">Run Reference</TableHead>
-                      <TableHead className="h-12 text-[9px] font-black uppercase text-muted-foreground">Period Node</TableHead>
+                      <TableHead className="h-12 text-[9px] font-black uppercase text-muted-foreground">Audit Period</TableHead>
                       <TableHead className="h-12 text-[9px] font-black uppercase text-center text-muted-foreground">Workflow Stage</TableHead>
-                      <TableHead className="h-12 text-[9px] font-black uppercase text-right text-muted-foreground">Net Commitment</TableHead>
-                      <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase text-muted-foreground">Management</TableHead>
+                      <TableHead className="h-12 text-[9px] font-black uppercase text-right text-muted-foreground">Net Disbursement</TableHead>
+                      <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase text-muted-foreground">Command</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {runsLoading ? (
                       <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse uppercase font-black">Syncing Cycles...</TableCell></TableRow>
                     ) : (!runs || runs.length === 0) ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-24 text-xs text-muted-foreground uppercase font-black tracking-widest opacity-20 italic">Initialize a cycle to begin processing.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center py-24 text-xs text-muted-foreground uppercase font-black tracking-widest opacity-20 italic">No payroll cycles have been initialized.</TableCell></TableRow>
                     ) : runs.map((run) => (
                       <TableRow key={run.id} className="h-16 hover:bg-secondary/10 transition-colors border-b-border/30 group">
                         <TableCell className="pl-8">
@@ -183,8 +256,13 @@ export default function PayrollProcessingPage() {
                           {currency} {run.totalNet?.toLocaleString() || 0}
                         </TableCell>
                         <TableCell className="text-right pr-8">
-                          <Button variant="ghost" size="sm" className="h-9 px-4 text-[9px] font-black uppercase gap-2 hover:bg-primary/10 hover:text-primary transition-all group-hover:scale-105">
-                            Audit Worksheet <ArrowRight className="size-3" />
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-9 px-4 text-[9px] font-black uppercase gap-2 hover:bg-primary/10 hover:text-primary transition-all group-hover:scale-105"
+                            onClick={() => setSelectedRunId(run.id)}
+                          >
+                            {run.status === 'Draft' ? 'Audit Worksheet' : 'View Summary'} <ArrowRight className="size-3" />
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -200,10 +278,10 @@ export default function PayrollProcessingPage() {
                 <div className="flex flex-col gap-4 relative z-10">
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="size-5 text-primary" />
-                    <p className="text-[10px] font-black uppercase text-primary tracking-[0.2em]">Computation Guard</p>
+                    <p className="text-[10px] font-black uppercase text-primary tracking-[0.2em]">Computation Node</p>
                   </div>
                   <p className="text-[11px] leading-relaxed text-muted-foreground font-medium italic">
-                    "The processing engine automatically cross-references finalized **Attendance Logs**, **Absence Requisitions**, and **Sales Commissions**. Once 'Posted', the system freezes the period and generates verified payslips for all staff nodes."
+                    "Initializing a run aggregates all approved **Attendance Logs**, **Leave Records**, and **Recurring Salary Nodes**. The final stage performs an atomic GL posting and generates immutable payslips for the staff vault."
                   </p>
                 </div>
               </Card>
@@ -212,7 +290,7 @@ export default function PayrollProcessingPage() {
                   <p className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2 tracking-widest">
                     <Zap className="size-3 text-amber-500" /> Ledger Automation
                   </p>
-                  <p className="text-[11px] font-bold leading-tight max-w-[250px]">Finalizing a run triggers a double-entry event: DR Salaries Expense, CR Net Salaries Payable liability node.</p>
+                  <p className="text-[11px] font-bold leading-tight max-w-[250px]">Finalizing a cycle run triggers automatic journal entries across mapped Salaries, Tax, and Statutory liability accounts.</p>
                 </div>
                 <Landmark className="size-10 text-primary opacity-10 group-hover:opacity-100 transition-all duration-700 animate-pulse" />
               </div>
@@ -220,16 +298,15 @@ export default function PayrollProcessingPage() {
           </div>
         )}
 
-        {/* INITIALIZE RUN DIALOG */}
         <Dialog open={isRunModalOpen} onOpenChange={setIsRunModalOpen}>
           <DialogContent className="max-w-md shadow-2xl ring-1 ring-border rounded-[2.5rem] overflow-hidden">
             <form onSubmit={handleInitializeRun}>
               <DialogHeader className="bg-secondary/10 p-8 border-b">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500"><BadgeCent className="size-5" /></div>
-                  <DialogTitle className="text-sm font-black uppercase tracking-widest">Initialize Settlement Run</DialogTitle>
+                  <DialogTitle className="text-sm font-black uppercase tracking-widest">Initialize Cycle Run</DialogTitle>
                 </div>
-                <CardDescription className="text-[9px] uppercase font-bold text-muted-foreground">Remuneration Provisioning Node v4.2</CardDescription>
+                <CardDescription className="text-[9px] uppercase font-bold text-muted-foreground">Provisioning Node v4.2</CardDescription>
               </DialogHeader>
               
               <div className="p-8 space-y-6 text-xs">
@@ -250,7 +327,7 @@ export default function PayrollProcessingPage() {
                   <div className="space-y-1">
                     <p className="text-[10px] font-black uppercase tracking-widest">Engine Handshake</p>
                     <p className="text-[11px] leading-relaxed italic font-medium">
-                      Initializing this run will aggregate all approved attendance logs and leave records into a draft settlement worksheet for audit.
+                      Initializing this run will freeze the selected period and compile a dynamic worksheet based on the latest staff remuneration nodes.
                     </p>
                   </div>
                 </div>

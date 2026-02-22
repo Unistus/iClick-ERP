@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, Suspense, useEffect } from 'react';
@@ -59,7 +58,8 @@ import {
   HandCoins,
   Smartphone,
   SmartphoneNfc,
-  PlayCircle
+  PlayCircle,
+  FileBadge
 } from "lucide-react";
 import { format, differenceInDays, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -99,7 +99,7 @@ function PortalContent() {
   }, [db, selectedInstId, employeeId]);
   const { data: employee, isLoading: empLoading } = useDoc(empRef);
 
-  // Data Fetching: Payslips
+  // Data Fetching: Payslips Registry
   const payslipsQuery = useMemoFirebase(() => {
     if (!selectedInstId || !employeeId) return null;
     return query(
@@ -147,16 +147,6 @@ function PortalContent() {
     );
   }, [db, selectedInstId, employeeId]);
   const { data: reviews } = useCollection(reviewsQuery);
-
-  // Data Fetching: Conduct & Disciplinary Archive
-  const conductQuery = useMemoFirebase(() => {
-    if (!selectedInstId || !employeeId) return null;
-    return query(
-      collection(db, 'institutions', selectedInstId, 'disciplinary_records'), 
-      where('employeeId', '==', employeeId)
-    );
-  }, [db, selectedInstId, employeeId]);
-  const { data: conduct } = useCollection(conductQuery);
 
   // Data Fetching: Real-time Attendance Stream
   const attQuery = useMemoFirebase(() => {
@@ -380,8 +370,8 @@ function PortalContent() {
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 shadow-inner"><HandCoins className="size-5" /></div>
                 <div>
-                  <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">Payslip Vault</CardTitle>
-                  <CardDescription className="text-[10px]">Your verified remuneration records.</CardDescription>
+                  <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">Remuneration Vault</CardTitle>
+                  <CardDescription className="text-[10px]">Verified digital payslips and statutory summaries.</CardDescription>
                 </div>
               </div>
             </CardHeader>
@@ -389,24 +379,36 @@ function PortalContent() {
               <Table>
                 <TableHeader className="bg-secondary/30">
                   <TableRow>
-                    <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Pay Period</TableHead>
-                    <TableHead className="h-12 text-[9px] font-black uppercase">Gross Earnings</TableHead>
-                    <TableHead className="h-12 text-[9px] font-black uppercase">Statutory Ded.</TableHead>
-                    <TableHead className="h-12 text-[9px] font-black uppercase text-right pr-8">Net Payout</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Period Reference</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase text-center">Lifecycle</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase text-right">Net Take-home</TableHead>
+                    <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Command</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {!payslips?.length ? (
-                    <TableRow><TableCell colSpan={4} className="text-center py-24 text-[10px] opacity-20 uppercase font-black italic">No finalized records in vault.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="text-center py-24 text-[10px] opacity-20 uppercase font-black italic">No finalized records in identity vault.</TableCell></TableRow>
                   ) : payslips.map(ps => (
-                    <TableRow key={ps.id} className="h-16 hover:bg-emerald-500/5 transition-all group">
-                      <TableCell className="pl-8 font-black uppercase text-xs">{ps.periodName}</TableCell>
-                      <TableCell className="font-mono text-xs opacity-60">KES {ps.gross?.toLocaleString()}</TableCell>
-                      <TableCell className="font-mono text-xs text-destructive">KES {ps.deductions?.toLocaleString()}</TableCell>
+                    <TableRow key={ps.id} className="h-16 hover:bg-emerald-500/5 transition-all group border-b-border/30">
+                      <TableCell className="pl-8">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-primary/10 text-primary"><FileBadge className="size-4" /></div>
+                          <span className="font-black uppercase text-xs">{ps.periodName}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="text-[8px] h-5 bg-emerald-500/10 text-emerald-500 border-none ring-1 ring-emerald-500/20 font-black uppercase">
+                          <CheckCircle2 className="size-2 mr-1.5" /> VERIFIED SLIP
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-mono font-black text-sm text-emerald-500">
+                        KES {ps.netSalary?.toLocaleString()}
+                      </TableCell>
                       <TableCell className="text-right pr-8">
-                        <div className="flex items-center justify-end gap-4">
-                          <span className="font-mono font-black text-sm text-emerald-500">KES {ps.net?.toLocaleString()}</span>
-                          <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100 transition-opacity"><Download className="size-4" /></Button>
+                        <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-all">
+                          <Button size="sm" variant="ghost" className="h-8 px-4 text-[9px] font-black uppercase gap-2 hover:bg-primary/10 text-primary">
+                            <Download className="size-3.5" /> Export PDF
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -431,14 +433,9 @@ function PortalContent() {
                   <CardTitle className="text-sm font-black uppercase leading-tight tracking-tight">{en.courseName}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[8px] font-black uppercase"><span>Course Progress</span><span className="text-primary">{en.progress || 0}%</span></div>
-                    <Progress value={en.progress || 0} className="h-1 bg-secondary shadow-inner" />
-                  </div>
+                  <div className="space-y-1.5"><div className="flex justify-between text-[8px] font-black uppercase"><span>Course Progress</span><span className="text-primary">{en.progress || 0}%</span></div><Progress value={en.progress || 0} className="h-1 bg-secondary shadow-inner" /></div>
                 </CardContent>
-                <CardFooter className="bg-secondary/10 border-t border-border/50 p-4">
-                  <Button className="w-full h-9 font-black uppercase text-[10px] gap-2 shadow-lg bg-primary hover:bg-primary/90"><PlayCircle className="size-3.5" /> Resume Learning</Button>
-                </CardFooter>
+                <CardFooter className="bg-secondary/10 border-t border-border/50 p-4"><Button className="w-full h-9 font-black uppercase text-[10px] gap-2 shadow-lg bg-primary hover:bg-primary/90"><PlayCircle className="size-3.5" /> Resume Learning</Button></CardFooter>
               </Card>
             ))}
           </div>
@@ -450,7 +447,7 @@ function PortalContent() {
               <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6 flex items-center justify-between"><CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-accent"><Star className="size-4" /> Growth History</CardTitle></CardHeader>
               <CardContent className="p-0">
                 <Table>
-                  <TableHeader className="bg-secondary/20"><TableRow><TableHead className="h-12 text-[9px] font-black uppercase pl-8">Review Date</TableHead><TableHead className="h-12 text-[9px] font-black uppercase text-center">Score</TableHead><TableHead className="h-12 text-[9px] font-black uppercase">Feedback Summary</TableHead></TableRow></TableHeader>
+                  <TableHeader className="bg-secondary/30"><TableRow><TableHead className="h-12 text-[9px] font-black uppercase pl-8">Review Date</TableHead><TableHead className="h-12 text-[9px] font-black uppercase text-center">Score</TableHead><TableHead className="h-12 text-[9px] font-black uppercase">Feedback Summary</TableHead></TableRow></TableHeader>
                   <TableBody>
                     {!reviews?.length ? <TableRow><TableCell colSpan={3} className="text-center py-20 text-[10px] opacity-30 italic uppercase font-black">No audits found.</TableCell></TableRow> : reviews.map(r => (
                       <TableRow key={r.id} className="h-20 hover:bg-secondary/5 border-b-border/30 transition-colors">
@@ -481,7 +478,7 @@ function PortalContent() {
             <CardHeader className="bg-secondary/10 border-b py-4 px-8"><CardTitle className="text-sm font-black uppercase tracking-[0.2em] flex items-center gap-2 text-primary"><Timer className="size-4" /> Live Shift Stream</CardTitle></CardHeader>
             <CardContent className="p-0">
               <Table>
-                <TableHeader className="bg-secondary/20"><TableRow><TableHead className="h-12 text-[9px] font-black uppercase pl-8">Timestamp</TableHead><TableHead className="h-12 text-[9px] font-black uppercase text-center">Direction</TableHead><TableHead className="h-12 text-[9px] font-black uppercase">Institutional Node</TableHead><TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Proof</TableHead></TableRow></TableHeader>
+                <TableHeader className="bg-secondary/30"><TableRow><TableHead className="h-12 text-[9px] font-black uppercase pl-8">Timestamp</TableHead><TableHead className="h-12 text-[9px] font-black uppercase text-center">Direction</TableHead><TableHead className="h-12 text-[9px] font-black uppercase">Institutional Node</TableHead><TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Proof</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {!attendance?.length ? <TableRow><TableCell colSpan={4} className="text-center py-20 text-[10px] opacity-30 italic uppercase font-black">No shift activity recorded.</TableCell></TableRow> : attendance.map(a => (
                     <TableRow key={a.id} className="h-14 hover:bg-secondary/5 border-b-border/30">

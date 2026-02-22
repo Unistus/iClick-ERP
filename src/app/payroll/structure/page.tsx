@@ -29,7 +29,9 @@ import {
   Activity,
   Scale,
   History,
-  UserCircle
+  UserCircle,
+  Save,
+  Sparkles
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -38,6 +40,7 @@ import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 import { calculateNetSalary, type StatutorySettings } from "@/lib/payroll/payroll.service";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { setDoc } from 'firebase/firestore';
 
 export default function SalaryStructurePage() {
   const db = useFirestore();
@@ -298,8 +301,10 @@ export default function SalaryStructurePage() {
                       <div className="flex justify-between text-[10px] font-bold uppercase"><span className="opacity-50">Gross Basis</span><span className="font-black">KES {computationPreview.gross.toLocaleString()}</span></div>
                       <div className="flex justify-between text-[10px] font-bold uppercase text-destructive"><span className="opacity-50">Total Deductions</span><span className="font-black">- {computationPreview.totalDeductions.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></div>
                       <div className="pt-2 border-t flex justify-between items-end">
-                        <span className="text-[11px] font-black uppercase text-primary">Est. Net Pay</span>
-                        <p className="text-xl font-black font-headline text-foreground">{computationPreview.netSalary.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                        <span className="text-[11px] font-black uppercase tracking-widest text-primary pb-1">Est. Net Pay</span>
+                        <div className="text-right">
+                          <p className="text-xl font-black font-headline text-foreground">{computationPreview.netSalary.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                        </div>
                       </div>
                     </div>
 

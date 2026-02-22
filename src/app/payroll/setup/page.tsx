@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, serverTimestamp, setDoc, query, orderBy, deleteDoc } from "firebase/firestore";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { 
   Settings2, 
@@ -30,10 +30,13 @@ import {
   Activity,
   ShieldCheck,
   Percent,
-  ListTree
+  ListTree,
+  Building
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { bootstrapPayrollFinancials } from '@/lib/payroll/payroll.service';
 import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 
@@ -162,7 +165,7 @@ export default function PayrollSetupPage() {
               <Settings2 className="size-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-headline font-bold text-foreground">Payroll Command</h1>
+              <h1 className="text-2xl font-headline font-bold">Payroll Command</h1>
               <p className="text-[10px] text-muted-foreground uppercase font-black tracking-[0.2em] mt-1">Institutional Remuneration Logic & Statutory Bands</p>
             </div>
           </div>

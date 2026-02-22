@@ -92,27 +92,36 @@ export async function bootstrapPayrollFinancials(db: Firestore, institutionId: s
  */
 export function calculateNetSalary(basicPay: number, settings: StatutorySettings) {
   // 1. NSSF Calculation (Tax Deductible in Kenya)
-  const pensionablePay = Math.min(basicPay, settings.nssfTierIILimit);
-  const nssf = (pensionablePay * (settings.nssfRate / 100));
+  const pensionablePay = Math.min(basicPay, settings.nssfTierIILimit || 36000);
+  const nssf = (pensionablePay * ((settings.nssfRate || 6) / 100));
 
   // 2. Housing Levy (Non-tax deductible, based on Gross)
-  const housingLevy = (basicPay * (settings.housingLevyRate / 100));
+  const housingLevy = (basicPay * ((settings.housingLevyRate || 1.5) / 100));
 
   // 3. SHA (Social Health Authority - replaces NHIF)
-  const sha = (basicPay * (settings.shaRate / 100));
+  const sha = (basicPay * ((settings.shaRate || 2.75) / 100));
 
   // 4. PAYE Calculation
-  const taxableIncome = basicPay - nssf; // NSSF is tax exempt
+  // Legal standard: Deduct NSSF from gross to get taxable income
+  const taxableIncome = basicPay - nssf; 
   let paye = 0;
   
-  settings.payeBands.forEach(band => {
+  const bands = settings.payeBands || [
+    { min: 0, max: 24000, rate: 10 },
+    { min: 24001, max: 32333, rate: 25 },
+    { min: 32334, max: 500000, rate: 30 },
+    { min: 500001, max: 800000, rate: 32.5 },
+    { min: 800001, max: 999999999, rate: 35 },
+  ];
+
+  bands.forEach(band => {
     if (taxableIncome > band.min) {
       const taxableInBand = Math.min(taxableIncome, band.max) - band.min;
       paye += (taxableInBand * (band.rate / 100));
     }
   });
 
-  const netPaye = Math.max(0, paye - settings.personalRelief);
+  const netPaye = Math.max(0, paye - (settings.personalRelief || 2400));
 
   // 5. Final Net
   const totalDeductions = nssf + sha + housingLevy + netPaye;

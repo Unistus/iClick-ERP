@@ -24,7 +24,12 @@ import {
   ArrowRight,
   Info,
   Calendar,
-  Wallet
+  Wallet,
+  Landmark,
+  Activity,
+  Scale,
+  History,
+  UserCircle
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -164,7 +169,7 @@ export default function SalaryStructurePage() {
               <CardContent className="p-0 overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-secondary/20">
-                    <TableRow className="hover:bg-transparent">
+                    <TableRow>
                       <TableHead className="h-10 text-[9px] font-black uppercase pl-6">Staff Member</TableHead>
                       <TableHead className="h-10 text-[9px] font-black uppercase">Official Title</TableHead>
                       <TableHead className="h-10 text-[9px] font-black uppercase">Pay Grade</TableHead>

@@ -21,7 +21,8 @@ import {
   Calendar,
   ChevronRight,
   Zap,
-  LayoutGrid
+  LayoutGrid,
+  ArrowDownLeft
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -40,7 +41,7 @@ export default function PayrollDashboard() {
   // Data Fetching: Runs
   const runsQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
-    return query(collection(db, 'institutions', selectedInstId, 'payroll_runs'), orderBy('createdAt', 'desc'), limit(5));
+    return query(collection(db, 'institutions', selectedInstId, 'payroll_runs'), orderBy('createdAt', 'desc'), limit(10));
   }, [db, selectedInstId]);
   const { data: recentRuns, isLoading: runsLoading } = useCollection(runsQuery);
 
@@ -54,12 +55,16 @@ export default function PayrollDashboard() {
   const currency = settings?.general?.currencySymbol || "KES";
 
   const metrics = useMemo(() => {
-    if (!recentRuns) return { gross: 0, count: 0, status: 'IDLE' };
+    if (!recentRuns) return { gross: 0, count: 0, status: 'IDLE', pendingSettlement: 0 };
     const latest = recentRuns[0];
+    const pendingCount = recentRuns.filter(r => r.status === 'Posted').length;
+    const pendingVal = recentRuns.filter(r => r.status === 'Posted').reduce((sum, r) => sum + (r.totalNet || 0), 0);
+
     return {
-      gross: recentRuns.reduce((sum, r) => sum + (r.totalGross || 0), 0),
+      gross: recentRuns.filter(r => r.status !== 'Draft').reduce((sum, r) => sum + (r.totalGross || 0), 0),
       count: recentRuns.length,
-      status: latest?.status || 'IDLE'
+      status: latest?.status || 'IDLE',
+      pendingSettlement: pendingVal
     };
   }, [recentRuns]);
 
@@ -102,39 +107,42 @@ export default function PayrollDashboard() {
                 <CardContent className="pb-4">
                   <div className="text-2xl font-black font-headline text-foreground/90">{currency} {metrics.gross.toLocaleString()}</div>
                   <div className="flex items-center gap-1.5 mt-1 text-emerald-500 font-bold text-[9px] uppercase tracking-tighter">
-                    <TrendingUp className="size-3" /> Budget Adherence: 94%
+                    <TrendingUp className="size-3" /> Budget Sync: OK
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden">
-                <CardHeader className="pb-1 pt-3"><span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Active Cycles</span></CardHeader>
+              <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden group hover:ring-accent/30 transition-all">
+                <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
+                  <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Pending Settlement</span>
+                  <Wallet className="size-3.5 text-accent opacity-50" />
+                </CardHeader>
                 <CardContent className="pb-4">
-                  <div className="text-2xl font-black font-headline text-accent">{metrics.count} RUNS</div>
-                  <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Institutional Flow</p>
+                  <div className="text-2xl font-black font-headline text-accent">{currency} {metrics.pendingSettlement.toLocaleString()}</div>
+                  <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Awaiting Bank Outflow</p>
                 </CardContent>
               </Card>
 
               <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden group hover:ring-emerald-500/30 transition-all">
                 <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
-                  <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Audit Stage</span>
-                  <History className="size-3 text-emerald-500 opacity-50" />
+                  <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Cycle Status</span>
+                  <Activity className="size-3 text-emerald-500 opacity-50" />
                 </CardHeader>
                 <CardContent className="pb-4">
                   <div className="text-2xl font-black font-headline text-emerald-500">{metrics.status}</div>
-                  <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Current State</p>
+                  <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Last Node State</p>
                 </CardContent>
               </Card>
 
               <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm relative overflow-hidden">
                 <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12"><ShieldCheck className="size-24 text-primary" /></div>
                 <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between relative z-10">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-primary">Compliance Pulse</span>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-primary">Compliance Hub</span>
                   <div className="size-2.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_#10b981]" />
                 </CardHeader>
                 <CardContent className="pb-4 relative z-10">
                   <div className="text-2xl font-black font-headline">LOCKED</div>
-                  <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Regulatory Sync: OK</p>
+                  <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Audit Ready Registry</p>
                 </CardContent>
               </Card>
             </div>
@@ -144,9 +152,11 @@ export default function PayrollDashboard() {
                 <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-6 flex flex-row items-center justify-between">
                   <div className="space-y-0.5">
                     <CardTitle className="text-sm font-bold uppercase tracking-widest">Recent Processing Log</CardTitle>
-                    <CardDescription className="text-[10px]">Audit trail of finalized remuneration cycles.</CardDescription>
+                    <CardDescription className="text-[10px]">End-to-end audit trail of finalized cycles.</CardDescription>
                   </div>
-                  <Badge variant="outline" className="text-[8px] h-5 px-3 bg-background font-black border-primary/20 text-primary">REAL-TIME DATA</Badge>
+                  <Link href="/payroll/processing">
+                    <Button variant="ghost" size="sm" className="text-[10px] font-bold uppercase gap-1 hover:bg-primary/10 transition-all">Go to Hub <ChevronRight className="size-3" /></Button>
+                  </Link>
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="divide-y divide-border/10">
@@ -155,17 +165,29 @@ export default function PayrollDashboard() {
                     ) : !recentRuns || recentRuns.length === 0 ? (
                       <div className="p-12 text-center text-xs text-muted-foreground uppercase font-bold opacity-30 italic">No cycles processed in this institution node.</div>
                     ) : recentRuns.map((run) => (
-                      <div key={run.id} className="p-4 flex items-center justify-between hover:bg-secondary/5 transition-colors">
+                      <div key={run.id} className="p-4 flex items-center justify-between hover:bg-secondary/5 transition-colors group">
                         <div className="flex items-center gap-4">
-                          <div className="size-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner"><Activity className="size-5" /></div>
+                          <div className={cn("size-10 rounded-2xl flex items-center justify-center shadow-inner", 
+                            run.status === 'Settled' ? "bg-emerald-500/10 text-emerald-500" : "bg-primary/10 text-primary"
+                          )}>
+                            {run.status === 'Settled' ? <CheckCircle2 className="size-5" /> : <Activity className="size-5" />}
+                          </div>
                           <div>
                             <p className="text-xs font-black uppercase tracking-tight">{run.runNumber}</p>
-                            <p className="text-[9px] text-muted-foreground font-mono uppercase tracking-tighter">REF: {run.id.slice(0, 8)}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[8px] text-muted-foreground font-mono uppercase">REF: {run.id.slice(0, 8)}</span>
+                              <span className="text-[8px] text-muted-foreground opacity-40">•</span>
+                              <span className="text-[8px] text-muted-foreground font-bold">{run.createdAt?.toDate ? format(run.createdAt.toDate(), 'dd MMM yy') : '...'}</span>
+                            </div>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-xs font-black font-mono text-primary">{currency} {run.totalGross?.toLocaleString()}</p>
-                          <Badge variant="outline" className="text-[7px] h-3.5 px-1 mt-1 font-black uppercase border-none bg-secondary/50">{run.status}</Badge>
+                          <p className="text-xs font-black font-mono text-primary">{currency} {run.totalNet?.toLocaleString()}</p>
+                          <Badge variant="outline" className={cn("text-[7px] h-3.5 px-1 mt-1 font-black uppercase border-none",
+                            run.status === 'Settled' ? "bg-emerald-500/10 text-emerald-500" : 
+                            run.status === 'Posted' ? "bg-primary/10 text-primary" : 
+                            "bg-secondary/50 text-muted-foreground"
+                          )}>{run.status}</Badge>
                         </div>
                       </div>
                     ))}
@@ -177,37 +199,37 @@ export default function PayrollDashboard() {
                 <Card className="border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
                   <CardHeader className="pb-3 border-b border-border/10 bg-primary/5">
                     <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
-                      <Users className="size-4 text-primary" /> Staff Remuneration
+                      <Zap className="size-4 text-primary" /> Rapid Access
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pt-4 space-y-3">
-                    <Link href="/payroll/structure" className="block">
-                      <Button variant="outline" className="w-full justify-between h-11 text-[9px] font-bold uppercase bg-secondary/10 hover:bg-secondary/20 border-none ring-1 ring-border group">
-                        <span className="flex items-center gap-2">Salary Structures</span>
-                        <ArrowUpRight className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </Button>
-                    </Link>
                     <Link href="/payroll/processing" className="block">
-                      <Button variant="outline" className="w-full justify-between h-11 text-[9px] font-bold uppercase bg-secondary/10 hover:bg-secondary/20 border-none ring-1 ring-border group">
-                        <span className="flex items-center gap-2">Process Run</span>
-                        <ArrowUpRight className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <Button variant="outline" className="w-full justify-between h-11 text-[10px] font-bold uppercase bg-secondary/10 hover:bg-secondary/20 border-none ring-1 ring-border group transition-all">
+                        <span className="flex items-center gap-2"><RefreshCw className="size-4 text-emerald-500" /> Settlement Run</span>
+                        <ChevronRight className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </Button>
                     </Link>
-                    <Link href="/payroll/statutory" className="block">
-                      <Button variant="outline" className="w-full justify-between h-11 text-[9px] font-bold uppercase bg-secondary/10 hover:bg-secondary/20 border-none ring-1 ring-border group">
-                        <span className="flex items-center gap-2">Statutory Filings</span>
-                        <ArrowUpRight className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <Link href="/payroll/loans" className="block">
+                      <Button variant="outline" className="w-full justify-between h-11 text-[10px] font-bold uppercase bg-secondary/10 hover:bg-secondary/20 border-none ring-1 ring-border group transition-all">
+                        <span className="flex items-center gap-2"><HandCoins className="size-4 text-accent" /> Staff Advances</span>
+                        <ChevronRight className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </Button>
+                    </Link>
+                    <Link href="/payroll/payslips" className="block">
+                      <Button variant="outline" className="w-full justify-between h-11 text-[10px] font-bold uppercase bg-secondary/10 hover:bg-secondary/20 border-none ring-1 ring-border group transition-all">
+                        <span className="flex items-center gap-2"><FileText className="size-4 text-primary" /> View Payslips</span>
+                        <ChevronRight className="size-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                       </Button>
                     </Link>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-primary/5 border-none ring-1 ring-primary/20 p-6 rounded-2xl relative overflow-hidden">
-                  <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12"><LayoutGrid className="size-24 text-primary" /></div>
+                <Card className="bg-primary/5 border-none ring-1 ring-primary/20 p-6 rounded-2xl relative overflow-hidden group shadow-md transition-all hover:ring-primary/40">
+                  <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12 transition-transform group-hover:scale-110"><LayoutGrid className="size-24 text-primary" /></div>
                   <div className="flex flex-col gap-3 relative z-10">
-                    <p className="text-[10px] font-black uppercase text-primary tracking-widest">Compliance Matrix</p>
+                    <p className="text-[10px] font-black uppercase text-primary tracking-widest">Financial Strategy</p>
                     <p className="text-[11px] leading-relaxed text-muted-foreground font-medium italic">
-                      "Remuneration flows are strictly siloed by legal entity. Cross-tenant payroll processing is prohibited at the edge."
+                      "Payroll Settlement runs provide the final audit closure for each remuneration cycle. It converts the 'Salary Payable' liability into a realized 'Bank Disbursement' event."
                     </p>
                   </div>
                 </Card>

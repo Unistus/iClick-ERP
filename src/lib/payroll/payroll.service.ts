@@ -84,7 +84,7 @@ export async function bootstrapPayrollFinancials(db: Firestore, institutionId: s
     nssfTierILimit: 7000,
     nssfTierIILimit: 36000,
     payeBands: [
-      { min: 0, max: 24000, rate: 10 },
+      { min: 0, max: 2400, rate: 10 },
       { min: 24001, max: 32333, rate: 25 },
       { min: 32334, max: 500000, rate: 30 },
       { min: 500001, max: 800000, rate: 32.5 },
@@ -369,6 +369,55 @@ export async function finalizeAndPostPayroll(db: Firestore, institutionId: strin
       totalGross,
       totalNet,
       totalDeductions: totalGross - totalNet,
+      updatedAt: serverTimestamp()
+    });
+  });
+}
+
+/**
+ * Final phase of the remuneration cycle: Physical disbursement of funds.
+ * Clears the Salaries Payable liability and records the bank outflow.
+ */
+export async function settlePayrollRun(
+  db: Firestore, 
+  institutionId: string, 
+  runId: string, 
+  bankAccountId: string,
+  userId: string
+) {
+  const runRef = doc(db, 'institutions', institutionId, 'payroll_runs', runId);
+  const setupRef = doc(db, 'institutions', institutionId, 'settings', 'payroll');
+  
+  return runTransaction(db, async (transaction) => {
+    const [runSnap, setupSnap] = await Promise.all([
+      transaction.get(runRef),
+      transaction.get(setupRef)
+    ]);
+
+    if (!runSnap.exists()) throw new Error("Run not found");
+    const run = runSnap.data();
+    const setup = setupSnap.data();
+
+    if (run.status !== 'Posted') throw new Error("Only posted runs can be settled.");
+
+    // Post to Ledger
+    // DR: Salaries Payable (Liability -)
+    // CR: Selected Bank Account (Asset -)
+    await postJournalEntry(db, institutionId, {
+      date: new Date(),
+      description: `Payroll Settlement disbursement: ${run.runNumber}`,
+      reference: `PAY-${run.runNumber}`,
+      items: [
+        { accountId: setup.netPayableAccountId, amount: run.totalNet, type: 'Debit' },
+        { accountId: bankAccountId, amount: run.totalNet, type: 'Credit' },
+      ]
+    });
+
+    transaction.update(runRef, {
+      status: 'Settled',
+      settledAt: serverTimestamp(),
+      settledBy: userId,
+      bankAccountId: bankAccountId,
       updatedAt: serverTimestamp()
     });
   });

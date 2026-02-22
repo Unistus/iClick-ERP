@@ -30,20 +30,25 @@ import {
   AlertCircle,
   Eye,
   ArrowLeft,
-  Lock
+  Lock,
+  Wallet,
+  CheckCircle,
+  Banknote
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { createPayrollRun, finalizeAndPostPayroll } from "@/lib/payroll/payroll.service";
+import { createPayrollRun, finalizeAndPostPayroll, settlePayrollRun } from "@/lib/payroll/payroll.service";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
+import { logSystemEvent } from "@/lib/audit-service";
 
 export default function PayrollProcessingPage() {
   const db = useFirestore();
   const { user } = useUser();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isRunModalOpen, setIsRunModalOpen] = useState(false);
+  const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
@@ -62,6 +67,13 @@ export default function PayrollProcessingPage() {
     return query(collection(db, 'institutions', selectedInstId, 'fiscal_periods'), where('status', '==', 'Open'));
   }, [db, selectedInstId]);
   const { data: activePeriods } = useCollection(periodsQuery);
+
+  // Data Fetching: Bank Accounts for Settlement
+  const banksQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return query(collection(db, 'institutions', selectedInstId, 'coa'), where('subtype', '==', 'Cash & Bank'), where('isActive', '==', true));
+  }, [db, selectedInstId]);
+  const { data: bankAccounts } = useCollection(banksQuery);
 
   // Data Fetching: Run Items (Worksheet)
   const itemsQuery = useMemoFirebase(() => {
@@ -82,6 +94,7 @@ export default function PayrollProcessingPage() {
 
     try {
       const newRun = await createPayrollRun(db, selectedInstId, periodId, user.uid);
+      logSystemEvent(db, selectedInstId, user, 'PAYROLL', 'Init Run', `Payroll run ${newRun.id} initialized for period ${periodId}`);
       toast({ title: "Remuneration Cycle Initialized", description: "Computing statutory and net pay nodes..." });
       setIsRunModalOpen(false);
       if (newRun) setSelectedRunId(newRun.id);
@@ -97,6 +110,7 @@ export default function PayrollProcessingPage() {
     setIsProcessing(true);
     try {
       await finalizeAndPostPayroll(db, selectedInstId, selectedRunId);
+      logSystemEvent(db, selectedInstId, user, 'PAYROLL', 'Post Run', `Payroll run ${selectedRunId} finalized and posted to ledger.`);
       toast({ title: "Payroll Run Posted", description: "Ledger updated and payslips generated." });
       setSelectedRunId(null);
     } catch (err) {
@@ -106,63 +120,176 @@ export default function PayrollProcessingPage() {
     }
   };
 
+  const handleSettleRun = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedInstId || !selectedRunId || isProcessing || !user) return;
+    setIsProcessing(true);
+
+    const formData = new FormData(e.currentTarget);
+    const bankId = formData.get('bankAccountId') as string;
+
+    try {
+      await settlePayrollRun(db, selectedInstId, selectedRunId, bankId, user.uid);
+      logSystemEvent(db, selectedInstId, user, 'PAYROLL', 'Settle Run', `Funds disbursed for run ${selectedRunId} from bank ${bankId}.`);
+      toast({ title: "Disbursement Complete", description: "Salaries settled and cash outflow recorded." });
+      setIsSettlementModalOpen(false);
+      setSelectedRunId(null);
+    } catch (err) {
+      toast({ variant: "destructive", title: "Settlement Failed" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const settingsRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return doc(db, 'institutions', selectedInstId, 'settings', 'global');
+  }, [db, selectedInstId]);
+  const { data: globalSettings } = useDoc(settingsRef);
+  const currency = globalSettings?.general?.currencySymbol || "KES";
+
   if (selectedRunId) {
     return (
       <DashboardLayout>
         <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => setSelectedRunId(null)} className="rounded-full">
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-4 bg-card p-6 rounded-[2rem] border shadow-sm">
+            <Button variant="ghost" size="icon" onClick={() => setSelectedRunId(null)} className="rounded-full shrink-0">
               <ArrowLeft className="size-5" />
             </Button>
-            <div>
-              <h1 className="text-2xl font-headline font-bold">Audit Worksheet</h1>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <Badge variant="outline" className="text-[10px] font-black uppercase bg-primary/5 text-primary border-primary/20">Audit Phase</Badge>
+                <span className="text-[10px] text-muted-foreground font-mono">/ {selectedRun?.id}</span>
+              </div>
+              <h1 className="text-2xl font-headline font-bold">Settlement Worksheet</h1>
               <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-1">Reviewing: {selectedRun?.runNumber}</p>
             </div>
-            {selectedRun?.status === 'Draft' && (
-              <Button 
-                onClick={handlePostRun} 
-                disabled={isProcessing} 
-                className="ml-auto gap-2 px-8 font-black uppercase text-xs h-10 shadow-xl bg-emerald-600 hover:bg-emerald-700"
-              >
-                {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <Lock className="size-4" />} Finalize & Post to Ledger
-              </Button>
-            )}
+            
+            <div className="flex gap-2 w-full md:w-auto">
+              {selectedRun?.status === 'Draft' && (
+                <Button 
+                  onClick={handlePostRun} 
+                  disabled={isProcessing} 
+                  className="flex-1 md:flex-none gap-2 px-8 font-black uppercase text-xs h-11 shadow-xl bg-emerald-600 hover:bg-emerald-700 transition-all active:scale-95"
+                >
+                  {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <Lock className="size-4" />} Finalize & Post Ledger
+                </Button>
+              )}
+              {selectedRun?.status === 'Posted' && (
+                <Button 
+                  onClick={() => setIsSettlementModalOpen(true)} 
+                  disabled={isProcessing} 
+                  className="flex-1 md:flex-none gap-2 px-8 font-black uppercase text-xs h-11 shadow-xl bg-primary hover:bg-primary/90 transition-all active:scale-95"
+                >
+                  {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <Wallet className="size-4" />} Execute Disbursement
+                </Button>
+              )}
+              {selectedRun?.status === 'Settled' && (
+                <Badge className="h-11 px-8 font-black uppercase bg-emerald-500/10 text-emerald-500 border-none ring-1 ring-emerald-500/20 text-xs">
+                  <CheckCircle className="size-4 mr-2" /> Cycle Fully Reconciled
+                </Badge>
+              )}
+            </div>
           </div>
 
           <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
-            <CardHeader className="bg-secondary/10 border-b border-border/50 flex flex-row items-center justify-between py-4">
-              <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em]">Personnel Net Settlement Matrix</CardTitle>
-              <Badge variant="secondary" className="text-[8px] bg-primary/10 text-primary uppercase font-black">Period: {selectedRun?.periodId}</Badge>
+            <CardHeader className="bg-secondary/10 border-b border-border/50 flex flex-row items-center justify-between py-4 px-8">
+              <div className="space-y-0.5">
+                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em]">Personnel Net Settlement Matrix</CardTitle>
+                <p className="text-[9px] text-muted-foreground italic">Statutory calculations verified against Institutional Setup.</p>
+              </div>
+              <Badge variant="secondary" className="text-[8px] bg-primary/10 text-primary uppercase font-black px-3 h-6">Period: {selectedRun?.periodId}</Badge>
             </CardHeader>
             <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader className="bg-secondary/20">
                   <TableRow>
-                    <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Employee</TableHead>
-                    <TableHead className="h-12 text-[9px] font-black uppercase text-right">Gross</TableHead>
-                    <TableHead className="h-12 text-[9px] font-black uppercase text-right">PAYE</TableHead>
-                    <TableHead className="h-12 text-[9px] font-black uppercase text-right">Statutory</TableHead>
-                    <TableHead className="h-12 text-[9px] font-black uppercase text-right">Custom Ded.</TableHead>
-                    <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase">Net Pay</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase pl-8 text-muted-foreground">Staff Node</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase text-right text-muted-foreground">Gross Payload</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase text-right text-muted-foreground">P.A.Y.E (Tax)</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase text-right text-muted-foreground">Statutory Ded.</TableHead>
+                    <TableHead className="h-12 text-[9px] font-black uppercase text-right text-muted-foreground">Custom / Loan</TableHead>
+                    <TableHead className="h-12 text-right pr-8 text-[9px] font-black uppercase text-primary">Final Net</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {itemsLoading ? (
-                    <TableRow><TableCell colSpan={6} className="text-center py-12 text-xs animate-pulse">Computing Matrix...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="text-center py-20"><Loader2 className="size-8 animate-spin mx-auto text-primary opacity-20 mb-4" /><p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Computing Settlement Matrix...</p></TableCell></TableRow>
+                  ) : worksheetItems?.length === 0 ? (
+                    <TableRow><TableCell colSpan={6} className="text-center py-20 text-[10px] opacity-20 uppercase font-black italic">No personnel nodes found in this cycle.</TableCell></TableRow>
                   ) : worksheetItems?.map(item => (
-                    <TableRow key={item.id} className="h-14 hover:bg-secondary/5 border-b-border/30">
-                      <TableCell className="pl-8 font-bold text-xs uppercase tracking-tight">{item.employeeName}</TableCell>
-                      <TableCell className="text-right font-mono text-xs opacity-60">{item.gross?.toLocaleString()}</TableCell>
-                      <TableCell className="text-right font-mono text-xs text-destructive">{item.paye?.toLocaleString()}</TableCell>
-                      <TableCell className="text-right font-mono text-xs text-destructive">{(item.nssf + item.sha + item.housingLevy)?.toLocaleString()}</TableCell>
-                      <TableCell className="text-right font-mono text-xs text-destructive">{item.customDeductions?.toLocaleString()}</TableCell>
-                      <TableCell className="text-right pr-8 font-mono text-xs font-black text-emerald-500">{item.netSalary?.toLocaleString()}</TableCell>
+                    <TableRow key={item.id} className="h-16 hover:bg-secondary/10 transition-colors border-b-border/30">
+                      <TableCell className="pl-8">
+                        <div className="flex items-center gap-3">
+                          <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-black text-[10px] uppercase">{item.employeeName?.[0]}</div>
+                          <span className="font-black text-xs uppercase tracking-tight">{item.employeeName}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xs opacity-60">{currency} {item.gross?.toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-mono text-xs text-destructive">{currency} {item.paye?.toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-mono text-xs text-destructive">{currency} {(item.nssf + item.sha + item.housingLevy)?.toLocaleString()}</TableCell>
+                      <TableCell className="text-right font-mono text-xs text-destructive">{currency} {item.customDeductions?.toLocaleString()}</TableCell>
+                      <TableCell className="text-right pr-8 font-mono text-sm font-black text-emerald-500">{currency} {item.netSalary?.toLocaleString()}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
+
+          {/* SETTLEMENT DIALOG */}
+          <Dialog open={isSettlementModalOpen} onOpenChange={setIsSettlementModalOpen}>
+            <DialogContent className="max-w-md shadow-2xl ring-1 ring-border rounded-[2.5rem] overflow-hidden p-0 border-none">
+              <div className="bg-primary p-8 text-white relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-10"><Landmark className="size-32 rotate-12" /></div>
+                <div className="flex items-center gap-3 mb-6 relative z-10">
+                  <div className="p-2 rounded-xl bg-white/20 backdrop-blur-md"><BadgeCent className="size-5" /></div>
+                  <div>
+                    <h3 className="text-lg font-black uppercase tracking-widest">Execute Disbursement</h3>
+                    <p className="text-[10px] font-bold uppercase opacity-70">Cycle: {selectedRun?.runNumber}</p>
+                  </div>
+                </div>
+                <div className="text-center relative z-10">
+                  <p className="text-[9px] font-black uppercase opacity-60 tracking-[0.4em] mb-2">Total Disbursement Value</p>
+                  <p className="text-5xl font-black font-headline tracking-tighter">{currency} {selectedRun?.totalNet?.toLocaleString()}</p>
+                </div>
+              </div>
+              
+              <form onSubmit={handleSettleRun} className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <Label className="uppercase font-black text-[10px] tracking-widest opacity-60 text-primary">Funding Source Node</Label>
+                  <Select name="bankAccountId" required>
+                    <SelectTrigger className="h-12 font-black uppercase border-none ring-1 ring-border bg-secondary/5">
+                      <SelectValue placeholder="Pick Bank/Cash Account..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {bankAccounts?.map(bank => (
+                        <SelectItem key={bank.id} value={bank.id} className="text-[10px] font-black uppercase">
+                          {bank.name} ({currency} {bank.balance?.toLocaleString()})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[9px] text-muted-foreground italic">Only 'Cash & Bank' nodes are visible for disbursement.</p>
+                </div>
+
+                <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl flex gap-4 items-start text-emerald-600 shadow-inner">
+                  <CheckCircle2 className="size-5 shrink-0 mt-0.5 animate-pulse" />
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest">Double-Entry Handshake</p>
+                    <p className="text-[11px] leading-relaxed italic font-medium">Finalizing this run will clear the Net Payables liability and record the asset outflow in your General Ledger.</p>
+                  </div>
+                </div>
+
+                <DialogFooter className="pt-4 gap-3">
+                  <Button type="button" variant="ghost" onClick={() => setIsSettlementModalOpen(false)} className="h-12 font-black uppercase text-[10px] tracking-widest">Abort</Button>
+                  <Button type="submit" disabled={isProcessing} className="h-12 px-12 font-black uppercase text-[10px] shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-3 border-none ring-2 ring-primary/20 transition-all active:scale-95">
+                    {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <Zap className="size-4" />} Commit Settlement
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </DashboardLayout>
     );
@@ -246,7 +373,8 @@ export default function PayrollProcessingPage() {
                         <TableCell className="text-center">
                           <Badge variant="outline" className={cn(
                             "text-[8px] h-5 px-3 font-black uppercase border-none ring-1 shadow-sm",
-                            run.status === 'Posted' ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : 
+                            run.status === 'Settled' ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : 
+                            run.status === 'Posted' ? 'bg-primary/10 text-primary ring-primary/20' :
                             'bg-amber-500/10 text-amber-500 ring-amber-500/20 animate-pulse'
                           )}>
                             {run.status}
@@ -262,7 +390,7 @@ export default function PayrollProcessingPage() {
                             className="h-9 px-4 text-[9px] font-black uppercase gap-2 hover:bg-primary/10 hover:text-primary transition-all group-hover:scale-105"
                             onClick={() => setSelectedRunId(run.id)}
                           >
-                            {run.status === 'Draft' ? 'Audit Worksheet' : 'View Summary'} <ArrowRight className="size-3" />
+                            {run.status === 'Draft' ? 'Audit Worksheet' : run.status === 'Posted' ? 'Initialize Payment' : 'View Summary'} <ArrowRight className="size-3" />
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -299,7 +427,7 @@ export default function PayrollProcessingPage() {
         )}
 
         <Dialog open={isRunModalOpen} onOpenChange={setIsRunModalOpen}>
-          <DialogContent className="max-w-md shadow-2xl ring-1 ring-border rounded-[2.5rem] overflow-hidden">
+          <DialogContent className="max-w-md shadow-2xl ring-1 ring-border rounded-[2.5rem] overflow-hidden border-none p-0">
             <form onSubmit={handleInitializeRun}>
               <DialogHeader className="bg-secondary/10 p-8 border-b">
                 <div className="flex items-center gap-3 mb-2">

@@ -1,6 +1,6 @@
 'use client';
 
-import { Firestore, collection, doc, serverTimestamp, getDoc, setDoc, query, where, getDocs, writeBatch, increment } from 'firebase/firestore';
+import { Firestore, collection, doc, serverTimestamp, getDoc, setDoc, query, where, getDocs, writeBatch, increment, addDoc, deleteDoc } from 'firebase/firestore';
 
 /**
  * @fileOverview Core logic for the Payroll Engine.
@@ -20,6 +20,13 @@ export interface DeductionType {
   name: string;
   isStatutory: boolean;
   ledgerAccountId: string;
+}
+
+export interface EmployeeComponent {
+  id: string;
+  typeId: string;
+  name: string;
+  amount: number;
 }
 
 export interface StatutorySettings {
@@ -89,21 +96,34 @@ export async function bootstrapPayrollFinancials(db: Firestore, institutionId: s
 
 /**
  * Calculates full payroll breakdown based on institutional statutory settings.
+ * Now factors in dynamic recurring earnings and deductions.
  */
-export function calculateNetSalary(basicPay: number, settings: StatutorySettings) {
-  // 1. NSSF Calculation (Tax Deductible in Kenya)
-  const pensionablePay = Math.min(basicPay, settings.nssfTierIILimit || 36000);
+export function calculateNetSalary(
+  basicPay: number, 
+  settings: StatutorySettings,
+  recurringEarnings: { type: EarningType, amount: number }[] = [],
+  recurringDeductions: { type: DeductionType, amount: number }[] = []
+) {
+  // 1. Split Earnings into Taxable and Non-Taxable
+  const taxableEarnings = recurringEarnings.filter(e => e.type.isTaxable).reduce((sum, e) => sum + e.amount, 0);
+  const nonTaxableEarnings = recurringEarnings.filter(e => !e.type.isTaxable).reduce((sum, e) => sum + e.amount, 0);
+  
+  const grossPay = basicPay + taxableEarnings + nonTaxableEarnings;
+  const taxableGrossForNssf = basicPay + recurringEarnings.filter(e => e.type.isPensionable).reduce((sum, e) => sum + e.amount, 0);
+
+  // 2. NSSF Calculation (Tax Deductible in Kenya)
+  const pensionablePay = Math.min(taxableGrossForNssf, settings.nssfTierIILimit || 36000);
   const nssf = (pensionablePay * ((settings.nssfRate || 6) / 100));
 
-  // 2. Housing Levy (Non-tax deductible, based on Gross)
-  const housingLevy = (basicPay * ((settings.housingLevyRate || 1.5) / 100));
+  // 3. Housing Levy (Non-tax deductible, based on Gross)
+  const housingLevy = (grossPay * ((settings.housingLevyRate || 1.5) / 100));
 
-  // 3. SHA (Social Health Authority - replaces NHIF)
-  const sha = (basicPay * ((settings.shaRate || 2.75) / 100));
+  // 4. SHA (Social Health Authority - replaces NHIF)
+  const sha = (grossPay * ((settings.shaRate || 2.75) / 100));
 
-  // 4. PAYE Calculation
-  // Legal standard: Deduct NSSF from gross to get taxable income
-  const taxableIncome = basicPay - nssf; 
+  // 5. PAYE Calculation
+  // Legal standard: Deduct NSSF from taxable gross to get taxable income
+  const taxableIncome = (basicPay + taxableEarnings) - nssf; 
   let paye = 0;
   
   const bands = settings.payeBands || [
@@ -123,17 +143,21 @@ export function calculateNetSalary(basicPay: number, settings: StatutorySettings
 
   const netPaye = Math.max(0, paye - (settings.personalRelief || 2400));
 
-  // 5. Final Net
-  const totalDeductions = nssf + sha + housingLevy + netPaye;
-  const netSalary = basicPay - totalDeductions;
+  // 6. Non-Statutory Deductions
+  const customDeductionsTotal = recurringDeductions.reduce((sum, d) => sum + d.amount, 0);
+
+  // 7. Final Net
+  const totalStatutoryDeductions = nssf + sha + housingLevy + netPaye;
+  const netSalary = grossPay - totalStatutoryDeductions - customDeductionsTotal;
 
   return {
-    gross: basicPay,
+    gross: grossPay,
     nssf,
     sha,
     housingLevy,
     paye: netPaye,
-    totalDeductions,
+    customDeductions: customDeductionsTotal,
+    totalDeductions: totalStatutoryDeductions + customDeductionsTotal,
     netSalary
   };
 }
@@ -144,4 +168,42 @@ export async function processLoanRepayment(db: Firestore, institutionId: string,
     balance: increment(-amount),
     updatedAt: serverTimestamp()
   });
+}
+
+/**
+ * Assigns a recurring earning component to an employee.
+ */
+export async function assignEmployeeEarning(db: Firestore, institutionId: string, employeeId: string, earning: { typeId: string, name: string, amount: number }) {
+  const colRef = collection(db, 'institutions', institutionId, 'employees', employeeId, 'earnings');
+  return addDoc(colRef, {
+    ...earning,
+    createdAt: serverTimestamp()
+  });
+}
+
+/**
+ * Removes a recurring earning component from an employee.
+ */
+export async function removeEmployeeEarning(db: Firestore, institutionId: string, employeeId: string, assignmentId: string) {
+  const ref = doc(db, 'institutions', institutionId, 'employees', employeeId, 'earnings', assignmentId);
+  return deleteDoc(ref);
+}
+
+/**
+ * Assigns a recurring deduction component to an employee.
+ */
+export async function assignEmployeeDeduction(db: Firestore, institutionId: string, employeeId: string, deduction: { typeId: string, name: string, amount: number }) {
+  const colRef = collection(db, 'institutions', institutionId, 'employees', employeeId, 'deductions');
+  return addDoc(colRef, {
+    ...deduction,
+    createdAt: serverTimestamp()
+  });
+}
+
+/**
+ * Removes a recurring deduction component from an employee.
+ */
+export async function removeEmployeeDeduction(db: Firestore, institutionId: string, employeeId: string, assignmentId: string) {
+  const ref = doc(db, 'institutions', institutionId, 'employees', employeeId, 'deductions', assignmentId);
+  return deleteDoc(ref);
 }

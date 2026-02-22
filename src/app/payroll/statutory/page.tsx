@@ -361,7 +361,7 @@ export default function StatutoryHubPage() {
               <div className="flex items-center gap-3 mb-6 relative z-10">
                 <div className="p-2 rounded-xl bg-white/20 backdrop-blur-md shadow-inner"><Clock className="size-5" /></div>
                 <div>
-                  <h3 className="text-lg font-black uppercase tracking-widest">Statutory Review</h3>
+                  <DialogTitle className="text-lg font-black uppercase tracking-widest">Statutory Review</DialogTitle>
                   <p className="text-[10px] font-bold uppercase opacity-70">Cycle: {selectedRunForReview?.runNumber}</p>
                 </div>
               </div>
@@ -415,9 +415,9 @@ export default function StatutoryHubPage() {
               <div className="absolute top-0 right-0 p-4 opacity-5"><Scale className="size-32 -rotate-12" /></div>
               <div className="flex items-center gap-3 mb-2 relative z-10">
                 <div className="p-2 rounded-xl bg-primary/10 text-primary shadow-inner"><Calculator className="size-5" /></div>
-                <h3 className="text-lg font-black uppercase tracking-widest">General Ledger Handshake</h3>
+                <DialogTitle className="text-lg font-black uppercase tracking-widest">General Ledger Handshake</DialogTitle>
               </div>
-              <p className="text-xs text-muted-foreground max-w-md relative z-10">Verification of real-time payroll computation against institutional Chart of Account nodes.</p>
+              <DialogDescription className="text-xs text-muted-foreground max-w-md relative z-10">Verification of real-time payroll computation against institutional Chart of Account nodes.</DialogDescription>
             </div>
             
             <div className="p-8 space-y-6">

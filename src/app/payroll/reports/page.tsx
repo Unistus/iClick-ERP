@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -26,13 +27,19 @@ import {
   Zap,
   Scale,
   Clock,
-  History
+  History,
+  ShieldCheck,
+  AlertTriangle,
+  Users,
+  HandCoins,
+  ArrowUpRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
+import { Progress } from "@/components/ui/progress";
 
-type PayrollReportType = 'CONSOLIDATED' | 'STATUTORY' | 'DEPARTMENTAL' | 'VARIANCES';
+type PayrollReportType = 'CONSOLIDATED' | 'STATUTORY' | 'DEPARTMENTAL' | 'VARIANCES' | 'LOAN_AUDIT';
 
 const REPORT_CATEGORIES = [
   {
@@ -40,6 +47,7 @@ const REPORT_CATEGORIES = [
     reports: [
       { id: 'CONSOLIDATED', title: "Master Wage Ledger", description: "Gross vs Net across all cost centers.", icon: Wallet },
       { id: 'STATUTORY', title: "Regulatory Returns", description: "P.A.Y.E, NSSF, and Levy audit.", icon: Landmark },
+      { id: 'LOAN_AUDIT', title: "Loan Asset Audit", description: "Staff credit exposure and arrears.", icon: HandCoins },
     ]
   },
   {
@@ -69,6 +77,12 @@ export default function PayrollReportsPage() {
   }, [db, selectedInstId]);
   const { data: runs, isLoading: runsLoading } = useCollection(runsQuery);
 
+  const loansQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return query(collection(db, 'institutions', selectedInstId, 'loans'), orderBy('createdAt', 'desc'));
+  }, [db, selectedInstId]);
+  const { data: loans, isLoading: loansLoading } = useCollection(loansQuery);
+
   const settingsRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return doc(db, 'institutions', selectedInstId, 'settings', 'global');
@@ -77,9 +91,92 @@ export default function PayrollReportsPage() {
 
   const currency = settings?.general?.currencySymbol || "KES";
 
+  // --- REPORT COMPONENTS ---
+
+  const LoanAuditReport = () => {
+    const activeLoans = loans?.filter(l => l.status === 'Active') || [];
+    const totalPrincipal = loans?.reduce((sum, l) => sum + (l.principal || 0), 0) || 0;
+    const totalBalance = loans?.reduce((sum, l) => sum + (l.balance || 0), 0) || 0;
+    const totalRecouped = totalPrincipal - totalBalance;
+
+    return (
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-700">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-primary/5 border-primary/20">
+            <CardHeader className="p-4 pb-2"><p className="text-[10px] font-black uppercase text-primary tracking-widest">Global Principal</p></CardHeader>
+            <CardContent className="px-4 pb-4"><p className="text-xl font-bold font-headline">{currency} {totalPrincipal.toLocaleString()}</p></CardContent>
+          </Card>
+          <Card className="bg-emerald-500/5 border-emerald-500/20">
+            <CardHeader className="p-4 pb-2"><p className="text-[10px] font-black uppercase text-emerald-500 tracking-widest">Amount Recouped</p></CardHeader>
+            <CardContent className="px-4 pb-4"><p className="text-xl font-bold font-headline">{currency} {totalRecouped.toLocaleString()}</p></CardContent>
+          </Card>
+          <Card className="bg-destructive/5 border-destructive/20 ring-1 ring-destructive/30">
+            <CardHeader className="p-4 pb-2"><p className="text-[10px] font-black uppercase text-destructive tracking-widest">Current Exposure</p></CardHeader>
+            <CardContent className="px-4 pb-4"><p className="text-xl font-bold font-headline">{currency} {totalBalance.toLocaleString()}</p></CardContent>
+          </Card>
+        </div>
+
+        <section className="space-y-4">
+          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground border-b pb-2">Personnel Credit Ledger</h3>
+          <Table>
+            <TableHeader className="bg-secondary/30">
+              <TableRow>
+                <TableHead className="h-12 text-[9px] font-black uppercase pl-6">Staff Identity</TableHead>
+                <TableHead className="h-12 text-[9px] font-black uppercase">Initial Principal</TableHead>
+                <TableHead className="h-12 text-[9px] font-black uppercase w-[200px]">Settlement Progress</TableHead>
+                <TableHead className="h-12 text-right pr-6 text-[9px] font-black uppercase">Net Arrears</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {!loans?.length ? (
+                <TableRow><TableCell colSpan={4} className="text-center py-20 text-[10px] opacity-20 uppercase font-black italic">No staff credit nodes detected.</TableCell></TableRow>
+              ) : loans.map(l => {
+                const progress = ((l.principal - l.balance) / l.principal) * 100;
+                return (
+                  <TableRow key={l.id} className="h-16 hover:bg-secondary/10 transition-colors border-b-border/30">
+                    <TableCell className="pl-6">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-black uppercase tracking-tight">{l.employeeName}</span>
+                        <span className="text-[8px] text-muted-foreground font-mono uppercase opacity-60">{l.type} • ID: {l.id.slice(0, 5)}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono text-[10px] opacity-60 uppercase">{currency} {l.principal?.toLocaleString()}</TableCell>
+                    <TableCell>
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-[8px] font-black uppercase tracking-tighter">
+                          <span className="opacity-40">Recouped</span>
+                          <span className="text-primary">{progress.toFixed(0)}%</span>
+                        </div>
+                        <Progress value={progress} className="h-1 bg-secondary shadow-inner" />
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right pr-6 font-mono text-xs font-black text-destructive">
+                      {currency} {l.balance?.toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </section>
+
+        <div className="p-6 bg-primary/5 border border-primary/10 rounded-2xl flex gap-4 items-start shadow-inner">
+          <ShieldCheck className="size-6 text-primary shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="text-[10px] font-black uppercase tracking-widest text-primary">Audit Note</p>
+            <p className="text-[11px] leading-relaxed text-muted-foreground font-medium italic">
+              "Loan exposure is tracked as a contra-liability. Recoupment occurs during the 'Posted' phase of the payroll cycle, ensuring staff net pay is computed correctly before settlement."
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-4">
+        {/* Header Bar */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3">
             <div className="p-1.5 rounded bg-primary/20 text-primary shadow-inner">
@@ -167,36 +264,47 @@ export default function PayrollReportsPage() {
                 </CardHeader>
                 
                 <ScrollArea className="flex-1 p-8">
-                  {runsLoading ? (
+                  {runsLoading || loansLoading ? (
                     <div className="h-64 flex flex-col items-center justify-center space-y-4">
                       <Activity className="size-8 animate-spin text-primary opacity-30" />
                       <p className="text-[10px] font-black uppercase tracking-widest opacity-50">Aggregating Remuneration Sub-ledgers...</p>
                     </div>
                   ) : (
                     <div className="animate-in fade-in duration-700">
-                      <Table>
-                        <TableHeader className="bg-secondary/30">
-                          <TableRow>
-                            <TableHead className="text-[10px] uppercase font-black pl-6">Reference</TableHead>
-                            <TableHead className="text-[10px] uppercase font-black text-right">Gross</TableHead>
-                            <TableHead className="text-[10px] uppercase font-black text-right">Deductions</TableHead>
-                            <TableHead className="text-[10px] uppercase font-black text-right pr-6">Net Settlement</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {runs?.map(run => (
-                            <TableRow key={run.id} className="h-14 border-b-border/30 hover:bg-secondary/5">
-                              <TableCell className="pl-6">
-                                <p className="text-xs font-black uppercase tracking-tight">{run.runNumber}</p>
-                                <p className="text-[9px] text-muted-foreground font-mono">{format(run.createdAt?.toDate ? run.createdAt.toDate() : new Date(), 'dd MMM yyyy')}</p>
-                              </TableCell>
-                              <TableCell className="text-right font-mono text-xs opacity-60">{currency} {run.totalGross?.toLocaleString()}</TableCell>
-                              <TableCell className="text-right font-mono text-xs text-destructive">{currency} {run.totalDeductions?.toLocaleString()}</TableCell>
-                              <TableCell className="text-right pr-6 font-mono text-xs font-black text-primary">{currency} {run.totalNet?.toLocaleString()}</TableCell>
+                      {activeReport === 'CONSOLIDATED' && (
+                        <Table>
+                          <TableHeader className="bg-secondary/30">
+                            <TableRow>
+                              <TableHead className="text-[10px] uppercase font-black pl-6">Reference</TableHead>
+                              <TableHead className="text-[10px] uppercase font-black text-right">Gross</TableHead>
+                              <TableHead className="text-[10px] uppercase font-black text-right">Deductions</TableHead>
+                              <TableHead className="text-[10px] uppercase font-black text-right pr-6">Net Settlement</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                          </TableHeader>
+                          <TableBody>
+                            {runs?.map(run => (
+                              <TableRow key={run.id} className="h-14 border-b-border/30 hover:bg-secondary/5">
+                                <TableCell className="pl-6">
+                                  <p className="text-xs font-black uppercase tracking-tight">{run.runNumber}</p>
+                                  <p className="text-[9px] text-muted-foreground font-mono">{format(run.createdAt?.toDate ? run.createdAt.toDate() : new Date(), 'dd MMM yyyy')}</p>
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-xs opacity-60">{currency} {run.totalGross?.toLocaleString()}</TableCell>
+                                <TableCell className="text-right font-mono text-xs text-destructive">{currency} {run.totalDeductions?.toLocaleString()}</TableCell>
+                                <TableCell className="text-right pr-6 font-mono text-xs font-black text-primary">{currency} {run.totalNet?.toLocaleString()}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+
+                      {activeReport === 'LOAN_AUDIT' && <LoanAuditReport />}
+
+                      {['STATUTORY', 'DEPARTMENTAL', 'VARIANCES'].includes(activeReport) && (
+                        <div className="h-96 flex flex-col items-center justify-center space-y-4 border-2 border-dashed rounded-3xl opacity-20 italic">
+                          <Zap className="size-12" />
+                          <p className="font-bold uppercase tracking-widest text-xs">Generating Advanced Insights...</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </ScrollArea>

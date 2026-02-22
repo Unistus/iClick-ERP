@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -29,13 +28,17 @@ import {
   Clock,
   History,
   ShieldCheck,
-  AlertTriangle,
+  AlertCircle,
+  ShieldAlert,
+  ArrowRight,
+  MapPin,
   Users,
   HandCoins,
   ArrowUpRight,
   PieChart,
   BrainCircuit,
-  Target
+  Target,
+  FileBadge
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";

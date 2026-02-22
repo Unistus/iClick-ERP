@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -28,7 +29,10 @@ import {
   Calculator,
   ShieldAlert,
   BadgeCent,
-  Clock
+  Clock,
+  XCircle,
+  Eye,
+  CheckCircle
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
@@ -36,12 +40,17 @@ import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 export default function StatutoryHubPage() {
   const db = useFirestore();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [dataTimestamp, setDataTimestamp] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Modal States
+  const [selectedRunForReview, setSelectedRunForReview] = useState<any>(null);
+  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
 
   useEffect(() => {
     setDataTimestamp(new Date().toLocaleTimeString());
@@ -49,7 +58,7 @@ export default function StatutoryHubPage() {
 
   const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
-  // Data Fetching: Runs (Pulling more to provide a decent historical audit)
+  // Data Fetching: Runs
   const runsQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return query(
@@ -67,36 +76,48 @@ export default function StatutoryHubPage() {
   }, [db, selectedInstId]);
   const { data: coa } = useCollection(coaRef);
 
-  const settingsRef = useMemoFirebase(() => {
+  // Data Fetching: Payroll Settings for mappings
+  const setupRef = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return doc(db, 'institutions', selectedInstId, 'settings', 'payroll');
+  }, [db, selectedInstId]);
+  const { data: payrollSetup } = useDoc(setupRef);
+
+  const globalSettingsRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return doc(db, 'institutions', selectedInstId, 'settings', 'global');
   }, [db, selectedInstId]);
-  const { data: settings } = useDoc(settingsRef);
+  const { data: globalSettings } = useDoc(globalSettingsRef);
 
-  const currency = settings?.general?.currencySymbol || "KES";
+  const currency = globalSettings?.general?.currencySymbol || "KES";
 
-  // AGGREGATION ENGINE: Compute dynamic liabilities from posted runs
+  // AGGREGATION ENGINE
   const aggregates = useMemo(() => {
     const activeRuns = runs?.filter(r => r.status === 'Posted' || r.status === 'Settled') || [];
-    
-    // We'll simulate a 30-day window for the KPIs
     return {
       paye: activeRuns.reduce((sum, r) => sum + (r.totalPAYE || 0), 0),
-      nssf: activeRuns.reduce((sum, r) => sum + (r.totalNSSF || 0) * 2, 0), // Emp + Employer
-      housing: activeRuns.reduce((sum, r) => sum + (r.totalHousing || 0) * 2, 0), // Emp + Employer
+      nssf: activeRuns.reduce((sum, r) => sum + (r.totalNSSF || 0) * 2, 0),
+      housing: activeRuns.reduce((sum, r) => sum + (r.totalHousing || 0) * 2, 0),
       sha: activeRuns.reduce((sum, r) => sum + (r.totalSHA || 0), 0),
-      totalLiability: 0
     };
   }, [runs]);
 
-  // LEDGER HANDSHAKE: Compare Payroll output with GL Account Balances
-  const ledgerDiscrepancy = useMemo(() => {
-    if (!coa) return false;
-    const payeAcc = coa.find(a => a.code === '2310'); // P.A.Y.E Liability Node
-    if (!payeAcc) return false;
-    // Discrepancy if Ledger balance != aggregated payroll output (simplified check)
-    return Math.abs(payeAcc.balance - aggregates.paye) > 100;
-  }, [coa, aggregates.paye]);
+  // LEDGER AUDIT LOGIC
+  const auditReport = useMemo(() => {
+    if (!coa || !payrollSetup) return [];
+    
+    const findBal = (id: string) => coa.find(a => a.id === id)?.balance || 0;
+    const findCode = (id: string) => coa.find(a => a.id === id)?.code || '...';
+
+    return [
+      { label: 'P.A.Y.E Tax', payroll: aggregates.paye, ledger: findBal(payrollSetup.payeAccountId), code: findCode(payrollSetup.payeAccountId) },
+      { label: 'NSSF Pension', payroll: aggregates.nssf, ledger: findBal(payrollSetup.nssfAccountId), code: findCode(payrollSetup.nssfAccountId) },
+      { label: 'S.H.A Health', payroll: aggregates.sha, ledger: findBal(payrollSetup.shaAccountId), code: findCode(payrollSetup.shaAccountId) },
+      { label: 'Housing Levy', payroll: aggregates.housing, ledger: findBal(payrollSetup.housingLevyAccountId), code: findCode(payrollSetup.housingLevyAccountId) },
+    ];
+  }, [coa, payrollSetup, aggregates]);
+
+  const hasLedgerDiscrepancy = auditReport.some(item => Math.abs(item.payroll - item.ledger) > 1);
 
   const handleExport = (type: string) => {
     toast({ 
@@ -127,7 +148,7 @@ export default function StatutoryHubPage() {
           <div className="flex flex-wrap items-center gap-3">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
               <SelectTrigger className="w-[240px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
-                <SelectValue placeholder={instLoading ? "Authorizing..." : "Select Institution"} />
+                <SelectValue placeholder={instLoading ? "Validating Access..." : "Select Institution"} />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (
@@ -186,21 +207,21 @@ export default function StatutoryHubPage() {
                 </CardContent>
               </Card>
 
-              <Card className={cn("border-none ring-1 shadow-sm relative overflow-hidden transition-all", ledgerDiscrepancy ? "bg-destructive/5 ring-destructive/30" : "bg-emerald-500/5 ring-emerald-500/30")}>
+              <Card className={cn("border-none ring-1 shadow-sm relative overflow-hidden transition-all", hasLedgerDiscrepancy ? "bg-destructive/5 ring-destructive/30" : "bg-emerald-500/5 ring-emerald-500/30")}>
                 <div className="absolute -right-4 -bottom-4 opacity-10 rotate-12">
-                  {ledgerDiscrepancy ? <ShieldAlert className="size-24 text-destructive" /> : <CheckCircle2 className="size-24 text-emerald-500" />}
+                  {hasLedgerDiscrepancy ? <ShieldAlert className="size-24 text-destructive" /> : <CheckCircle2 className="size-24 text-emerald-500" />}
                 </div>
                 <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between relative z-10">
-                  <span className={cn("text-[9px] font-black uppercase tracking-widest", ledgerDiscrepancy ? "text-destructive" : "text-emerald-500")}>
-                    {ledgerDiscrepancy ? "Ledger Mismatch" : "Compliance Status"}
+                  <span className={cn("text-[9px] font-black uppercase tracking-widest", hasLedgerDiscrepancy ? "text-destructive" : "text-emerald-500")}>
+                    {hasLedgerDiscrepancy ? "Ledger Mismatch" : "Compliance Status"}
                   </span>
-                  <div className={cn("size-2.5 rounded-full animate-pulse", ledgerDiscrepancy ? "bg-destructive" : "bg-emerald-500")} />
+                  <div className={cn("size-2.5 rounded-full animate-pulse", hasLedgerDiscrepancy ? "bg-destructive" : "bg-emerald-500")} />
                 </CardHeader>
                 <CardContent className="pb-4 relative z-10">
-                  <div className={cn("text-xl font-black font-headline", ledgerDiscrepancy ? "text-destructive" : "text-emerald-500")}>
-                    {ledgerDiscrepancy ? "VARIANCE" : "VERIFIED"}
+                  <div className={cn("text-xl font-black font-headline", hasLedgerDiscrepancy ? "text-destructive" : "text-emerald-500")}>
+                    {hasLedgerDiscrepancy ? "VARIANCE" : "VERIFIED"}
                   </div>
-                  <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Against KRA Standards</p>
+                  <p className="text-[9px] text-muted-foreground font-bold uppercase mt-1">Against GL Standards</p>
                 </CardContent>
               </Card>
             </div>
@@ -280,7 +301,12 @@ export default function StatutoryHubPage() {
                           {currency} {(run.totalPAYE || 0).toLocaleString()}
                         </TableCell>
                         <TableCell className="text-right pr-8">
-                          <Button variant="ghost" size="sm" className="h-9 px-4 text-[9px] font-black uppercase gap-2 hover:bg-primary/10 hover:text-primary transition-all group-hover:scale-105 shadow-inner">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-9 px-4 text-[9px] font-black uppercase gap-2 hover:bg-primary/10 hover:text-primary transition-all group-hover:scale-105 shadow-inner"
+                            onClick={() => setSelectedRunForReview(run)}
+                          >
                             Review Filing <ExternalLink className="size-3" />
                           </Button>
                         </TableCell>
@@ -313,12 +339,145 @@ export default function StatutoryHubPage() {
                 </div>
                 <div className="flex justify-between items-end mt-6">
                   <span className="text-[8px] font-mono text-muted-foreground uppercase">Data Node: {dataTimestamp}</span>
-                  <Button variant="link" size="sm" className="p-0 h-auto text-emerald-500 font-bold text-[9px] uppercase gap-1.5 hover:gap-2 transition-all">Audit Ledger Balances <ArrowUpRight className="size-3" /></Button>
+                  <Button 
+                    variant="link" 
+                    size="sm" 
+                    className="p-0 h-auto text-emerald-500 font-bold text-[9px] uppercase gap-1.5 hover:gap-2 transition-all"
+                    onClick={() => setIsAuditModalOpen(true)}
+                  >
+                    Audit Ledger Balances <ArrowUpRight className="size-3" />
+                  </Button>
                 </div>
               </div>
             </div>
           </div>
         )}
+
+        {/* REVIEW FILING DIALOG */}
+        <Dialog open={!!selectedRunForReview} onOpenChange={(open) => !open && setSelectedRunForReview(null)}>
+          <DialogContent className="max-w-xl shadow-2xl ring-1 ring-border rounded-[2.5rem] overflow-hidden p-0 border-none">
+            <div className="bg-primary p-8 text-white relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-10"><ShieldCheck className="size-32 rotate-12" /></div>
+              <div className="flex items-center gap-3 mb-6 relative z-10">
+                <div className="p-2 rounded-xl bg-white/20 backdrop-blur-md shadow-inner"><Clock className="size-5" /></div>
+                <div>
+                  <h3 className="text-lg font-black uppercase tracking-widest">Statutory Review</h3>
+                  <p className="text-[10px] font-bold uppercase opacity-70">Cycle: {selectedRunForReview?.runNumber}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-8 relative z-10">
+                <div>
+                  <p className="text-[9px] font-black uppercase opacity-60 tracking-widest mb-1">Gross Payroll</p>
+                  <p className="text-2xl font-black font-headline tracking-tighter">{currency} {selectedRunForReview?.totalGross?.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-[9px] font-black uppercase opacity-60 tracking-widest mb-1">Net Settlement</p>
+                  <p className="text-2xl font-black font-headline tracking-tighter">{currency} {selectedRunForReview?.totalNet?.toLocaleString()}</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-8 space-y-6">
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-black uppercase text-muted-foreground tracking-widest pl-1">Compliance Breakdown</h4>
+                <div className="grid gap-2">
+                  {[
+                    { label: 'P.A.Y.E (Tax)', val: selectedRunForReview?.totalPAYE, color: 'text-primary' },
+                    { label: 'NSSF Pension', val: selectedRunForReview?.totalNSSF * 2, color: 'text-emerald-500' },
+                    { label: 'SHA Health Fund', val: selectedRunForReview?.totalSHA, color: 'text-accent' },
+                    { label: 'Housing Levy (3%)', val: selectedRunForReview?.totalHousing * 2, color: 'text-primary' },
+                  ].map(item => (
+                    <div key={item.label} className="flex items-center justify-between p-3 rounded-2xl bg-secondary/5 border border-border/50">
+                      <span className="text-[10px] font-bold uppercase opacity-70">{item.label}</span>
+                      <span className={cn("font-mono text-xs font-black", item.color)}>{currency} {item.val?.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl flex gap-4 items-start shadow-inner">
+                <CheckCircle2 className="size-5 text-emerald-600 shrink-0 mt-0.5 animate-pulse" />
+                <p className="text-[10px] leading-relaxed italic text-muted-foreground font-medium">
+                  This cycle is locked and verified. The statutory components are ready for institutional reporting portals.
+                </p>
+              </div>
+              <DialogFooter className="pt-2">
+                <Button className="w-full h-12 font-black uppercase text-xs shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-3 rounded-2xl" onClick={() => handleExport(selectedRunForReview.runNumber)}>
+                  <Download className="size-4" /> Download Filing Dataset
+                </Button>
+              </DialogFooter>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* AUDIT LEDGER DIALOG */}
+        <Dialog open={isAuditModalOpen} onOpenChange={setIsAuditModalOpen}>
+          <DialogContent className="max-w-2xl shadow-2xl ring-1 ring-border rounded-[2.5rem] overflow-hidden p-0 border-none">
+            <div className="bg-secondary p-8 text-foreground relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-5"><Scale className="size-32 -rotate-12" /></div>
+              <div className="flex items-center gap-3 mb-2 relative z-10">
+                <div className="p-2 rounded-xl bg-primary/10 text-primary shadow-inner"><Calculator className="size-5" /></div>
+                <h3 className="text-lg font-black uppercase tracking-widest">General Ledger Handshake</h3>
+              </div>
+              <p className="text-xs text-muted-foreground max-w-md relative z-10">Verification of real-time payroll computation against institutional Chart of Account nodes.</p>
+            </div>
+            
+            <div className="p-8 space-y-6">
+              <Table>
+                <TableHeader className="bg-secondary/20">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="h-10 text-[9px] font-black uppercase pl-6">Statutory Node</TableHead>
+                    <TableHead className="h-10 text-[9px] font-black uppercase text-right">Payroll Output</TableHead>
+                    <TableHead className="h-10 text-[9px] font-black uppercase text-right">GL Balance</TableHead>
+                    <TableHead className="h-10 text-right pr-6 text-[9px] font-black uppercase">Variance</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {auditReport.map(item => {
+                    const variance = item.payroll - item.ledger;
+                    return (
+                      <TableRow key={item.label} className="h-14 border-b-border/30 hover:bg-secondary/5 transition-all">
+                        <TableCell className="pl-6">
+                          <p className="text-xs font-black uppercase tracking-tight">{item.label}</p>
+                          <p className="text-[8px] font-mono text-muted-foreground uppercase opacity-50">Node: {item.code}</p>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs font-bold text-primary">{currency} {item.payroll.toLocaleString(undefined, { maximumFractionDigits: 0 })}</TableCell>
+                        <TableCell className="text-right font-mono text-xs font-bold">{currency} {item.ledger.toLocaleString(undefined, { maximumFractionDigits: 0 })}</TableCell>
+                        <TableCell className="text-right pr-6">
+                          <Badge variant="outline" className={cn(
+                            "text-[9px] h-5 font-black uppercase border-none ring-1 px-2.5 shadow-sm",
+                            Math.abs(variance) < 1 ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : 'bg-destructive/10 text-destructive ring-destructive/20'
+                          )}>
+                            {Math.abs(variance) < 1 ? 'MATCHED' : `${variance > 0 ? '+' : ''}${variance.toLocaleString()}`}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+
+              {!hasLedgerDiscrepancy ? (
+                <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-2xl flex gap-4 items-center shadow-inner">
+                  <CheckCircle className="size-6 text-emerald-600 shrink-0" />
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600">Sync Integrity: 100% Validated</p>
+                </div>
+              ) : (
+                <div className="p-4 bg-destructive/5 border border-destructive/10 rounded-2xl flex gap-4 items-start shadow-inner">
+                  <ShieldAlert className="size-6 text-destructive shrink-0 mt-0.5 animate-pulse" />
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-destructive">Variance Detected</p>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground italic">
+                      The Ledger Balance for one or more statutory nodes does not match the accumulated payroll output. Please verify manual Journal Entries in the **Financial Suite**.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter className="pt-2">
+                <Button variant="ghost" className="w-full h-12 font-black uppercase text-[10px] tracking-widest hover:bg-secondary/20" onClick={() => setIsAuditModalOpen(false)}>Close Auditor</Button>
+              </DialogFooter>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

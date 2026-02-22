@@ -91,19 +91,19 @@ export default function PayrollReportsPage() {
     if (!selectedInstId) return null;
     return collection(db, 'institutions', selectedInstId, 'branches');
   }, [db, selectedInstId]);
-  const { data: branches } = useCollection(branchesQuery);
+  const { data: branches, isLoading: branchesLoading } = useCollection(branchesQuery);
 
   const coaQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return collection(db, 'institutions', selectedInstId, 'coa');
   }, [db, selectedInstId]);
-  const { data: coa } = useCollection(coaQuery);
+  const { data: coa, isLoading: coaLoading } = useCollection(coaQuery);
 
   const employeesQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return collection(db, 'institutions', selectedInstId, 'employees');
   }, [db, selectedInstId]);
-  const { data: employees } = useCollection(employeesQuery);
+  const { data: employees, isLoading: employeesLoading } = useCollection(employeesQuery);
 
   const settingsRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -131,7 +131,7 @@ export default function PayrollReportsPage() {
     }
 
     if (activeReport === 'STATUTORY') {
-      const taxRatio = (latest.totalPAYE / latest.totalGross) * 100;
+      const taxRatio = latest.totalGross > 0 ? (latest.totalPAYE / latest.totalGross) * 100 : 0;
       return {
         title: "Compliance Insight",
         msg: `The effective institutional tax rate is ${taxRatio.toFixed(1)}%. All social security and health nodes are synchronized with portal standards.`,
@@ -141,9 +141,9 @@ export default function PayrollReportsPage() {
 
     if (activeReport === 'VARIANCES') {
       const budgetAcc = coa?.find(a => a.id === 'salaries_expense');
-      const limit = budgetAcc?.monthlyLimit || 0;
+      const limitVal = budgetAcc?.monthlyLimit || 0;
       const actual = latest.totalGross || 0;
-      const variance = limit - actual;
+      const variance = limitVal - actual;
       return {
         title: "Fiscal Drift",
         msg: variance < 0 
@@ -273,7 +273,7 @@ export default function PayrollReportsPage() {
             <div className="space-y-1 relative z-10">
               <p className="text-[10px] font-black uppercase text-primary tracking-widest">Top Cost Center</p>
               <p className="text-2xl font-black font-headline">{branchSpend[0]?.name || 'N/A'}</p>
-              <p className="text-[9px] font-bold uppercase opacity-50">{branchSpend[0]?.count} ACTIVE NODES</p>
+              <p className="text-[9px] font-bold uppercase opacity-50">{branchSpend[0]?.count || 0} ACTIVE NODES</p>
             </div>
           </Card>
           <div className="p-6 bg-secondary/10 rounded-[2rem] border border-border/50 flex flex-col justify-center">
@@ -319,9 +319,9 @@ export default function PayrollReportsPage() {
   const VarianceReport = () => {
     const salariesAcc = coa?.find(a => a.id === 'salaries_expense');
     const latest = runs?.[0];
-    const limit = salariesAcc?.monthlyLimit || 0;
+    const limitVal = salariesAcc?.monthlyLimit || 0;
     const actual = latest?.totalGross || 0;
-    const pct = limit > 0 ? (actual / limit) * 100 : 0;
+    const pct = limitVal > 0 ? (actual / limitVal) * 100 : 0;
 
     return (
       <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-700">
@@ -338,7 +338,7 @@ export default function PayrollReportsPage() {
             <div className="flex justify-between items-start">
               <div className="space-y-1">
                 <p className="text-[10px] font-black uppercase text-muted-foreground opacity-50 tracking-widest">Monthly Allocation</p>
-                <p className="text-3xl font-black font-headline">{currency} {limit.toLocaleString()}</p>
+                <p className="text-3xl font-black font-headline">{currency} {limitVal.toLocaleString()}</p>
               </div>
               <Target className="size-6 text-primary opacity-20" />
             </div>
@@ -355,14 +355,14 @@ export default function PayrollReportsPage() {
             <div className="flex justify-between items-start">
               <div className="space-y-1">
                 <p className="text-[10px] font-black uppercase text-muted-foreground opacity-50 tracking-widest">Variance Status</p>
-                <p className={cn("text-3xl font-black font-headline", actual > limit ? "text-destructive" : "text-emerald-500")}>
-                  {actual > limit ? 'BREACHED' : 'HEALTHY'}
+                <p className={cn("text-3xl font-black font-headline", actual > limitVal ? "text-destructive" : "text-emerald-500")}>
+                  {actual > limitVal ? 'BREACHED' : 'HEALTHY'}
                 </p>
               </div>
               <Activity className="size-6 text-emerald-500 opacity-20" />
             </div>
             <div className="p-4 bg-secondary/5 rounded-2xl border border-border/50 text-[11px] leading-relaxed italic text-muted-foreground">
-              {actual > limit 
+              {actual > limitVal 
                 ? "The current payroll payload exceeds the allocated budget node. Managerial override or budget re-allocation required."
                 : "Institutional spend is within safe thresholds. Current headroom allows for additional tactical resource allocation."}
             </div>
@@ -440,6 +440,8 @@ export default function PayrollReportsPage() {
       </div>
     );
   };
+
+  const isLoadingData = runsLoading || loansLoading || branchesLoading || employeesLoading || coaLoading;
 
   return (
     <DashboardLayout>
@@ -532,7 +534,7 @@ export default function PayrollReportsPage() {
                     <Badge variant="outline" className={cn("text-[8px] font-black h-4 px-1.5 border-none ring-1", 
                       reportInsights.priority === 'High' ? 'bg-destructive/10 text-destructive ring-destructive/20' : 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20'
                     )}>
-                      {reportInsights.priority?.toUpperCase()} PRIORITY
+                      {reportInsights.priority?.toUpperCase() || 'LOW'} PRIORITY
                     </Badge>
                   </div>
                 </CardContent>
@@ -557,7 +559,7 @@ export default function PayrollReportsPage() {
                 </CardHeader>
                 
                 <ScrollArea className="flex-1 p-8">
-                  {runsLoading || loansLoading || productsLoading ? (
+                  {isLoadingData ? (
                     <div className="h-64 flex flex-col items-center justify-center space-y-4">
                       <Activity className="size-8 animate-spin text-primary opacity-30" />
                       <p className="text-[10px] font-black uppercase tracking-widest opacity-50">Aggregating Remuneration Sub-ledgers...</p>

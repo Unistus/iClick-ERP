@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -218,7 +219,7 @@ export default function HRSetupPage() {
             <Button 
               size="sm" 
               variant="outline" 
-              className="gap-2 h-9 text-[10px] font-black uppercase border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/5"
+              className="gap-2 h-9 text-[10px] font-black uppercase border-emerald-500/20 text-emerald-500 hover:bg-emerald-500/5 shadow-sm"
               disabled={!selectedInstId || isBootstrapping}
               onClick={handleBootstrap}
             >
@@ -229,7 +230,7 @@ export default function HRSetupPage() {
         </div>
 
         {!selectedInstId ? (
-          <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed rounded-[2.5rem] bg-secondary/5">
+          <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed rounded-[2rem] bg-secondary/5">
             <ShieldCheck className="size-16 text-muted-foreground opacity-10 mb-4 animate-pulse" />
             <p className="text-sm font-medium text-muted-foreground text-center px-6">Select an institution to configure its personnel perimeter.</p>
           </div>

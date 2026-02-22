@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -11,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, serverTimestamp, setDoc, query, orderBy, deleteDoc } from "firebase/firestore";
+import { collection, doc, serverTimestamp, setDoc, query, orderBy, updateDoc } from "firebase/firestore";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { 
   Settings2, 
@@ -31,7 +32,9 @@ import {
   ShieldCheck,
   Percent,
   ListTree,
-  Building
+  Building,
+  ShieldAlert,
+  ArrowUpRight
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";

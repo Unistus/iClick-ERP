@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -103,7 +104,7 @@ export default function PayrollProcessingPage() {
           <div className="flex flex-wrap items-center gap-3">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
               <SelectTrigger className="w-[240px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
-                <SelectValue placeholder={instLoading ? "Validating..." : "Select Institution"} />
+                <SelectValue placeholder={instLoading ? "Validating Access..." : "Select Institution"} />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (
@@ -140,7 +141,7 @@ export default function PayrollProcessingPage() {
               <CardContent className="p-0 overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-secondary/20">
-                    <TableRow className="hover:bg-transparent">
+                    <TableRow>
                       <TableHead className="h-12 text-[9px] font-black uppercase pl-8 text-muted-foreground">Run Reference</TableHead>
                       <TableHead className="h-12 text-[9px] font-black uppercase text-muted-foreground">Period Node</TableHead>
                       <TableHead className="h-12 text-[9px] font-black uppercase text-center text-muted-foreground">Workflow Stage</TableHead>
@@ -219,6 +220,7 @@ export default function PayrollProcessingPage() {
           </div>
         )}
 
+        {/* INITIALIZE RUN DIALOG */}
         <Dialog open={isRunModalOpen} onOpenChange={setIsRunModalOpen}>
           <DialogContent className="max-w-md shadow-2xl ring-1 ring-border rounded-[2.5rem] overflow-hidden">
             <form onSubmit={handleInitializeRun}>
@@ -257,7 +259,7 @@ export default function PayrollProcessingPage() {
               <DialogFooter className="bg-secondary/10 p-8 border-t gap-3">
                 <Button type="button" variant="ghost" onClick={() => setIsRunModalOpen(false)} className="h-12 font-black uppercase text-[10px] tracking-widest">Discard</Button>
                 <Button type="submit" disabled={isProcessing} className="h-12 px-12 font-black uppercase text-[10px] shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-3 border-none ring-2 ring-primary/20">
-                  {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <PlayCircle className="size-4" />} Initialize Computation
+                  {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <PlayCircle className="size-4" />} Initialize Computation
                 </Button>
               </DialogFooter>
             </form>

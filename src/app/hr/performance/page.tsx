@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -175,10 +176,13 @@ export default function PerformanceReviewsPage() {
             </div>
 
             <div className="lg:col-span-4 space-y-6">
-              <Card className="bg-primary/5 border-none ring-1 ring-primary/20 p-6 relative overflow-hidden">
-                <div className="absolute -right-4 -bottom-4 opacity-5 rotate-12"><TrendingUp className="size-24 text-primary" /></div>
-                <div className="space-y-3 relative z-10">
-                  <p className="text-[10px] font-black uppercase text-primary tracking-widest">Growth Intelligence</p>
+              <Card className="bg-primary/5 border-none ring-1 ring-primary/20 p-6 rounded-2xl relative overflow-hidden group shadow-md">
+                <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:rotate-6 transition-transform"><TrendingUp className="size-32 text-primary" /></div>
+                <div className="flex flex-col gap-3 relative z-10">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="size-4 text-primary" />
+                    <p className="text-[10px] font-black uppercase text-primary tracking-widest">Growth Intelligence</p>
+                  </div>
                   <p className="text-[11px] leading-relaxed text-muted-foreground font-medium italic">
                     "Reviews are aggregated to calculate the **Talent Velocity Score**. High-performers are flagged for institutional leadership promotion tracks."
                   </p>

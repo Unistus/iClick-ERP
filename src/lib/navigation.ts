@@ -96,7 +96,8 @@ import {
   Cog,
   FileBadge,
   RefreshCw,
-  PlayCircle
+  PlayCircle,
+  GanttChart
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -122,6 +123,19 @@ export const navConfig: NavItem[] = [
     url: "/", 
     pattern: /^\/($|dashboard)/,
     id: "dashboard"
+  },
+  {
+    title: "Workflow Hub",
+    icon: GanttChart,
+    url: "/approvals",
+    pattern: /^\/approvals/,
+    id: "approvals",
+    submenus: [
+      { title: "Control Panel", icon: LayoutDashboard, url: "/approvals", id: "overview" },
+      { title: "Active Queue", icon: Zap, url: "/approvals?tab=Pending", id: "pending" },
+      { title: "Decision History", icon: History, url: "/approvals?tab=History", id: "history" },
+      { title: "Workflow Setup", icon: Settings2, url: "/admin/approval-workflows", id: "setup" },
+    ]
   },
   {
     title: "AI Strategist",

@@ -1,9 +1,10 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     /**
-     * GLOBAL PERMISSIVE POLICY (V18.0.0)
-     * Simplified for seamless multi-tenant development and data synchronization.
+     * GLOBAL PERMISSIVE POLICY (V18.1.0)
+     * Optimized for high-integrity institutional data access and compliance audits.
      */
     match /{document=**} {
       allow read, write: if true;

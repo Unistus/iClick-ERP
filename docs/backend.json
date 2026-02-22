@@ -1,67 +1,52 @@
 
 {
   "entities": {
-    "InstitutionSettings": {
-      "title": "InstitutionSettings",
-      "type": "object",
-      "description": "Comprehensive configuration object for an institution, managing operational, financial, and branding parameters.",
-      "properties": {
-        "id": { "type": "string" },
-        "general": {
-          "type": "object",
-          "properties": {
-            "timezone": { "type": "string" },
-            "fiscalYearStart": { "type": "string" },
-            "language": { "type": "string" },
-            "currencySymbol": { "type": "string" }
-          }
-        },
-        "pos": {
-          "type": "object",
-          "properties": {
-            "requireCustomerForSale": { "type": "boolean" },
-            "printReceiptOnComplete": { "type": "boolean" },
-            "allowCustomDiscounts": { "type": "boolean" }
-          }
-        }
-      }
-    },
-    "FiscalPeriod": {
-      "title": "FiscalPeriod",
-      "type": "object",
-      "description": "A defined accounting cycle for budgeting and auditing.",
-      "properties": {
-        "id": { "type": "string" },
-        "name": { "type": "string" },
-        "startDate": { "type": "string", "format": "date" },
-        "endDate": { "type": "string", "format": "date" },
-        "status": { "type": "string", "enum": ["Open", "Closed"] }
-      },
-      "required": ["name", "startDate", "endDate", "status"]
-    },
-    "BudgetAllocation": {
-      "title": "BudgetAllocation",
-      "type": "object",
-      "description": "A defined spend ceiling for a specific ledger account within a fiscal period.",
-      "properties": {
-        "accountId": { "type": "string" },
-        "limit": { "type": "number" },
-        "actual": { "type": "number" },
-        "utilization": { "type": "number" }
-      }
-    },
-    "Customer": {
-      "title": "Customer",
+    "Institution": {
+      "title": "Institution",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
-        "phone": { "type": "string" },
-        "status": { "type": "string", "enum": ["Lead", "Active", "Blocked"] },
-        "tier": { "type": "string", "enum": ["Silver", "Gold", "Platinum"] },
-        "loyaltyPoints": { "type": "number" },
-        "walletBalance": { "type": "number" }
+        "country": { "type": "string" },
+        "taxIdentificationNumber": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "PayrollRun": {
+      "title": "PayrollRun",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "runNumber": { "type": "string" },
+        "periodId": { "type": "string" },
+        "status": { "type": "string", "enum": ["Draft", "Posted", "Settled"] },
+        "totalGross": { "type": "number" },
+        "totalNet": { "type": "number" },
+        "totalDeductions": { "type": "number" },
+        "totalPAYE": { "type": "number" },
+        "totalNSSF": { "type": "number" },
+        "totalSHA": { "type": "number" },
+        "totalHousing": { "type": "number" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "PayrollItem": {
+      "title": "PayrollItem",
+      "type": "object",
+      "properties": {
+        "employeeId": { "type": "string" },
+        "employeeName": { "type": "string" },
+        "gross": { "type": "number" },
+        "netSalary": { "type": "number" },
+        "paye": { "type": "number" },
+        "nssf": { "type": "number" },
+        "sha": { "type": "number" },
+        "housingLevy": { "type": "number" },
+        "customDeductions": { "type": "number" }
       }
     }
   },
@@ -69,31 +54,17 @@
     "providers": ["password"]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/institutions/{institutionId}/fiscal_periods/{periodId}",
-        "definition": {
-          "entityName": "FiscalPeriod",
-          "schema": { "$ref": "#/backend/entities/FiscalPeriod" },
-          "description": "Institutional auditing and budgeting cycles."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/fiscal_periods/{periodId}/allocations/{accountId}",
-        "definition": {
-          "entityName": "BudgetAllocation",
-          "schema": { "$ref": "#/backend/entities/BudgetAllocation" },
-          "description": "Specific account spend targets per period."
-        }
-      },
-      {
-        "path": "/institutions/{institutionId}/customers/{customerId}",
-        "definition": {
-          "entityName": "Customer",
-          "schema": { "$ref": "#/backend/entities/Customer" },
-          "description": "Master customer identity ledger."
-        }
-      }
-    ]
+    "/institutions/{institutionId}": {
+      "schema": { "$ref": "#/entities/Institution" },
+      "description": "Global institution master record."
+    },
+    "/institutions/{institutionId}/payroll_runs/{runId}": {
+      "schema": { "$ref": "#/entities/PayrollRun" },
+      "description": "Consolidated payroll cycle headers."
+    },
+    "/institutions/{institutionId}/payroll_runs/{runId}/items/{itemId}": {
+      "schema": { "$ref": "#/entities/PayrollItem" },
+      "description": "Individual employee computation lines for a run."
+    }
   }
 }

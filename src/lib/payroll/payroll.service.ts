@@ -22,9 +22,18 @@ export interface DeductionType {
   ledgerAccountId: string;
 }
 
+export interface StatutorySettings {
+  payeBands: { min: number; max: number; rate: number }[];
+  personalRelief: number;
+  nssfRate: number;
+  nssfTierILimit: number;
+  nssfTierIILimit: number;
+  shaRate: number;
+  housingLevyRate: number;
+}
+
 /**
- * Bootstraps the Payroll financial hub.
- * Creates standard liability and expense nodes in the COA.
+ * Bootstraps the Payroll financial hub with standard Kenyan 2024 settings.
  */
 export async function bootstrapPayrollFinancials(db: Firestore, institutionId: string) {
   const batch = writeBatch(db);
@@ -33,11 +42,10 @@ export async function bootstrapPayrollFinancials(db: Firestore, institutionId: s
     { id: 'payroll_net_payable', code: '2300', name: 'Salaries & Wages Payable', type: 'Liability', subtype: 'Accrued Liabilities' },
     { id: 'payroll_paye_liability', code: '2310', name: 'P.A.Y.E Tax Liability', type: 'Liability', subtype: 'Accrued Liabilities' },
     { id: 'payroll_nssf_liability', code: '2320', name: 'NSSF Employee/Employer Contribution', type: 'Liability', subtype: 'Accrued Liabilities' },
-    { id: 'payroll_nhif_liability', code: '2330', name: 'NHIF Hospital Fund Liability', type: 'Liability', subtype: 'Accrued Liabilities' },
+    { id: 'payroll_sha_liability', code: '2330', name: 'S.H.A Health Fund Liability', type: 'Liability', subtype: 'Accrued Liabilities' },
     { id: 'payroll_housing_levy', code: '2340', name: 'Housing Levy Fund', type: 'Liability', subtype: 'Accrued Liabilities' },
     { id: 'payroll_expense_basic', code: '6000', name: 'Staff Basic Salaries', type: 'Expense', subtype: 'Salaries' },
     { id: 'payroll_expense_bonus', code: '6010', name: 'Staff Bonuses & Comm.', type: 'Expense', subtype: 'Salaries' },
-    { id: 'payroll_expense_pension', code: '6020', name: 'Employer Pension Contribution', type: 'Expense', subtype: 'Salaries' },
   ];
 
   nodes.forEach(node => {
@@ -50,16 +58,29 @@ export async function bootstrapPayrollFinancials(db: Firestore, institutionId: s
     }, { merge: true });
   });
 
-  // Update Payroll Settings with default mappings
   const setupRef = doc(db, 'institutions', institutionId, 'settings', 'payroll');
   batch.set(setupRef, {
     netPayableAccountId: 'payroll_net_payable',
     payeAccountId: 'payroll_paye_liability',
     nssfAccountId: 'payroll_nssf_liability',
-    nhifAccountId: 'payroll_nhif_liability',
+    shaAccountId: 'payroll_sha_liability',
     housingLevyAccountId: 'payroll_housing_levy',
     basicSalaryExpenseId: 'payroll_expense_basic',
     bonusExpenseId: 'payroll_expense_bonus',
+    // Kenyan 2024 Statutory Standards
+    personalRelief: 2400,
+    shaRate: 2.75,
+    housingLevyRate: 1.5,
+    nssfRate: 6,
+    nssfTierILimit: 7000,
+    nssfTierIILimit: 36000,
+    payeBands: [
+      { min: 0, max: 24000, rate: 10 },
+      { min: 24001, max: 32333, rate: 25 },
+      { min: 32334, max: 500000, rate: 30 },
+      { min: 500001, max: 800000, rate: 32.5 },
+      { min: 800001, max: 999999999, rate: 35 },
+    ],
     updatedAt: serverTimestamp()
   }, { merge: true });
 
@@ -67,69 +88,47 @@ export async function bootstrapPayrollFinancials(db: Firestore, institutionId: s
 }
 
 /**
- * Calculates Kenyan P.A.Y.E (Tax) based on standard 2024 graduated brackets.
- * Values in KES.
+ * Calculates full payroll breakdown based on institutional statutory settings.
  */
-export function calculatePAYE(taxableIncome: number): number {
-  if (taxableIncome <= 24000) return 0;
+export function calculateNetSalary(basicPay: number, settings: StatutorySettings) {
+  // 1. NSSF Calculation (Tax Deductible in Kenya)
+  const pensionablePay = Math.min(basicPay, settings.nssfTierIILimit);
+  const nssf = (pensionablePay * (settings.nssfRate / 100));
+
+  // 2. Housing Levy (Non-tax deductible, based on Gross)
+  const housingLevy = (basicPay * (settings.housingLevyRate / 100));
+
+  // 3. SHA (Social Health Authority - replaces NHIF)
+  const sha = (basicPay * (settings.shaRate / 100));
+
+  // 4. PAYE Calculation
+  const taxableIncome = basicPay - nssf; // NSSF is tax exempt
+  let paye = 0;
   
-  let tax = 0;
-  let remaining = taxableIncome;
+  settings.payeBands.forEach(band => {
+    if (taxableIncome > band.min) {
+      const taxableInBand = Math.min(taxableIncome, band.max) - band.min;
+      paye += (taxableInBand * (band.rate / 100));
+    }
+  });
 
-  // Bracket 1: 10% on first 24,000
-  tax += 24000 * 0.10;
-  remaining -= 24000;
-  if (remaining <= 0) return tax;
+  const netPaye = Math.max(0, paye - settings.personalRelief);
 
-  // Bracket 2: 25% on next 8,333
-  const b2 = Math.min(remaining, 8333);
-  tax += b2 * 0.25;
-  remaining -= b2;
-  if (remaining <= 0) return tax;
+  // 5. Final Net
+  const totalDeductions = nssf + sha + housingLevy + netPaye;
+  const netSalary = basicPay - totalDeductions;
 
-  // Bracket 3: 30% on next 467,667
-  const b3 = Math.min(remaining, 467667);
-  tax += b3 * 0.30;
-  remaining -= b3;
-  if (remaining <= 0) return tax;
-
-  // Bracket 4: 32.5% on next 300,000
-  const b4 = Math.min(remaining, 300000);
-  tax += b4 * 0.325;
-  remaining -= b4;
-  if (remaining <= 0) return tax;
-
-  // Bracket 5: 35% on anything above 800,000
-  tax += remaining * 0.35;
-
-  // Subtract Personal Relief (Standard 2,400)
-  return Math.max(0, tax - 2400);
+  return {
+    gross: basicPay,
+    nssf,
+    sha,
+    housingLevy,
+    paye: netPaye,
+    totalDeductions,
+    netSalary
+  };
 }
 
-/**
- * Atomic calculation for NSSF Tier I and II (Employee + Employer).
- */
-export function calculateNSSF(grossSalary: number): { employee: number; employer: number } {
-  // 2024 Standards: 6% of Pensionable Pay
-  const tierILimit = 7000;
-  const tierIILimit = 36000;
-  
-  const totalLimit = Math.min(grossSalary, tierIILimit);
-  const contribution = totalLimit * 0.06;
-  
-  return { employee: contribution, employer: contribution };
-}
-
-/**
- * Calculates SHIF/NHIF based on 2.75% of Gross (Standard 2024 reform).
- */
-export function calculateNHIF(grossSalary: number): number {
-  return grossSalary * 0.0275;
-}
-
-/**
- * Issues a loan repayment event.
- */
 export async function processLoanRepayment(db: Firestore, institutionId: string, loanId: string, amount: number) {
   const ref = doc(db, 'institutions', institutionId, 'loans', loanId);
   return updateDoc(ref, {

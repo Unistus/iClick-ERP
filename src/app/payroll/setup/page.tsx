@@ -11,28 +11,26 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, doc, serverTimestamp, setDoc, deleteDoc } from "firebase/firestore";
+import { collection, doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { addDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import { 
   Settings2, 
   Save, 
   Loader2, 
-  Calculator, 
-  ShieldCheck, 
   Landmark, 
-  BadgeCent, 
-  HandCoins, 
   Plus, 
   Trash2, 
+  Calculator, 
   Zap, 
   Sparkles,
   Info,
   Scale,
-  Building,
   TrendingUp,
   History,
   Activity,
-  UserCheck
+  ShieldCheck,
+  Percent,
+  ListTree
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
@@ -83,6 +81,8 @@ export default function PayrollSetupPage() {
     formData.forEach((value, key) => {
       if (['autoPostToLedger', 'enableHousingLevy', 'strictBankValidation'].includes(key)) {
         updates[key] = value === 'on';
+      } else if (['personalRelief', 'shaRate', 'housingLevyRate', 'nssfRate', 'nssfTierIILimit'].includes(key)) {
+        updates[key] = parseFloat(value as string) || 0;
       } else {
         updates[key] = value;
       }
@@ -94,7 +94,7 @@ export default function PayrollSetupPage() {
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      logSystemEvent(db, selectedInstId, user, 'PAYROLL', 'Update Setup', 'Institutional payroll parameters modified.');
+      logSystemEvent(db, selectedInstId, user, 'PAYROLL', 'Update Setup', 'Institutional payroll parameters and statutory rates modified.');
       toast({ title: "Payroll Policy Deployed" });
     } catch (err) {
       toast({ variant: "destructive", title: "Deployment Failed" });
@@ -162,15 +162,15 @@ export default function PayrollSetupPage() {
               <Settings2 className="size-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-headline font-bold">Payroll Policy Command</h1>
-              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-[0.2em] mt-1">Institutional Remuneration Logic</p>
+              <h1 className="text-2xl font-headline font-bold text-foreground">Payroll Command</h1>
+              <p className="text-[10px] text-muted-foreground uppercase font-black tracking-[0.2em] mt-1">Institutional Remuneration Logic & Statutory Bands</p>
             </div>
           </div>
           
           <div className="flex gap-2 items-center">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
               <SelectTrigger className="w-[240px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
-                <SelectValue placeholder={instLoading ? "Authorizing..." : "Select Institution"} />
+                <SelectValue placeholder={instLoading ? "Validating Access..." : "Select Institution"} />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (
@@ -186,7 +186,7 @@ export default function PayrollSetupPage() {
               onClick={handleBootstrap}
             >
               {isBootstrapping ? <Loader2 className="size-3 animate-spin" /> : <Calculator className="size-3" />} 
-              Sync Financial Nodes
+              Sync Regulatory Nodes
             </Button>
           </div>
         </div>
@@ -197,13 +197,92 @@ export default function PayrollSetupPage() {
             <p className="text-sm font-medium text-muted-foreground">Select an institution to configure its payroll perimeter.</p>
           </div>
         ) : (
-          <Tabs defaultValue="financial" className="w-full">
+          <Tabs defaultValue="bands" className="w-full">
             <TabsList className="bg-secondary/20 h-auto p-1 mb-6 flex-wrap justify-start gap-1 bg-transparent border-b rounded-none w-full">
+              <TabsTrigger value="bands" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Percent className="size-3.5" /> Bands & Rates</TabsTrigger>
               <TabsTrigger value="financial" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Calculator className="size-3.5" /> Ledger Integration</TabsTrigger>
-              <TabsTrigger value="statutory" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Landmark className="size-3.5" /> Statutory Matrix</TabsTrigger>
               <TabsTrigger value="earnings" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><TrendingUp className="size-3.5" /> Earning Types</TabsTrigger>
               <TabsTrigger value="deductions" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Scale className="size-3.5" /> Custom Deductions</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="bands" className="space-y-6">
+              <form onSubmit={handleSavePolicy}>
+                <div className="grid gap-6 lg:grid-cols-12">
+                  <div className="lg:col-span-8 space-y-6">
+                    <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
+                      <CardHeader className="bg-secondary/10 border-b py-4 px-6 flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2 text-primary">
+                            <Landmark className="size-4" /> Kenyan Statutory Matrix (2024)
+                          </CardTitle>
+                          <CardDescription className="text-[10px]">Define the tax and social security parameters for this entity.</CardDescription>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-8 space-y-10">
+                        <div className="grid md:grid-cols-2 gap-12">
+                          <div className="space-y-6">
+                            <h3 className="text-[10px] font-black text-primary uppercase border-b pb-2 tracking-[0.2em]">Health & Housing Funds</h3>
+                            <div className="space-y-2">
+                              <Label className="text-[9px] font-bold uppercase opacity-60">S.H.A Rate (%)</Label>
+                              <Input name="shaRate" type="number" step="0.01" defaultValue={setup?.shaRate || 2.75} className="h-10 font-black bg-secondary/5" />
+                              <p className="text-[8px] text-muted-foreground italic">Standard Social Health Authority rate on Gross.</p>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-[9px] font-bold uppercase opacity-60">Housing Levy Rate (%)</Label>
+                              <Input name="housingLevyRate" type="number" step="0.01" defaultValue={setup?.housingLevyRate || 1.5} className="h-10 font-black bg-secondary/5" />
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-6">
+                            <h3 className="text-[10px] font-black text-accent uppercase border-b pb-2 tracking-[0.2em]">Pension (NSSF)</h3>
+                            <div className="space-y-2">
+                              <Label className="text-[9px] font-bold uppercase opacity-60">Tier II Upper Limit</Label>
+                              <Input name="nssfTierIILimit" type="number" defaultValue={setup?.nssfTierIILimit || 36000} className="h-10 font-black bg-secondary/5" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-[9px] font-bold uppercase opacity-60">Pension Rate (%)</Label>
+                              <Input name="nssfRate" type="number" step="0.1" defaultValue={setup?.nssfRate || 6} className="h-10 font-black bg-secondary/5" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-6 border-t pt-8">
+                          <h3 className="text-[10px] font-black text-primary uppercase border-b pb-2 tracking-[0.2em]">Income Tax (P.A.Y.E) Bands</h3>
+                          <div className="space-y-2 max-w-xs">
+                            <Label className="text-[9px] font-bold uppercase opacity-60">Monthly Personal Relief</Label>
+                            <Input name="personalRelief" type="number" defaultValue={setup?.personalRelief || 2400} className="h-10 font-black bg-primary/5 border-primary/20" />
+                          </div>
+                          <div className="p-4 bg-secondary/5 rounded-2xl border border-dashed text-center">
+                            <Activity className="size-8 mx-auto mb-2 text-primary opacity-20" />
+                            <p className="text-[10px] font-bold uppercase text-muted-foreground">Standard Graduated Brackets Active</p>
+                            <p className="text-[9px] mt-1 italic">10% to 35% brackets are applied automatically via the Calculation Engine.</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                      <CardFooter className="bg-secondary/5 border-t p-6 flex justify-end">
+                        <Button type="submit" disabled={isSaving} className="h-11 px-12 font-black uppercase text-xs gap-3 shadow-xl shadow-primary/40 bg-primary hover:bg-primary/90 transition-all active:scale-95">
+                          {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Deploy Statutory Settings
+                        </Button>
+                      </CardFooter>
+                    </Card>
+                  </div>
+                  <div className="lg:col-span-4 space-y-6">
+                    <Card className="bg-emerald-500/5 border-none ring-1 ring-emerald-500/20 p-8 rounded-[2.5rem] relative overflow-hidden group shadow-md">
+                      <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:rotate-6 transition-transform"><ShieldCheck className="size-32 text-emerald-500" /></div>
+                      <div className="flex flex-col gap-4 relative z-10">
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="size-5 text-emerald-500" />
+                          <p className="text-[10px] font-black uppercase text-emerald-500 tracking-[0.2em]">Compliance Handshake</p>
+                        </div>
+                        <p className="text-[11px] leading-relaxed text-muted-foreground font-medium italic">
+                          "Institutional bands configured here serve as the source of truth for the **Payroll Computation Engine**. All salary structures are audited against these rates in real-time."
+                        </p>
+                      </div>
+                    </Card>
+                  </div>
+                </div>
+              </form>
+            </TabsContent>
 
             <TabsContent value="financial">
               <form onSubmit={handleSavePolicy}>
@@ -266,57 +345,6 @@ export default function PayrollSetupPage() {
                   </div>
                 </div>
               </form>
-            </TabsContent>
-
-            <TabsContent value="statutory" className="space-y-6">
-              <div className="grid gap-6 lg:grid-cols-12">
-                <div className="lg:col-span-8">
-                  <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
-                    <CardHeader className="bg-secondary/10 border-b py-4 px-6 flex items-center justify-between">
-                      <div>
-                        <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-accent">
-                          <Landmark className="size-4" /> Regulatory Compliance Hub
-                        </CardTitle>
-                        <CardDescription className="text-[10px]">Configure standard government deduction rates.</CardDescription>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-8 space-y-10">
-                      <div className="grid md:grid-cols-2 gap-12">
-                        <div className="space-y-6">
-                          <h3 className="text-[10px] font-black text-primary uppercase border-b pb-2 tracking-[0.2em]">Pension & Health (Fixed Nodes)</h3>
-                          <AccountSelect name="nssfAccountId" label="NSSF / Pension Node" description="Liability hub for social security." typeFilter={['Liability']} />
-                          <AccountSelect name="nhifAccountId" label="NHIF / Health Node" description="Liability hub for hospital insurance." typeFilter={['Liability']} />
-                        </div>
-                        <div className="space-y-6">
-                          <h3 className="text-[10px] font-black text-accent uppercase border-b pb-2 tracking-[0.2em]">Special Levies</h3>
-                          <div className="flex items-center justify-between p-4 bg-secondary/5 rounded-xl border">
-                            <div className="space-y-0.5">
-                              <Label className="text-xs font-bold">Enable Housing Levy</Label>
-                              <p className="text-[10px] text-muted-foreground">Standard 1.5% deduction node.</p>
-                            </div>
-                            <Switch name="enableHousingLevy" defaultChecked={setup?.enableHousingLevy} />
-                          </div>
-                          <AccountSelect name="housingLevyAccountId" label="Housing Fund Hub" description="Liability hub for regulatory housing levy." typeFilter={['Liability']} />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-                <div className="lg:col-span-4 space-y-6">
-                  <Card className="bg-accent/5 border-none ring-1 ring-accent/20 p-8 rounded-[2rem] relative overflow-hidden group shadow-md">
-                    <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:rotate-6 transition-transform"><Scale className="size-32 text-accent" /></div>
-                    <div className="flex flex-col gap-4 relative z-10">
-                      <div className="flex items-center gap-2">
-                        <Zap className="size-5 text-accent" />
-                        <p className="text-[10px] font-black uppercase text-accent tracking-[0.2em]">Compliance Engine</p>
-                      </div>
-                      <p className="text-[11px] leading-relaxed text-muted-foreground font-medium italic">
-                        "The Payroll Engine utilizes **Kenyan Statutory Tables** (2024 V2). Rates for PAYE, NSSF Tier I/II, and SHIF/NHIF are computed at the edge to ensure zero error margins."
-                      </p>
-                    </div>
-                  </Card>
-                </div>
-              </div>
             </TabsContent>
 
             <TabsContent value="earnings">

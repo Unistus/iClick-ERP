@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import {
   ShieldCheck, 
   Zap,
   TrendingUp,
+  TrendingDown,
   Edit2,
   Calculator,
   ArrowRight,
@@ -112,7 +113,6 @@ export default function SalaryStructurePage() {
   const computationPreview = useMemo(() => {
     if (!payrollSetup || !tempSalary) return null;
     
-    // Construct rich objects for the computation engine
     const richEarnings = empEarnings?.map(ee => ({
       type: globalEarnings?.find(ge => ge.id === ee.typeId) || { name: ee.name, isTaxable: true, isPensionable: true } as any,
       amount: ee.amount
@@ -434,7 +434,7 @@ export default function SalaryStructurePage() {
                   <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="p-5 bg-background rounded-3xl border border-border/50 shadow-xl space-y-3">
                       <div className="flex justify-between text-[9px] font-bold uppercase"><span className="opacity-50">Computed Gross</span><span className="font-black text-foreground">KES {computationPreview.gross.toLocaleString()}</span></div>
-                      <div className="flex justify-between text-[9px] font-bold uppercase text-destructive"><span className="opacity-50">Statutory Deduct.</span><span className="font-black">- {computationPreview.paye + computationPreview.nssf + computationPreview.sha + computationPreview.housingLevy.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></div>
+                      <div className="flex justify-between text-[9px] font-bold uppercase text-destructive"><span className="opacity-50">Statutory Deduct.</span><span className="font-black">- {(computationPreview.paye + computationPreview.nssf + computationPreview.sha + computationPreview.housingLevy).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></div>
                       <div className="flex justify-between text-[9px] font-bold uppercase text-destructive"><span className="opacity-50">Custom Deduct.</span><span className="font-black">- {computationPreview.customDeductions.toLocaleString()}</span></div>
                       <div className="pt-4 border-t border-border/50 flex justify-between items-end">
                         <span className="text-[11px] font-black uppercase tracking-widest text-emerald-500 pb-1">Final Settlement</span>

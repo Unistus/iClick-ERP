@@ -31,7 +31,8 @@ import {
   History,
   UserCircle,
   Save,
-  Sparkles
+  Sparkles,
+  Building
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -79,10 +80,6 @@ export default function SalaryStructurePage() {
 
   const currency = globalSettings?.general?.currencySymbol || "KES";
 
-  const filteredEmployees = employees?.filter(emp => 
-    `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
-
   // COMPUTATION PREVIEW LOGIC
   const computationPreview = useMemo(() => {
     if (!payrollSetup || !tempSalary) return null;
@@ -113,6 +110,10 @@ export default function SalaryStructurePage() {
       toast({ variant: "destructive", title: "Update Failed" });
     }
   };
+
+  const filteredEmployees = employees?.filter(emp => 
+    `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
 
   return (
     <DashboardLayout>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -28,7 +29,8 @@ import {
   UserCircle,
   Truck,
   ArrowRightLeft,
-  ArrowRight
+  ArrowRight,
+  Activity
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { createSalesOrder, confirmSalesOrder, type SalesItem } from "@/lib/sales/sales.service";
@@ -246,7 +248,7 @@ export default function SalesOrdersPage() {
               <CardContent className="p-0 overflow-x-auto">
                 <Table>
                   <TableHeader className="bg-secondary/20">
-                    <TableRow className="hover:bg-transparent">
+                    <TableRow>
                       <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Order Identifier</TableHead>
                       <TableHead className="h-12 text-[9px] font-black uppercase">Recipient Member</TableHead>
                       <TableHead className="h-12 text-[9px] font-black uppercase text-center">Cycle Phase</TableHead>
@@ -256,7 +258,7 @@ export default function SalesOrdersPage() {
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse uppercase font-black">Scanning Pipeline Hub...</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse uppercase font-black tracking-widest opacity-50">Scanning Pipeline Hub...</TableCell></TableRow>
                     ) : filteredOrders.length === 0 ? (
                       <TableRow><TableCell colSpan={5} className="text-center py-24 text-xs text-muted-foreground uppercase font-black tracking-widest opacity-20 italic">No movement detected in the pipeline.</TableCell></TableRow>
                     ) : filteredOrders.map((o) => (

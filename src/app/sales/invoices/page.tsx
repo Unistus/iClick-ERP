@@ -37,15 +37,10 @@ import {
   Truck,
   Send,
   Trash2,
-  ArrowUpRight
+  ArrowUpRight,
+  Banknote
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { createSalesInvoice, finalizeInvoice, type SalesItem } from "@/lib/sales/sales.service";
-import { recordInvoicePayment } from "@/lib/accounting/receivable.service";
-import { toast } from "@/hooks/use-toast";
-import { logSystemEvent } from "@/lib/audit-service";
-import { cn } from '@/lib/utils';
-import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -54,6 +49,12 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import { createSalesInvoice, finalizeInvoice, type SalesItem } from "@/lib/sales/sales.service";
+import { recordInvoicePayment } from "@/lib/accounting/receivable.service";
+import { toast } from "@/hooks/use-toast";
+import { logSystemEvent } from "@/lib/audit-service";
+import { cn } from '@/lib/utils';
+import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 import { useRouter } from 'next/navigation';
 
 export default function SalesInvoicesPage() {
@@ -189,7 +190,9 @@ export default function SalesInvoicesPage() {
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-1.5 rounded-xl bg-primary/20 text-primary shadow-inner border border-primary/10"><FileText className="size-5" /></div>
+            <div className="p-1.5 rounded-xl bg-primary/20 text-primary shadow-inner border border-primary/10">
+              <FileText className="size-5" />
+            </div>
             <div>
               <h1 className="text-2xl font-headline font-bold">Billing Center</h1>
               <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-1">Revenue Lifecycle & AR Hub</p>
@@ -197,15 +200,26 @@ export default function SalesInvoicesPage() {
           </div>
           <div className="flex gap-2 w-full md:w-auto">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
-              <SelectTrigger className="w-[240px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm"><SelectValue placeholder={instLoading ? "Authorizing..." : "Select Institution"} /></SelectTrigger>
-              <SelectContent>{institutions?.map(i => <SelectItem key={i.id} value={i.id} className="text-xs font-bold">{i.name}</SelectItem>)}</SelectContent>
+              <SelectTrigger className="w-[240px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
+                <SelectValue placeholder={instLoading ? "Authorizing..." : "Select Institution"} />
+              </SelectTrigger>
+              <SelectContent>
+                {institutions?.map(i => (
+                  <SelectItem key={i.id} value={i.id} className="text-xs font-bold">{i.name}</SelectItem>
+                ))}
+              </SelectContent>
             </Select>
-            <Button size="sm" className="gap-2 h-10 px-6 text-xs font-bold uppercase shadow-xl bg-primary" disabled={!selectedInstId} onClick={() => setIsCreateOpen(true)}><Plus className="size-4" /> Issue Bill</Button>
+            <Button size="sm" className="gap-2 h-10 px-6 text-xs font-bold uppercase shadow-xl bg-primary" disabled={!selectedInstId} onClick={() => setIsCreateOpen(true)}>
+              <Plus className="size-4" /> Issue Bill
+            </Button>
           </div>
         </div>
 
         {!selectedInstId ? (
-          <div className="flex flex-col items-center justify-center py-32 border-2 border-dashed rounded-[2.5rem] bg-secondary/5"><Calculator className="size-16 text-muted-foreground opacity-10 mb-4 animate-pulse" /><p className="text-sm font-medium text-muted-foreground">Select an institution to access verified sales billing.</p></div>
+          <div className="flex flex-col items-center justify-center py-32 border-2 border-dashed rounded-[2.5rem] bg-secondary/5">
+            <Calculator className="size-16 text-muted-foreground opacity-10 mb-4 animate-pulse" />
+            <p className="text-sm font-medium text-muted-foreground">Select an institution to access verified sales billing.</p>
+          </div>
         ) : (
           <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
             <CardHeader className="py-4 px-6 border-b border-border/50 bg-secondary/10 flex flex-row items-center justify-between gap-4">
@@ -218,7 +232,7 @@ export default function SalesInvoicesPage() {
             <CardContent className="p-0 overflow-x-auto">
               <Table>
                 <TableHeader className="bg-secondary/20">
-                  <TableRow className="hover:bg-transparent">
+                  <TableRow>
                     <TableHead className="h-12 text-[9px] font-black uppercase pl-8">Invoice Hub</TableHead>
                     <TableHead className="h-12 text-[9px] font-black uppercase">Recipient Member</TableHead>
                     <TableHead className="h-12 text-[9px] font-black uppercase text-center">Audit Stage</TableHead>
@@ -324,7 +338,9 @@ export default function SalesInvoicesPage() {
                 <div className="space-y-2">
                   <Label className="uppercase font-black text-[10px] tracking-widest opacity-60 text-primary">Receiving Ledger Node</Label>
                   <Select name="paymentAccountId" required>
-                    <SelectTrigger className="h-12 font-black uppercase border-none ring-1 ring-border bg-secondary/5 focus:ring-emerald-500"><SelectValue placeholder="Pick Bank/Cash Hub..." /></SelectTrigger>
+                    <SelectTrigger className="h-12 font-black uppercase border-none ring-1 ring-border bg-secondary/5 focus:ring-emerald-500">
+                      <SelectValue placeholder="Pick Bank/Cash Hub..." />
+                    </SelectTrigger>
                     <SelectContent>
                       {accounts?.filter(a => a.subtype === 'Cash & Bank' || a.subtype === 'M-Pesa Clearing').map(acc => (
                         <SelectItem key={acc.id} value={acc.id} className="text-[10px] font-black uppercase tracking-tight">[{acc.code}] {acc.name}</SelectItem>
@@ -368,8 +384,14 @@ export default function SalesInvoicesPage() {
                       <div className="space-y-2">
                         <Label className="uppercase font-black text-[9px] tracking-widest opacity-60 text-primary">Identity Node</Label>
                         <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId} required>
-                          <SelectTrigger className="h-11 font-black uppercase border-none ring-1 ring-border bg-secondary/5 focus:ring-primary"><SelectValue placeholder="Pick Member..." /></SelectTrigger>
-                          <SelectContent>{activeCustomers?.map(c => <SelectItem key={c.id} value={c.id} className="text-[10px] font-black uppercase">{c.name}</SelectItem>)}</SelectContent>
+                          <SelectTrigger className="h-11 font-black uppercase border-none ring-1 ring-border bg-secondary/5 focus:ring-primary">
+                            <SelectValue placeholder="Pick Member..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {activeCustomers?.map(c => (
+                              <SelectItem key={c.id} value={c.id} className="text-[10px] font-black uppercase">{c.name}</SelectItem>
+                            ))}
+                          </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-2">
@@ -385,14 +407,27 @@ export default function SalesInvoicesPage() {
                       </div>
                     </div>
                     <div className="border rounded-2xl overflow-hidden shadow-inner bg-secondary/5 ring-1 ring-border">
-                      <div className="p-4 bg-secondary/20 border-b flex justify-between items-center"><span className="font-black uppercase text-[10px] tracking-widest text-primary">Billable Lines Matrix</span><Select onValueChange={handleAddItem}><SelectTrigger className="w-64 h-10 border-none ring-1 ring-border bg-background text-[10px] font-black uppercase"><SelectValue placeholder="Add Catalog SKU..." /></SelectTrigger><SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id} className="text-[10px] font-black uppercase">{p.name}</SelectItem>)}</SelectContent></Select></div>
+                      <div className="p-4 bg-secondary/20 border-b flex justify-between items-center">
+                        <span className="font-black uppercase text-[10px] tracking-widest text-primary">Billable Lines Matrix</span>
+                        <Select onValueChange={handleAddItem}>
+                          <SelectTrigger className="w-64 h-10 border-none ring-1 ring-border bg-background text-[10px] font-black uppercase"><SelectValue placeholder="Add Catalog SKU..." /></SelectTrigger>
+                          <SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id} className="text-[10px] font-black uppercase">{p.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
                       <div className="max-h-[250px] overflow-y-auto custom-scrollbar">
-                        <Table><TableBody>{items.length === 0 ? <TableRow><TableCell className="text-center py-16 text-[10px] text-muted-foreground uppercase font-black tracking-widest opacity-30 italic">No lines defined.</TableCell></TableRow> : items.map((item, idx) => (
-                          <TableRow key={idx} className="h-14 border-b-border/30 hover:bg-transparent group transition-colors">
-                            <TableCell className="pl-6"><p className="text-xs font-black uppercase text-foreground/90">{item.name}</p></TableCell>
-                            <TableCell className="w-24"><Input type="number" defaultValue={1} className="h-9 text-xs font-black text-center bg-background border-none ring-1 ring-border" /></TableCell>
-                            <TableCell className="text-right pr-6 font-mono text-xs font-black text-primary">KES {item.price.toLocaleString()}</TableCell>
-                          </TableRow>))}</TableBody></Table>
+                        <Table>
+                          <TableBody>
+                            {items.length === 0 ? (
+                              <TableRow><TableCell className="text-center py-16 text-[10px] text-muted-foreground uppercase font-black tracking-widest opacity-30 italic">No lines defined.</TableCell></TableRow>
+                            ) : items.map((item, idx) => (
+                              <TableRow key={idx} className="h-14 border-b-border/30 hover:bg-transparent group transition-colors">
+                                <TableCell className="pl-6"><p className="text-xs font-black uppercase text-foreground/90">{item.name}</p></TableCell>
+                                <TableCell className="w-24"><Input type="number" defaultValue={1} className="h-9 text-xs font-black text-center bg-background border-none ring-1 ring-border" /></TableCell>
+                                <TableCell className="text-right pr-6 font-mono text-xs font-black text-primary">KES {item.price.toLocaleString()}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
                       </div>
                     </div>
                   </div>
@@ -403,11 +438,31 @@ export default function SalesInvoicesPage() {
                         <div className="flex justify-between text-[10px] font-black uppercase text-primary"><span>Manual Adjustment</span><span className="font-black">-{manualDiscount.toLocaleString()}</span></div>
                         <div className="pt-4 border-t border-border/50 flex justify-between items-end">
                           <span className="text-[11px] font-black uppercase tracking-widest text-primary pb-1">Final Total</span>
-                          <div className="text-right"><p className="text-3xl font-black font-headline text-foreground tracking-tighter leading-none">{totals.total.toLocaleString()}</p><span className="text-[8px] font-mono font-bold opacity-40 uppercase">{currency} NET</span></div>
+                          <div className="text-right">
+                            <p className="text-3xl font-black font-headline text-foreground tracking-tighter leading-none">{totals.total.toLocaleString()}</p>
+                            <span className="text-[8px] font-mono font-bold opacity-40 uppercase">{currency} NET</span>
+                          </div>
                         </div>
                       </div>
-                      {requiresApproval && <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl flex gap-3 items-start animate-pulse"><ShieldAlert className="size-4 text-amber-600 shrink-0 mt-0.5" /><div className="space-y-1"><p className="text-[9px] font-black uppercase text-amber-600">Audit Required</p><p className="text-[10px] leading-tight text-muted-foreground italic">Discount exceeds institutional tolerance.</p></div></div>}
-                      <Button onClick={handleSaveDraft} disabled={isProcessing || items.length === 0 || !selectedCustomerId} className={cn("w-full h-14 font-black uppercase text-xs shadow-2xl gap-3 rounded-2xl transition-all active:scale-95 border-none ring-2", requiresApproval ? "bg-amber-600 hover:bg-amber-700 ring-amber-500/20" : "bg-primary hover:bg-primary/90 ring-primary/20 shadow-primary/40")}>{isProcessing ? <Loader2 className="size-5 animate-spin" /> : <ShieldCheck className="size-5" />} {requiresApproval ? "Queue for Audit" : "Authorize Cycle"}</Button>
+                      {requiresApproval && (
+                        <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl flex gap-3 items-start animate-pulse">
+                          <ShieldAlert className="size-4 text-amber-600 shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <p className="text-[9px] font-black uppercase text-amber-600">Audit Required</p>
+                            <p className="text-[10px] leading-tight text-muted-foreground italic">Discount exceeds institutional tolerance.</p>
+                          </div>
+                        </div>
+                      )}
+                      <Button 
+                        onClick={handleSaveDraft} 
+                        disabled={isProcessing || items.length === 0 || !selectedCustomerId} 
+                        className={cn("w-full h-14 font-black uppercase text-xs shadow-2xl gap-3 rounded-2xl transition-all active:scale-95 border-none ring-2", 
+                          requiresApproval ? "bg-amber-600 hover:bg-amber-700 ring-amber-500/20" : "bg-primary hover:bg-primary/90 ring-primary/20 shadow-primary/40"
+                        )}
+                      >
+                        {isProcessing ? <Loader2 className="size-5 animate-spin" /> : <ShieldCheck className="size-5" />} 
+                        {requiresApproval ? "Queue for Audit" : "Authorize Cycle"}
+                      </Button>
                     </div>
                   </div>
                 </div>

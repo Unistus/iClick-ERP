@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -302,7 +301,7 @@ export default function SalesOrdersPage() {
                                 <Button variant="ghost" size="icon" className="size-9 rounded-xl opacity-0 group-hover:opacity-100 transition-all shadow-sm"><MoreVertical className="size-4" /></Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-56 shadow-2xl ring-1 ring-border">
-                                <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Logistics Command</DropdownMenuLabel>
+                                <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground">Logistics Command</DropdownMenuLabel>
                                 <DropdownMenuItem className="text-xs gap-3 font-bold" onClick={() => router.push('/delivery/dispatch')}>
                                   <Truck className="size-3.5 text-primary" /> Initialize Dispatch Note
                                 </DropdownMenuItem>
@@ -415,7 +414,7 @@ export default function SalesOrdersPage() {
                 </DialogFooter>
               </div>
             </form>
-          </div>
+          </DialogContent>
         </Dialog>
       </div>
     </DashboardLayout>

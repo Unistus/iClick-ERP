@@ -1,8 +1,8 @@
-
 'use client';
 
 import { Firestore, collection, doc, serverTimestamp, increment, runTransaction, getDoc, addDoc, setDoc } from 'firebase/firestore';
 import { postJournalEntry } from '../accounting/journal.service';
+import { initiateApprovalRequest } from '../approvals/approvals.service';
 
 export interface MovementPayload {
   productId: string;
@@ -12,6 +12,7 @@ export interface MovementPayload {
   reference: string;
   unitCost: number;
   batchId?: string;
+  status?: 'Pending' | 'Completed';
 }
 
 export interface BatchPayload {
@@ -52,6 +53,10 @@ export async function bootstrapInventoryFinancials(db: Firestore, institutionId:
   }, { merge: true });
 }
 
+/**
+ * Records an atomic stock movement. 
+ * Note: If status is 'Pending', no actual stock increment/decrement occurs.
+ */
 export async function recordStockMovement(db: Firestore, institutionId: string, payload: MovementPayload) {
   const productRef = doc(db, 'institutions', institutionId, 'products', payload.productId);
   const movementsRef = collection(db, 'institutions', institutionId, 'movements');
@@ -70,60 +75,107 @@ export async function recordStockMovement(db: Firestore, institutionId: string, 
     else if (payload.type === 'Out' || payload.type === 'Damage') qtyChange = -payload.quantity;
     else if (payload.type === 'Adjustment') qtyChange = payload.quantity;
 
-    transaction.update(productRef, {
-      totalStock: increment(qtyChange),
-      updatedAt: serverTimestamp()
-    });
+    // IF PENDING: We only log the movement but DON'T update stock levels
+    if (payload.status !== 'Pending') {
+      transaction.update(productRef, {
+        totalStock: increment(qtyChange),
+        updatedAt: serverTimestamp()
+      });
+
+      if (payload.batchId) {
+        const batchRef = doc(db, 'institutions', institutionId, 'batches', payload.batchId);
+        transaction.update(batchRef, {
+          quantity: increment(qtyChange),
+          updatedAt: serverTimestamp()
+        });
+      }
+
+      // Financials
+      if (setup?.inventoryAssetAccountId) {
+        const absQty = Math.abs(qtyChange);
+        const totalAmount = absQty * (payload.unitCost || product.costPrice || 0);
+
+        if (totalAmount > 0) {
+          if (qtyChange < 0 && (payload.type === 'Adjustment' || payload.type === 'Damage')) {
+            if (setup.inventoryShrinkageAccountId) {
+              await postJournalEntry(db, institutionId, {
+                date: new Date(),
+                description: `Stock Reduction (${payload.type}): ${product.name}`,
+                reference: `INV-RED-${Date.now()}`,
+                items: [
+                  { accountId: setup.inventoryShrinkageAccountId, amount: totalAmount, type: 'Debit' },
+                  { accountId: setup.inventoryAssetAccountId, amount: totalAmount, type: 'Credit' },
+                ]
+              });
+            }
+          } else if (qtyChange > 0 && payload.type === 'Adjustment') {
+            const creditAccountId = setup.inventoryAdjustmentAccountId || setup.openingBalanceEquityAccountId;
+            if (creditAccountId) {
+              await postJournalEntry(db, institutionId, {
+                date: new Date(),
+                description: `Stock Increase (Adjustment): ${product.name}`,
+                reference: `INV-INC-${Date.now()}`,
+                items: [
+                  { accountId: setup.inventoryAssetAccountId, amount: totalAmount, type: 'Debit' },
+                  { accountId: creditAccountId, amount: totalAmount, type: 'Credit' },
+                ]
+              });
+            }
+          }
+        }
+      }
+    }
 
     const moveDocRef = doc(movementsRef);
     transaction.set(moveDocRef, {
       ...payload,
       quantity: qtyChange, 
+      status: payload.status || 'Completed',
       timestamp: serverTimestamp()
     });
+  });
+}
 
-    if (payload.batchId) {
-      const batchRef = doc(db, 'institutions', institutionId, 'batches', payload.batchId);
-      transaction.update(batchRef, {
-        quantity: increment(qtyChange),
-        updatedAt: serverTimestamp()
+/**
+ * Handles stock write-offs with governance guards.
+ * If loss value > 10,000, it creates a pending approval request.
+ */
+export async function requestStockWriteOff(db: Firestore, institutionId: string, payload: MovementPayload, userId: string) {
+  const productRef = doc(db, 'institutions', institutionId, 'products', payload.productId);
+  const prodSnap = await getDoc(productRef);
+  if (!prodSnap.exists()) throw new Error("Product not found");
+  const product = prodSnap.data();
+
+  const lossValue = payload.quantity * (product.costPrice || 0);
+  
+  if (lossValue > 10000) {
+    // TRIGGER GOVERNANCE
+    const approval = await initiateApprovalRequest(db, institutionId, {
+      module: 'Inventory',
+      action: 'High-Value Stock Write-off',
+      sourceDocId: 'pending',
+      requestedBy: userId,
+      requestedByName: 'Inventory Manager',
+      amount: lossValue,
+      data: {
+        productName: product.name,
+        quantity: payload.quantity,
+        lossValue: lossValue,
+        reason: payload.reference
+      },
+      justification: `Manual write-off of ${payload.quantity} units for ${product.name} exceeds the KES 10,000 self-approval threshold.`
+    });
+
+    if (approval.status === 'Pending') {
+      return recordStockMovement(db, institutionId, { 
+        ...payload, 
+        status: 'Pending',
+        reference: `[AWAITING APPROVAL] ${payload.reference}`
       });
     }
+  }
 
-    if (setup?.inventoryAssetAccountId) {
-      const absQty = Math.abs(qtyChange);
-      const totalAmount = absQty * (payload.unitCost || product.costPrice || 0);
-
-      if (totalAmount > 0) {
-        if (qtyChange < 0 && (payload.type === 'Adjustment' || payload.type === 'Damage')) {
-          if (setup.inventoryShrinkageAccountId) {
-            await postJournalEntry(db, institutionId, {
-              date: new Date(),
-              description: `Stock Reduction (${payload.type}): ${product.name}`,
-              reference: `INV-RED-${Date.now()}`,
-              items: [
-                { accountId: setup.inventoryShrinkageAccountId, amount: totalAmount, type: 'Debit' },
-                { accountId: setup.inventoryAssetAccountId, amount: totalAmount, type: 'Credit' },
-              ]
-            });
-          }
-        } else if (qtyChange > 0 && payload.type === 'Adjustment') {
-          const creditAccountId = setup.inventoryAdjustmentAccountId || setup.openingBalanceEquityAccountId;
-          if (creditAccountId) {
-            await postJournalEntry(db, institutionId, {
-              date: new Date(),
-              description: `Stock Increase (Adjustment): ${product.name}`,
-              reference: `INV-INC-${Date.now()}`,
-              items: [
-                { accountId: setup.inventoryAssetAccountId, amount: totalAmount, type: 'Debit' },
-                { accountId: creditAccountId, amount: totalAmount, type: 'Credit' },
-              ]
-            });
-          }
-        }
-      }
-    }
-  });
+  return recordStockMovement(db, institutionId, payload);
 }
 
 export async function registerInventoryBatch(db: Firestore, institutionId: string, payload: BatchPayload) {

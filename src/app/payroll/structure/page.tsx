@@ -36,24 +36,27 @@ import {
   Building,
   Plus,
   Trash2,
-  ListTree
+  ListTree,
+  ShieldAlert
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
-import { calculateNetSalary, type StatutorySettings, assignEmployeeEarning, assignEmployeeDeduction, removeEmployeeEarning, removeEmployeeDeduction } from "@/lib/payroll/payroll.service";
+import { calculateNetSalary, type StatutorySettings, assignEmployeeEarning, assignEmployeeDeduction, removeEmployeeEarning, removeEmployeeDeduction, requestSalaryAdjustment } from "@/lib/payroll/payroll.service";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 export default function SalaryStructurePage() {
   const db = useFirestore();
+  const { user } = useUser();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingEmp, setEditingEmp] = useState<any>(null);
   const [tempSalary, setTempSalary] = useState<number>(0);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
@@ -135,6 +138,18 @@ export default function SalaryStructurePage() {
     }
   }, [tempSalary, payrollSetup, empEarnings, empDeductions, globalEarnings, globalDeductions]);
 
+  // GOVERNANCE PREVIEW
+  const varianceInsight = useMemo(() => {
+    if (!editingEmp || tempSalary <= 0) return null;
+    const oldSal = editingEmp.salary || 0;
+    const diff = tempSalary - oldSal;
+    const pct = oldSal > 0 ? (diff / oldSal) * 100 : 100;
+    return {
+      requiresApproval: pct > 15,
+      variance: pct
+    };
+  }, [editingEmp, tempSalary]);
+
   const handleOpenEdit = (emp: any) => {
     setEditingEmp(emp);
     setTempSalary(emp.salary || 0);
@@ -142,17 +157,25 @@ export default function SalaryStructurePage() {
   };
 
   const handleUpdateStructure = async () => {
-    if (!selectedInstId || !editingEmp) return;
-    const ref = doc(db, 'institutions', selectedInstId, 'employees', editingEmp.id);
+    if (!selectedInstId || !editingEmp || !user) return;
+    setIsProcessing(true);
     try {
-      await setDoc(ref, { 
-        salary: tempSalary, 
-        updatedAt: serverTimestamp() 
-      }, { merge: true });
-      toast({ title: "Master Remuneration Updated" });
+      const result = await requestSalaryAdjustment(db, selectedInstId, editingEmp.id, tempSalary, user.uid);
+      
+      if (result.status === 'Pending Approval') {
+        toast({ 
+          variant: "destructive", 
+          title: "Governance Guard Triggered", 
+          description: `Adjustment of ${result.variance?.toFixed(1)}% exceeds the 15% threshold. Queued for audit.` 
+        });
+      } else {
+        toast({ title: "Master Remuneration Updated" });
+      }
       setIsEditOpen(false);
     } catch (e) {
       toast({ variant: "destructive", title: "Update Failed" });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -191,7 +214,7 @@ export default function SalaryStructurePage() {
             </div>
             <div>
               <h1 className="text-2xl font-headline font-bold">Salary Structures</h1>
-              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">Staff Remuneration Matrix</p>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">Staff Remuneration Matrix & Governance</p>
             </div>
           </div>
           
@@ -208,7 +231,7 @@ export default function SalaryStructurePage() {
         </div>
 
         {!selectedInstId ? (
-          <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed rounded-2xl bg-secondary/5">
+          <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed rounded-[2rem] bg-secondary/5">
             <BadgeCent className="size-12 text-muted-foreground opacity-20 mb-3" />
             <p className="text-sm font-medium text-muted-foreground text-center px-6">Select an institution to manage staff salary structures.</p>
           </div>
@@ -224,16 +247,21 @@ export default function SalaryStructurePage() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <Badge variant="outline" className="text-[10px] font-black uppercase text-primary border-primary/20 bg-primary/5 h-8 px-4">
-                {filteredEmployees.length} Master Nodes Detected
-              </Badge>
+              <div className="flex items-center gap-3">
+                <Badge variant="outline" className="text-[10px] font-black uppercase text-primary border-primary/20 bg-primary/5 h-8 px-4">
+                  {filteredEmployees.length} Master Nodes Detected
+                </Badge>
+                <Badge variant="outline" className="text-[10px] font-black uppercase text-emerald-500 bg-emerald-500/5 border-emerald-500/20 h-8 px-4 flex items-center gap-2">
+                  <ShieldCheck className="size-3" /> Compliance Active
+                </Badge>
+              </div>
             </div>
 
             <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
               <CardHeader className="py-3 px-6 border-b border-border/50 bg-secondary/10 flex flex-row items-center justify-between">
                 <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em]">Institutional Remuneration Ledger</CardTitle>
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-[8px] bg-emerald-500/10 text-emerald-500 font-black px-2">Compliance Phase: ACTIVE</Badge>
+                  <Badge variant="secondary" className="text-[8px] bg-emerald-500/10 text-emerald-500 font-black px-2">Lifecycle Status: SYNCED</Badge>
                 </div>
               </CardHeader>
               <CardContent className="p-0 overflow-x-auto">
@@ -289,9 +317,9 @@ export default function SalaryStructurePage() {
         )}
 
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="max-w-5xl shadow-2xl ring-1 ring-border rounded-[2.5rem] p-0 overflow-hidden">
+          <DialogContent className="max-w-5xl shadow-2xl ring-1 ring-border rounded-[2.5rem] p-0 overflow-hidden border-none">
             <div className="grid lg:grid-cols-12 h-full max-h-[90vh]">
-              <div className="lg:col-span-8 p-8 flex flex-col overflow-hidden">
+              <div className="lg:col-span-8 p-8 flex flex-col overflow-hidden bg-card">
                 <DialogHeader className="mb-6 shrink-0">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="p-2 rounded-lg bg-primary/10 text-primary"><UserCircle className="size-5" /></div>
@@ -327,18 +355,31 @@ export default function SalaryStructurePage() {
                           />
                         </div>
                       </div>
+
+                      {varianceInsight?.requiresApproval && (
+                        <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl flex gap-4 items-start animate-pulse">
+                          <ShieldAlert className="size-5 text-amber-600 shrink-0 mt-0.5" />
+                          <div className="space-y-1">
+                            <p className="text-[9px] font-black uppercase text-amber-600 tracking-widest">Governance Guard Required</p>
+                            <p className="text-[11px] leading-relaxed italic text-muted-foreground">
+                              "This increase of **{varianceInsight.variance.toFixed(1)}%** exceeds the 15% threshold. Finalization will queue this node for executive sign-off in the **Workflow Hub**."
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="p-6 bg-primary/5 rounded-3xl border border-primary/10 shadow-inner space-y-4">
                         <div className="flex items-center gap-2 text-primary font-black uppercase text-[10px] tracking-[0.2em]">
-                          <ShieldCheck className="size-4" /> Compliance Guard
+                          <ShieldCheck className="size-4" /> Compliance Hub
                         </div>
                         <p className="text-[11px] leading-relaxed italic text-muted-foreground">
-                          Base Salary changes are tracked in the institutional audit trail. Ensure this alignment matches the contract node in **HR &gt; Documents**.
+                          Base Salary changes are tracked in the institutional audit trail. High-impact adjustments trigger automated workflow locks.
                         </p>
                       </div>
                     </TabsContent>
 
                     <TabsContent value="earnings" className="space-y-6 mt-0">
-                      <div className="bg-secondary/5 p-4 rounded-2xl border space-y-4">
+                      <div className="bg-secondary/5 p-4 rounded-2xl border space-y-4 shadow-inner">
                         <Label className="text-[10px] font-black uppercase opacity-60 tracking-widest">Add Recurring Earning</Label>
                         <form className="flex gap-2" onSubmit={(e) => {
                           e.preventDefault();
@@ -377,7 +418,7 @@ export default function SalaryStructurePage() {
                     </TabsContent>
 
                     <TabsContent value="deductions" className="space-y-6 mt-0">
-                      <div className="bg-destructive/5 p-4 rounded-2xl border border-destructive/10 space-y-4">
+                      <div className="bg-destructive/5 p-4 rounded-2xl border border-destructive/10 space-y-4 shadow-inner">
                         <Label className="text-[10px] font-black uppercase opacity-60 tracking-widest text-destructive">Add Voluntary Deduction</Label>
                         <form className="flex gap-2" onSubmit={(e) => {
                           e.preventDefault();
@@ -419,46 +460,50 @@ export default function SalaryStructurePage() {
 
                 <div className="pt-8 mt-auto shrink-0 flex gap-3 border-t">
                   <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)} className="h-11 px-8 font-black uppercase text-[10px] tracking-widest">Discard</Button>
-                  <Button onClick={handleUpdateStructure} className="h-11 px-12 font-black uppercase text-[10px] shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-2 border-none ring-2 ring-primary/20 transition-all active:scale-95">
-                    <Save className="size-4" /> Save Master Remuneration Node
+                  <Button 
+                    onClick={handleUpdateStructure} 
+                    disabled={isProcessing}
+                    className={cn(
+                      "h-11 px-12 font-black uppercase text-[10px] shadow-2xl shadow-primary/40 gap-3 border-none ring-2 transition-all active:scale-95",
+                      varianceInsight?.requiresApproval ? "bg-amber-600 hover:bg-amber-700 ring-amber-500/20" : "bg-primary hover:bg-primary/90 ring-primary/20"
+                    )}
+                  >
+                    {isProcessing ? <Loader2 className="size-4 animate-spin" /> : varianceInsight?.requiresApproval ? <ShieldAlert className="size-4" /> : <Save className="size-4" />} 
+                    {varianceInsight?.requiresApproval ? 'Request High-Impact Change' : 'Update Master Roster'}
                   </Button>
                 </div>
               </div>
 
               <div className="lg:col-span-4 bg-secondary/20 border-l border-border/50 p-8 space-y-6 overflow-y-auto custom-scrollbar">
                 <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-2 mb-4">
-                  <Calculator className="size-4 text-primary" /> Multi-Layer Audit
+                  <Calculator className="size-4 text-primary" /> Computation Audit
                 </h3>
                 
                 {computationPreview ? (
                   <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div className="p-5 bg-background rounded-3xl border border-border/50 shadow-xl space-y-3">
-                      <div className="flex justify-between text-[9px] font-bold uppercase"><span className="opacity-50">Computed Gross</span><span className="font-black text-foreground">KES {computationPreview.gross.toLocaleString()}</span></div>
-                      <div className="flex justify-between text-[9px] font-bold uppercase text-destructive"><span className="opacity-50">Statutory Deduct.</span><span className="font-black">- {(computationPreview.paye + computationPreview.nssf + computationPreview.sha + computationPreview.housingLevy).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></div>
-                      <div className="flex justify-between text-[9px] font-bold uppercase text-destructive"><span className="opacity-50">Custom Deduct.</span><span className="font-black">- {computationPreview.customDeductions.toLocaleString()}</span></div>
+                      <div className="flex justify-between text-[9px] font-bold uppercase"><span className="opacity-50">Estimated Gross</span><span className="font-black text-foreground">{currency} {computationPreview.gross.toLocaleString()}</span></div>
+                      <div className="flex justify-between text-[9px] font-bold uppercase text-destructive"><span className="opacity-50">Regulatory Ded.</span><span className="font-black">- {(computationPreview.paye + computationPreview.nssf + computationPreview.sha + computationPreview.housingLevy).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></div>
                       <div className="pt-4 border-t border-border/50 flex justify-between items-end">
                         <span className="text-[11px] font-black uppercase tracking-widest text-emerald-500 pb-1">Final Settlement</span>
                         <div className="text-right">
                           <p className="text-2xl font-black font-headline text-emerald-500 leading-none">{computationPreview.netSalary.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
-                          <span className="text-[8px] font-mono font-bold opacity-40 uppercase">KES Take-Home</span>
+                          <span className="text-[8px] font-mono font-bold opacity-40 uppercase">{currency} Take-Home</span>
                         </div>
                       </div>
                     </div>
 
                     <div className="space-y-3">
-                      <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest pl-1">Statutory Matrix</p>
+                      <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest pl-1">Statutory Snapshot</p>
                       {[
-                        { label: 'NSSF (Pension)', val: computationPreview.nssf, icon: Landmark, color: 'text-primary' },
-                        { label: 'S.H.A (Health)', val: computationPreview.sha, icon: Activity, color: 'text-emerald-500' },
-                        { label: 'Housing Levy', val: computationPreview.housingLevy, icon: Building, color: 'text-accent' },
-                        { label: 'P.A.Y.E (Tax)', val: computationPreview.paye, icon: Scale, color: 'text-destructive' },
+                        { label: 'P.A.Y.E Tax', val: computationPreview.paye, color: 'text-destructive' },
+                        { label: 'Pension (NSSF)', val: computationPreview.nssf, color: 'text-primary' },
+                        { label: 'Health (SHA)', val: computationPreview.sha, color: 'text-accent' },
+                        { label: 'Housing Fund', val: computationPreview.housingLevy, color: 'text-emerald-500' },
                       ].map(item => (
-                        <div key={item.label} className="flex items-center justify-between p-3 rounded-2xl bg-background/50 border border-border/30 hover:bg-background transition-all hover:scale-[1.02] shadow-sm">
-                          <div className="flex items-center gap-2">
-                            <item.icon className={cn("size-3.5", item.color)} />
-                            <span className="text-[9px] font-bold uppercase opacity-70">{item.label}</span>
-                          </div>
-                          <span className="font-mono text-[10px] font-black">KES {item.val.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                        <div key={item.label} className="flex items-center justify-between p-3 rounded-2xl bg-background/50 border border-border/30 hover:bg-background transition-all shadow-sm">
+                          <span className="text-[9px] font-bold uppercase opacity-70">{item.label}</span>
+                          <span className={cn("font-mono text-[10px] font-black", item.color)}>{currency} {item.val.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                         </div>
                       ))}
                     </div>
@@ -468,10 +513,10 @@ export default function SalaryStructurePage() {
                       <div className="flex flex-col gap-2 relative z-10">
                         <div className="flex items-center gap-2">
                           <Zap className="size-4 text-accent animate-pulse" />
-                          <p className="text-[10px] font-black uppercase text-accent tracking-widest">Yield Insight</p>
+                          <p className="text-[10px] font-black uppercase text-accent tracking-widest">Efficiency Intelligence</p>
                         </div>
                         <p className="text-[10px] leading-relaxed text-muted-foreground font-medium italic">
-                          "This employee's tax efficiency is currently at **{(100 - (computationPreview.paye / computationPreview.gross * 100)).toFixed(1)}%**. High-value deductions like Mortgage Relief are not currently detected."
+                          "This node's tax efficiency is computed at **{(100 - (computationPreview.paye / computationPreview.gross * 100)).toFixed(1)}%**. High-value deductions like Mortgage Relief are not currently detected."
                         </p>
                       </div>
                     </div>
@@ -479,7 +524,7 @@ export default function SalaryStructurePage() {
                 ) : (
                   <div className="h-64 flex flex-col items-center justify-center text-center opacity-30 gap-3 border-2 border-dashed rounded-[2.5rem]">
                     <History className="size-12" />
-                    <p className="text-[9px] font-black uppercase max-w-[150px] tracking-widest">Assign base salary to trigger audit Engine</p>
+                    <p className="text-[9px] font-black uppercase max-w-[150px] tracking-widest">Input base salary to trigger audit engine</p>
                   </div>
                 )}
               </div>

@@ -1,8 +1,9 @@
 'use client';
 
-import { Firestore, collection, doc, serverTimestamp, getDoc, setDoc, query, where, getDocs, writeBatch, increment, addDoc, deleteDoc, runTransaction } from 'firebase/firestore';
+import { Firestore, collection, doc, serverTimestamp, getDoc, setDoc, query, where, getDocs, writeBatch, increment, addDoc, deleteDoc, runTransaction, updateDoc } from 'firebase/firestore';
 import { getNextSequence } from '../sequence-service';
 import { postJournalEntry } from '../accounting/journal.service';
+import { initiateApprovalRequest } from '../approvals/approvals.service';
 
 /**
  * @fileOverview Core logic for the Payroll Engine.
@@ -161,6 +162,46 @@ export function calculateNetSalary(
     totalDeductions: totalStatutoryDeductions + customDeductionsTotal,
     netSalary
   };
+}
+
+/**
+ * Updates an employee's base salary with a Governance Guard.
+ * If the increase > 15%, it triggers an approval workflow.
+ */
+export async function requestSalaryAdjustment(db: Firestore, institutionId: string, employeeId: string, newSalary: number, userId: string) {
+  const empRef = doc(db, 'institutions', institutionId, 'employees', employeeId);
+  const empSnap = await getDoc(empRef);
+  if (!empSnap.exists()) throw new Error("Employee not found");
+  const emp = empSnap.data();
+
+  const oldSalary = emp.salary || 0;
+  const variancePercent = oldSalary > 0 ? ((newSalary - oldSalary) / oldSalary) * 100 : 100;
+
+  if (variancePercent > 15) {
+    const approval = await initiateApprovalRequest(db, institutionId, {
+      module: 'Payroll',
+      action: 'Significant Salary Adjustment',
+      sourceDocId: employeeId,
+      requestedBy: userId,
+      requestedByName: 'HR Administrator',
+      amount: newSalary - oldSalary,
+      data: {
+        employeeName: `${emp.firstName} ${emp.lastName}`,
+        oldSalary,
+        newSalary,
+        variance: `${variancePercent.toFixed(1)}%`
+      },
+      justification: `Salary adjustment for ${emp.firstName} represents a ${variancePercent.toFixed(1)}% increase, exceeding the 15% institutional auto-limit.`
+    });
+
+    if (approval.status === 'Pending') {
+      return { status: 'Pending Approval', variance: variancePercent };
+    }
+  }
+
+  // Normal update if within limits
+  await updateDoc(empRef, { salary: newSalary, updatedAt: serverTimestamp() });
+  return { status: 'Updated' };
 }
 
 export async function processLoanRepayment(db: Firestore, institutionId: string, loanId: string, amount: number) {

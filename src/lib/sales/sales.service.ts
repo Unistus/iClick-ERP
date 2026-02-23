@@ -251,9 +251,41 @@ export async function createSalesOrder(db: Firestore, institutionId: string, pay
   });
 }
 
+/**
+ * Confirms a sales order and automatically generates a draft invoice.
+ */
 export async function confirmSalesOrder(db: Firestore, institutionId: string, orderId: string) {
   const orderRef = doc(db, 'institutions', institutionId, 'sales_orders', orderId);
-  return updateDoc(orderRef, { status: 'Confirmed', updatedAt: serverTimestamp() });
+  const invoiceNumber = await getNextSequence(db, institutionId, 'sales_invoice');
+
+  return runTransaction(db, async (transaction) => {
+    const orderSnap = await transaction.get(orderRef);
+    if (!orderSnap.exists()) throw new Error("Order not found");
+    const orderData = orderSnap.data();
+
+    // 1. Update Order Status
+    transaction.update(orderRef, { status: 'Confirmed', updatedAt: serverTimestamp() });
+
+    // 2. Create Draft Invoice
+    const invoiceRef = doc(collection(db, 'institutions', institutionId, 'sales_invoices'));
+    transaction.set(invoiceRef, {
+      invoiceNumber,
+      orderId: orderId,
+      customerId: orderData.customerId,
+      customerName: orderData.customerName,
+      items: orderData.items,
+      subtotal: orderData.subtotal,
+      taxTotal: orderData.taxTotal,
+      total: orderData.total,
+      paymentMethod: orderData.paymentMethod || 'Cash', // Default to Cash if not specified
+      status: 'Draft',
+      isPaid: false,
+      balance: orderData.total,
+      createdBy: orderData.createdBy,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+  });
 }
 
 export async function createDeliveryNote(db: Firestore, institutionId: string, payload: {

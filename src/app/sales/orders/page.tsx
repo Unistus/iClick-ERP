@@ -41,6 +41,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 
 export default function SalesOrdersPage() {
   const db = useFirestore();
@@ -53,9 +54,11 @@ export default function SalesOrdersPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [orderItems, setOrderItems] = useState<SalesItem[]>([]);
 
+  const { institutions, isLoading: instLoading } = usePermittedInstitutions();
+
   // Data Fetching
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
-  const { data: institutions } = useCollection(instColRef);
+  const { data: institutionsData } = useCollection(instColRef);
 
   // GATEKEEPER: Only Approved (Active) customers can receive orders
   const customersQuery = useMemoFirebase(() => {
@@ -99,8 +102,8 @@ export default function SalesOrdersPage() {
   const handleCreateOrder = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedInstId || !user || isProcessing) return;
+    
     setIsProcessing(true);
-
     const customer = activeCustomers?.find(c => c.id === selectedCustomerId);
     const subtotal = orderItems.reduce((sum, i) => sum + i.total, 0);
     const taxTotal = subtotal * 0.16;
@@ -134,7 +137,8 @@ export default function SalesOrdersPage() {
     setIsProcessing(true);
     try {
       await confirmSalesOrder(db, selectedInstId, orderId);
-      toast({ title: "Order Confirmed", description: "Ready for fulfillment and billing." });
+      logSystemEvent(db, selectedInstId, user, 'SALES', 'Confirm Order', `Order ${orderId} confirmed and converted to draft invoice.`);
+      toast({ title: "Order Confirmed", description: "Converted to draft invoice in the billing hub." });
     } catch (err) {
       toast({ variant: "destructive", title: "Confirmation Failed" });
     } finally {
@@ -147,28 +151,28 @@ export default function SalesOrdersPage() {
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-1.5 rounded bg-primary/20 text-primary">
+            <div className="p-1.5 rounded bg-primary/20 text-primary shadow-inner border border-primary/10">
               <ClipboardCheck className="size-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-headline font-bold">Sales Orders</h1>
-              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Operational Fulfillment Pipeline</p>
+              <h1 className="text-2xl font-headline font-bold text-foreground">Sales Orders</h1>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">Operational Fulfillment Pipeline</p>
             </div>
           </div>
           
           <div className="flex gap-2 w-full md:w-auto">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
-              <SelectTrigger className="w-[220px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold">
-                <SelectValue placeholder="Select Institution" />
+              <SelectTrigger className="w-[220px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
+                <SelectValue placeholder={instLoading ? "Validating..." : "Select Institution"} />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (
-                  <SelectItem key={i.id} value={i.id} className="text-xs">{i.name}</SelectItem>
+                  <SelectItem key={i.id} value={i.id} className="text-xs font-medium">{i.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase shadow-lg shadow-primary/20" disabled={!selectedInstId} onClick={() => setIsCreateOpen(true)}>
+            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90" disabled={!selectedInstId} onClick={() => setIsCreateOpen(true)}>
               <Plus className="size-4" /> New Order
             </Button>
           </div>
@@ -182,37 +186,37 @@ export default function SalesOrdersPage() {
         ) : (
           <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-3">
-              <Card className="bg-card border-none ring-1 ring-border shadow-sm">
+              <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden group hover:ring-primary/30 transition-all">
                 <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase text-muted-foreground">Draft Orders</span>
+                  <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Draft Orders</span>
                   <ShoppingCart className="size-3 text-muted-foreground" />
                 </CardHeader>
-                <CardContent className="pb-3">
+                <CardContent className="pb-4">
                   <div className="text-lg font-bold">{orders?.filter(o => o.status === 'Draft').length || 0}</div>
                 </CardContent>
               </Card>
               <Card className="bg-card border-none ring-1 ring-border shadow-sm">
                 <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase text-accent">Confirmed</span>
+                  <span className="text-[9px] font-black uppercase text-accent tracking-widest">Confirmed</span>
                   <CheckCircle2 className="size-3 text-accent" />
                 </CardHeader>
-                <CardContent className="pb-3">
+                <CardContent className="pb-4">
                   <div className="text-lg font-bold">{orders?.filter(o => o.status === 'Confirmed').length || 0}</div>
                 </CardContent>
               </Card>
               <Card className="bg-primary/5 border-none ring-1 ring-primary/20 shadow-sm overflow-hidden">
                 <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
-                  <span className="text-[10px] font-bold uppercase text-primary">Pipeline Value</span>
+                  <span className="text-[9px] font-black uppercase text-primary tracking-widest">Pipeline Value</span>
                   <Zap className="size-3 text-primary" />
                 </CardHeader>
-                <CardContent className="pb-3">
+                <CardContent className="pb-4">
                   <div className="text-lg font-bold text-primary">KES {(orders?.reduce((sum, o) => sum + (o.total || 0), 0) || 0).toLocaleString()}</div>
                 </CardContent>
               </Card>
             </div>
 
             <Card className="border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
-              <CardHeader className="py-3 px-6 border-b border-border/50 bg-secondary/10 flex flex-row items-center justify-between">
+              <CardHeader className="py-3 px-6 border-b border-border/50 bg-secondary/10 flex flex-row items-center justify-between gap-4">
                 <div className="relative max-w-sm w-full">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
                   <Input placeholder="Search orders..." className="pl-9 h-8 text-[10px] bg-secondary/20 border-none" />
@@ -234,10 +238,10 @@ export default function SalesOrdersPage() {
                     {isLoading ? (
                       <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse">Syncing pipeline...</TableCell></TableRow>
                     ) : orders?.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-20 text-xs text-muted-foreground uppercase font-bold">No orders in pipeline.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center py-20 text-xs text-muted-foreground uppercase font-black tracking-widest opacity-20 italic">No orders in pipeline.</TableCell></TableRow>
                     ) : orders?.map((o) => (
-                      <TableRow key={o.id} className="h-14 hover:bg-secondary/10 transition-colors border-b-border/30 group">
-                        <TableCell className="pl-6 font-mono text-[11px] font-bold text-primary">{o.orderNumber}</TableCell>
+                      <TableRow key={o.id} className="h-16 hover:bg-secondary/10 transition-colors border-b-border/30 group">
+                        <TableCell className="pl-6 font-mono text-[11px] font-bold text-primary uppercase">{o.orderNumber}</TableCell>
                         <TableCell className="text-xs font-bold uppercase">{o.customerName}</TableCell>
                         <TableCell className="text-center">
                           <Badge variant="outline" className={cn("text-[8px] h-4 uppercase font-bold", 
@@ -250,8 +254,14 @@ export default function SalesOrdersPage() {
                         <TableCell className="text-right pr-6">
                           <div className="flex justify-end gap-2">
                             {o.status === 'Draft' && (
-                              <Button size="sm" variant="ghost" className="h-7 text-[9px] font-bold uppercase gap-1.5 text-accent" onClick={() => handleConfirm(o.id)}>
-                                <CheckCircle2 className="size-3" /> Confirm
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                disabled={isProcessing}
+                                className="h-7 text-[9px] font-bold uppercase gap-1.5 text-accent hover:bg-accent/10" 
+                                onClick={() => handleConfirm(o.id)}
+                              >
+                                {isProcessing ? <Loader2 className="size-3 animate-spin" /> : <CheckCircle2 className="size-3" />} Confirm & Invoice
                               </Button>
                             )}
                             <DropdownMenu>

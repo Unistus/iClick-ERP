@@ -20,7 +20,8 @@ import {
   Navigation,
   Loader2,
   Package,
-  Zap
+  Zap,
+  MoreVertical
 } from "lucide-react";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, query, orderBy, limit, doc, where } from "firebase/firestore";
@@ -31,10 +32,12 @@ import { confirmDelivery } from "@/lib/delivery/delivery.service";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
+import { useRouter } from 'next/navigation';
 
 export default function DeliveryOrdersPage() {
   const db = useFirestore();
   const { user } = useUser();
+  const router = useRouter();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -180,7 +183,7 @@ export default function DeliveryOrdersPage() {
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse uppercase font-black tracking-widest opacity-50">Polling Satellite Data...</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse uppercase font-black">Scanning Satellite Data...</TableCell></TableRow>
                     ) : filteredDeliveries.length === 0 ? (
                       <TableRow><TableCell colSpan={5} className="text-center py-24 text-xs text-muted-foreground uppercase font-black tracking-widest opacity-20 italic">No movement detected in the registry.</TableCell></TableRow>
                     ) : filteredDeliveries.map((dl) => (

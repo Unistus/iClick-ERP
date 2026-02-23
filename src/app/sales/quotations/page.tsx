@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, query, orderBy, doc, updateDoc, where } from "firebase/firestore";
 import { format } from "date-fns";
-import { Quote, Plus, Search, Filter, History, MoreVertical, Loader2, Send, CheckCircle2, FileText, UserCircle } from "lucide-react";
+import { Quote, Plus, Search, Filter, History, MoreVertical, Loader2, Send, CheckCircle2, FileText, UserCircle, Printer, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { createQuotation, updateQuotationStatus } from "@/lib/sales/sales.service";
 import { toast } from "@/hooks/use-toast";
@@ -33,6 +33,7 @@ export default function QuotationsPage() {
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
   const { data: institutions } = useCollection(instColRef);
@@ -43,7 +44,6 @@ export default function QuotationsPage() {
   }, [db, selectedInstId]);
   const { data: products } = useCollection(productsRef);
 
-  // GATEKEEPER: Only Approved (Active) customers can receive quotes
   const customersQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return query(collection(db, 'institutions', selectedInstId, 'customers'), where('status', '==', 'Active'));
@@ -99,12 +99,17 @@ export default function QuotationsPage() {
     }
   };
 
+  const filteredQuotes = quotations?.filter(q => 
+    q.quoteNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    q.customerName?.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
+
   return (
     <DashboardLayout>
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-1.5 rounded bg-primary/20 text-primary">
+            <div className="p-1.5 rounded bg-primary/20 text-primary shadow-inner border border-primary/10">
               <Quote className="size-5" />
             </div>
             <div>
@@ -125,7 +130,7 @@ export default function QuotationsPage() {
               </SelectContent>
             </Select>
 
-            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase shadow-lg shadow-primary/20" disabled={!selectedInstId} onClick={() => setIsCreateOpen(true)}>
+            <Button size="sm" className="gap-2 h-9 text-xs font-bold uppercase shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90" disabled={!selectedInstId} onClick={() => setIsCreateOpen(true)}>
               <Plus className="size-4" /> New Quote
             </Button>
           </div>
@@ -138,10 +143,15 @@ export default function QuotationsPage() {
           </div>
         ) : (
           <Card className="border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
-            <CardHeader className="py-3 px-6 border-b border-border/50 bg-secondary/10 flex flex-row items-center justify-between">
+            <CardHeader className="py-3 px-6 border-b border-border/50 bg-secondary/10 flex flex-row items-center justify-between gap-4">
               <div className="relative max-w-sm w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-                <Input placeholder="Search quotes..." className="pl-9 h-8 text-[10px] bg-secondary/20 border-none" />
+                <Input 
+                  placeholder="Search quotes..." 
+                  className="pl-9 h-8 text-[10px] bg-secondary/20 border-none" 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
               <Badge variant="outline" className="text-[10px] font-bold uppercase tracking-widest text-primary bg-primary/5 border-primary/20">Authorized Quoting Cycle</Badge>
             </CardHeader>
@@ -158,15 +168,15 @@ export default function QuotationsPage() {
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse">Syncing quotes...</TableCell></TableRow>
-                  ) : quotations?.length === 0 ? (
+                    <TableRow><TableCell colSpan={5} className="text-center py-12 text-xs animate-pulse font-bold uppercase">Syncing quotes...</TableCell></TableRow>
+                  ) : filteredQuotes.length === 0 ? (
                     <TableRow><TableCell colSpan={5} className="text-center py-20 text-xs text-muted-foreground uppercase font-bold">No active quotations.</TableCell></TableRow>
-                  ) : quotations?.map((q) => (
+                  ) : filteredQuotes.map((q) => (
                     <TableRow key={q.id} className="h-14 hover:bg-secondary/10 transition-colors border-b-border/30 group">
                       <TableCell className="pl-6 font-mono text-[11px] font-bold text-primary uppercase">{q.quoteNumber}</TableCell>
-                      <TableCell className="text-xs font-bold uppercase">{q.customerName}</TableCell>
+                      <TableCell className="text-xs font-bold uppercase tracking-tight">{q.customerName}</TableCell>
                       <TableCell className="text-center">
-                        <Badge variant="outline" className={cn("text-[8px] h-4 uppercase font-bold", 
+                        <Badge variant="outline" className={cn("text-[8px] h-5 px-2 uppercase font-bold border-none ring-1 shadow-sm", 
                           q.status === 'Draft' ? 'bg-secondary text-muted-foreground' : 
                           q.status === 'Sent' ? 'bg-primary/10 text-primary border-primary/20' : 
                           'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
@@ -178,24 +188,26 @@ export default function QuotationsPage() {
                       <TableCell className="text-right pr-6">
                         <div className="flex justify-end items-center gap-2">
                           {q.status === 'Draft' && (
-                            <Button size="sm" variant="ghost" className="h-7 text-[9px] font-bold uppercase gap-1.5" onClick={() => handleStatusChange(q.id, 'Sent')}>
+                            <Button size="sm" variant="ghost" className="h-7 text-[9px] font-black uppercase gap-1.5" onClick={() => handleStatusChange(q.id, 'Sent')}>
                               <Send className="size-3" /> Mark Sent
                             </Button>
                           )}
                           {q.status === 'Sent' && (
-                            <Button size="sm" variant="ghost" className="h-7 text-[9px] font-bold uppercase gap-1.5 text-emerald-500" onClick={() => handleStatusChange(q.id, 'Confirmed')}>
+                            <Button size="sm" variant="ghost" className="h-7 text-[9px] font-black uppercase gap-1.5 text-emerald-500" onClick={() => handleStatusChange(q.id, 'Confirmed')}>
                               <CheckCircle2 className="size-3" /> Confirm & Order
                             </Button>
                           )}
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100"><MoreVertical className="size-4" /></Button>
+                              <Button variant="ghost" size="icon" className="size-8 opacity-0 group-hover:opacity-100 transition-all shadow-sm"><MoreVertical className="size-4" /></Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                              <DropdownMenuItem className="text-xs gap-2"><FileText className="size-3.5" /> Print Preview</DropdownMenuItem>
-                              <DropdownMenuItem className="text-xs gap-2"><Send className="size-3.5" /> Email to Client</DropdownMenuItem>
+                            <DropdownMenuContent align="end" className="w-56 shadow-2xl ring-1 ring-border">
+                              <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Document Command</DropdownMenuLabel>
+                              <DropdownMenuItem className="text-xs gap-3 font-bold"><FileText className="size-3.5 text-primary" /> View Full Spec</DropdownMenuItem>
+                              <DropdownMenuItem className="text-xs gap-3 font-bold"><Printer className="size-3.5 text-accent" /> Print PDF</DropdownMenuItem>
+                              <DropdownMenuItem className="text-xs gap-3 font-bold"><Send className="size-3.5 text-emerald-500" /> Dispatch to Email</DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-xs gap-2 text-destructive"><History className="size-3.5" /> Archive Quote</DropdownMenuItem>
+                              <DropdownMenuItem className="text-xs gap-3 font-bold text-destructive"><Trash2 className="size-3.5" /> Terminate Quote</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -209,48 +221,52 @@ export default function QuotationsPage() {
         )}
 
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md shadow-2xl ring-1 ring-border rounded-[2rem] overflow-hidden p-0 border-none">
             <form onSubmit={handleCreateQuote}>
-              <DialogHeader>
-                <div className="flex items-center gap-2 mb-2">
-                  <Quote className="size-5 text-primary" />
-                  <DialogTitle>Generate Quotation</DialogTitle>
-                </div>
-                <CardDescription className="text-xs font-bold text-primary">Compliance: APPROVED CUSTOMERS ONLY</CardDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4 text-xs">
-                <div className="space-y-2">
-                  <Label className="uppercase font-bold tracking-widest opacity-60">Verified Customer</Label>
-                  <Select name="customerId" required>
-                    <SelectTrigger className="h-11 font-bold">
-                      <SelectValue placeholder="Search Active Directory..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {activeCustomers?.map(c => (
-                        <SelectItem key={c.id} value={c.id} className="text-xs font-bold uppercase">
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[8px] text-muted-foreground italic">Only customers with 'Active' status appear in this selection.</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="uppercase font-bold tracking-widest opacity-60">Expiry Date</Label>
-                    <Input name="expiryDate" type="date" defaultValue={format(addDays(new Date(), 7), 'yyyy-MM-dd')} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="uppercase font-bold tracking-widest opacity-60">Estimated Total</Label>
-                    <Input name="total" type="number" step="0.01" placeholder="0.00" required className="h-10 font-black text-lg" />
+              <div className="bg-primary p-8 text-white relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-10"><Quote className="size-32 rotate-12" /></div>
+                <div className="flex items-center gap-3 mb-6 relative z-10">
+                  <div className="p-2 rounded-xl bg-white/20 backdrop-blur-md shadow-inner"><Quote className="size-5" /></div>
+                  <div>
+                    <DialogTitle className="text-lg font-black uppercase tracking-widest text-white">Generate Quotation</DialogTitle>
+                    <p className="text-[10px] font-bold uppercase opacity-70">Pre-sales Identity Node v4.2</p>
                   </div>
                 </div>
               </div>
-              <DialogFooter>
-                <Button type="submit" disabled={isProcessing} className="h-11 font-bold uppercase text-xs w-full shadow-xl shadow-primary/20 bg-primary hover:bg-primary/90">
-                  {isProcessing ? <Loader2 className="size-3 animate-spin mr-2" /> : <Quote className="size-3 mr-2" />} Save Draft Quote
-                </Button>
-              </DialogFooter>
+              <div className="p-8 space-y-6 bg-card">
+                <div className="grid gap-4 py-4 text-xs">
+                  <div className="space-y-2">
+                    <Label className="uppercase font-black text-[9px] tracking-[0.2em] opacity-60 text-primary">Verified Customer Identity</Label>
+                    <Select name="customerId" required>
+                      <SelectTrigger className="h-11 font-black uppercase border-none ring-1 ring-border bg-secondary/5 focus:ring-primary">
+                        <SelectValue placeholder="Search Active Directory..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {activeCustomers?.map(c => (
+                          <SelectItem key={c.id} value={c.id} className="text-[10px] font-black uppercase tracking-tight">
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="uppercase font-black text-[9px] tracking-widest opacity-60">Expiry Date</Label>
+                      <Input name="expiryDate" type="date" defaultValue={format(addDays(new Date(), 7), 'yyyy-MM-dd')} required className="h-11 bg-secondary/5 border-none ring-1 ring-border" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="uppercase font-black text-[9px] tracking-widest opacity-60">Estimated Total</Label>
+                      <Input name="total" type="number" step="0.01" placeholder="0.00" required className="h-11 font-black text-lg bg-secondary/5 border-none ring-1 ring-border focus:ring-primary shadow-inner" />
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter className="pt-2">
+                  <Button type="submit" disabled={isProcessing} className="h-12 px-12 font-black uppercase text-[10px] shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-3 border-none ring-2 ring-primary/20 transition-all active:scale-95 w-full rounded-2xl">
+                    {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} Initialize Quote Cycle
+                  </Button>
+                </DialogFooter>
+              </div>
             </form>
           </DialogContent>
         </Dialog>

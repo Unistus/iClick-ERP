@@ -4,6 +4,8 @@ import { Firestore, collection, doc, serverTimestamp, increment, getDoc, runTran
 import { postJournalEntry } from '../accounting/journal.service';
 import { recordStockMovement } from '../inventory/inventory.service';
 import { getNextSequence } from '../sequence-service';
+import { initiateApprovalRequest } from '../approvals/approvals.service';
+import { checkTransactionAgainstBudget } from '../budgeting/budget.service';
 
 export interface PurchaseItem {
   productId: string;
@@ -41,24 +43,69 @@ export async function bootstrapPurchasesFinancials(db: Firestore, institutionId:
   }, { merge: true });
 }
 
+/**
+ * Creates a Purchase Order with integrated Governance Guards.
+ * Handles Budget Overrides and High-Value Authorizations.
+ */
 export async function createPurchaseOrder(db: Firestore, institutionId: string, payload: any, userId: string) {
+  if (!institutionId || !db) return;
+
+  // 1. Budget Verification Node
+  const budgetCheck = await checkTransactionAgainstBudget(db, institutionId, payload.expenseAccountId, payload.total);
+  
+  // 2. Resolve Sequence
   const poNumber = await getNextSequence(db, institutionId, 'purchase_order');
   const ref = collection(db, 'institutions', institutionId, 'purchase_orders');
   
-  // Mark the expense account for budgeting tracking if it isn't already
-  if (payload.expenseAccountId) {
-    const coaRef = doc(db, 'institutions', institutionId, 'coa', payload.expenseAccountId);
-    updateDoc(coaRef, { isTrackedForBudget: true, updatedAt: serverTimestamp() });
+  let poStatus = 'Draft';
+  let approvalRequestId = null;
+
+  // 3. GOVERNANCE FIREWALL: Check if approval is required
+  // Rule A: Budget Breach (Override required)
+  // Rule B: High Value (> 50,000)
+  if (!budgetCheck.allowed || payload.total > 50000) {
+    const approval = await initiateApprovalRequest(db, institutionId, {
+      module: 'Procurement',
+      action: !budgetCheck.allowed ? 'Budget Override Authorization' : 'High-Value PO Approval',
+      sourceDocId: 'pending', // Linked after creation
+      requestedBy: userId,
+      requestedByName: 'Procurement Officer',
+      amount: payload.total,
+      data: {
+        poNumber,
+        supplierName: payload.supplierName,
+        isBudgetBreach: !budgetCheck.allowed,
+        utilization: budgetCheck.utilization
+      },
+      justification: !budgetCheck.allowed 
+        ? `PO exceeds budget ceiling by ${((budgetCheck.utilization || 0) - 100).toFixed(1)}%. Requires fiscal override.`
+        : `Order value of ${payload.total} exceeds institutional manual threshold.`
+    });
+
+    if (approval.status === 'Pending') {
+      poStatus = 'Pending Approval';
+      approvalRequestId = approval.requestId || null;
+    }
   }
 
-  return addDoc(ref, {
+  // 4. Persistence
+  const newPo = await addDoc(ref, {
     ...payload,
     poNumber,
-    status: 'Draft',
+    status: poStatus,
+    approvalRequestId,
     createdBy: userId,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   });
+
+  if (approvalRequestId) {
+    await updateDoc(doc(db, 'institutions', institutionId, 'approval_requests', approvalRequestId), {
+      sourceDocId: newPo.id
+    });
+  }
+
+  return { id: newPo.id, status: poStatus };
 }
 
 export async function receiveGRN(db: Firestore, institutionId: string, payload: {
@@ -70,6 +117,16 @@ export async function receiveGRN(db: Firestore, institutionId: string, payload: 
   
   return runTransaction(db, async (transaction) => {
     const poRef = doc(db, 'institutions', institutionId, 'purchase_orders', payload.poId);
+    const poSnap = await transaction.get(poRef);
+    
+    if (!poSnap.exists()) throw new Error("Source PO not found.");
+    const po = poSnap.data();
+
+    // BLOCKER: Cannot receive goods for a PO that isn't approved/finalized
+    if (po.status === 'Pending Approval') {
+      throw new Error("This Purchase Order is locked awaiting governance authorization.");
+    }
+
     transaction.update(poRef, { status: 'Received', updatedAt: serverTimestamp() });
 
     for (const item of payload.items) {

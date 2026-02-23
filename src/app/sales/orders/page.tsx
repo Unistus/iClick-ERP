@@ -47,10 +47,12 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
+import { useRouter } from 'next/navigation';
 
 export default function SalesOrdersPage() {
   const db = useFirestore();
   const { user } = useUser();
+  const router = useRouter();
   const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -413,7 +415,7 @@ export default function SalesOrdersPage() {
                 </DialogFooter>
               </div>
             </form>
-          </DialogContent>
+          </div>
         </Dialog>
       </div>
     </DashboardLayout>

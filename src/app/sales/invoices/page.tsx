@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { createSalesInvoice, finalizeInvoice, type SalesItem } from "@/lib/sales/sales.service";
 import { recordInvoicePayment } from "@/lib/accounting/receivable.service";
+import { initializeDeliveryOrder } from "@/lib/delivery/delivery.service";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
 import { cn } from '@/lib/utils';
@@ -75,7 +76,7 @@ export default function SalesInvoicesPage() {
   const [giftCardAmount, setGiftCardAmount] = useState(0);
   const [manualDiscount, setManualDiscount] = useState<number>(0);
 
-  const { institutions, isLoading: instLoading } = usePermittedInstitutions();
+  const { institutions, isSuperAdmin, isLoading: instLoading } = usePermittedInstitutions();
 
   const customersQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
@@ -185,6 +186,20 @@ export default function SalesInvoicesPage() {
     }
   };
 
+  const handleInitializeDispatch = async (invoice: any) => {
+    if (!selectedInstId || isProcessing) return;
+    setIsProcessing(true);
+    try {
+      await initializeDeliveryOrder(db, selectedInstId, invoice, user!.uid, 'invoice');
+      toast({ title: "Dispatch Hub Initialized", description: "Identity node created in Logistics." });
+      router.push('/delivery/orders');
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Dispatch Initialization Failed", description: err.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-4">
@@ -287,9 +302,22 @@ export default function SalesInvoicesPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-56 shadow-2xl ring-1 ring-border">
                               <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground">Billing Command</DropdownMenuLabel>
-                              <DropdownMenuItem className="text-xs gap-3 font-bold" onClick={() => router.push('/delivery/dispatch')}>
-                                <Truck className="size-3.5 text-primary" /> Initialize Dispatch Note
-                              </DropdownMenuItem>
+                              
+                              {(!inv.isDispatched || isSuperAdmin) ? (
+                                <DropdownMenuItem 
+                                  className="text-xs gap-3 font-bold" 
+                                  onClick={() => handleInitializeDispatch(inv)}
+                                  disabled={isProcessing || (inv.isDispatched && !isSuperAdmin)}
+                                >
+                                  <Truck className={cn("size-3.5", inv.isDispatched ? "text-amber-500" : "text-primary")} /> 
+                                  {inv.isDispatched ? "Re-initialize Dispatch (Admin)" : "Initialize Dispatch Note"}
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem className="text-xs gap-3 font-bold opacity-50 cursor-not-allowed">
+                                  <ShieldCheck className="size-3.5 text-emerald-500" /> Dispatched to Logistics
+                                </DropdownMenuItem>
+                              )}
+
                               <DropdownMenuItem className="text-xs gap-3 font-bold">
                                 <Printer className="size-3.5 text-accent" /> Print Official Invoice
                               </DropdownMenuItem>

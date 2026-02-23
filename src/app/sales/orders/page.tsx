@@ -27,7 +27,9 @@ import {
   UserCircle,
   Truck,
   ArrowRight,
-  Activity
+  Activity,
+  ShieldCheck,
+  ShieldAlert
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { createSalesOrder, confirmSalesOrder, type SalesItem } from "@/lib/sales/sales.service";
@@ -60,7 +62,7 @@ export default function SalesOrdersPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [orderItems, setOrderItems] = useState<SalesItem[]>([]);
 
-  const { institutions, isLoading: instLoading } = usePermittedInstitutions();
+  const { institutions, isSuperAdmin, isLoading: instLoading } = usePermittedInstitutions();
 
   // Data Fetching
   const customersQuery = useMemoFirebase(() => {
@@ -152,11 +154,11 @@ export default function SalesOrdersPage() {
     if (!selectedInstId || isProcessing) return;
     setIsProcessing(true);
     try {
-      await initializeDeliveryOrder(db, selectedInstId, order, user!.uid);
+      await initializeDeliveryOrder(db, selectedInstId, order, user!.uid, 'order');
       toast({ title: "Delivery Order Created", description: "Fulfillment cycle initialized in Logistics Hub." });
       router.push('/delivery/orders');
-    } catch (err) {
-      toast({ variant: "destructive", title: "Initialization Failed" });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Initialization Failed", description: err.message });
     } finally {
       setIsProcessing(false);
     }
@@ -247,7 +249,7 @@ export default function SalesOrdersPage() {
             </div>
 
             <Card className="border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
-              <CardHeader className="py-3 px-6 border-b border-border/50 bg-secondary/10 flex flex-col md:flex-row items-center justify-between gap-4">
+              <CardHeader className="py-3 px-6 border-b border-border/50 bg-secondary/10 flex flex-row items-center justify-between gap-4">
                 <div className="relative max-w-sm w-full">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
                   <Input 
@@ -315,9 +317,22 @@ export default function SalesOrdersPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-56 shadow-2xl ring-1 ring-border">
                                 <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground">Logistics Command</DropdownMenuLabel>
-                                <DropdownMenuItem className="text-xs gap-3 font-bold" onClick={() => handleInitializeDispatch(o)}>
-                                  <Truck className="size-3.5 text-primary" /> Initialize Dispatch Note
-                                </DropdownMenuItem>
+                                
+                                {(!o.isDispatched || isSuperAdmin) ? (
+                                  <DropdownMenuItem 
+                                    className="text-xs gap-3 font-bold" 
+                                    onClick={() => handleInitializeDispatch(o)}
+                                    disabled={isProcessing || (o.isDispatched && !isSuperAdmin)}
+                                  >
+                                    <Truck className={cn("size-3.5", o.isDispatched ? "text-amber-500" : "text-primary")} /> 
+                                    {o.isDispatched ? "Re-initialize Dispatch (Admin)" : "Initialize Dispatch Note"}
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem className="text-xs gap-3 font-bold opacity-50 cursor-not-allowed">
+                                    <ShieldCheck className="size-3.5 text-emerald-500" /> Dispatched to Logistics
+                                  </DropdownMenuItem>
+                                )}
+
                                 <DropdownMenuItem className="text-xs gap-3 font-bold">
                                   <FileText className="size-3.5 text-accent" /> Export Packing Slip
                                 </DropdownMenuItem>

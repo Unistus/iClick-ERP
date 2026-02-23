@@ -41,26 +41,56 @@ export async function bootstrapLogisticsFinancials(db: Firestore, institutionId:
 }
 
 /**
- * Initializes a Delivery Order from a confirmed Sales Order.
+ * Initializes a Delivery Order from a confirmed Sales Order or Invoice.
+ * Uses a transaction to prevent duplicate dispatch notes.
  */
-export async function initializeDeliveryOrder(db: Firestore, institutionId: string, salesOrder: any, userId: string) {
+export async function initializeDeliveryOrder(
+  db: Firestore, 
+  institutionId: string, 
+  sourceDoc: any, 
+  userId: string,
+  sourceType: 'order' | 'invoice' = 'order'
+) {
   const deliveryNumber = await getNextSequence(db, institutionId, 'delivery_order');
   const doRef = collection(db, 'institutions', institutionId, 'delivery_orders');
   
   const data = {
     deliveryNumber,
-    salesOrderId: salesOrder.id,
-    customerName: salesOrder.customerName,
-    customerId: salesOrder.customerId,
-    items: salesOrder.items,
+    sourceId: sourceDoc.id,
+    sourceType,
+    customerName: sourceDoc.customerName,
+    customerId: sourceDoc.customerId,
+    items: sourceDoc.items,
     status: 'Pending',
-    destinationAddress: '', 
+    destinationAddress: sourceDoc.shippingAddress || '', 
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     createdBy: userId
   };
 
-  return addDoc(doRef, data);
+  return runTransaction(db, async (transaction) => {
+    // 1. Check if source already dispatched (Secondary Guard)
+    const sourcePath = sourceType === 'order' ? 'sales_orders' : 'sales_invoices';
+    const sourceRef = doc(db, 'institutions', institutionId, sourcePath, sourceDoc.id);
+    const snap = await transaction.get(sourceRef);
+    
+    if (snap.exists() && snap.data().isDispatched) {
+      throw new Error("This document has already been dispatched to Logistics.");
+    }
+
+    // 2. Create Delivery Order
+    const newDocRef = doc(doRef);
+    transaction.set(newDocRef, data);
+
+    // 3. Update Source Flag
+    transaction.update(sourceRef, {
+      isDispatched: true,
+      deliveryOrderId: newDocRef.id,
+      updatedAt: serverTimestamp()
+    });
+
+    return newDocRef;
+  });
 }
 
 /**

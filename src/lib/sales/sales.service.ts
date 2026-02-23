@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Firestore, collection, doc, serverTimestamp, increment, getDoc, runTransaction, addDoc, updateDoc, setDoc } from 'firebase/firestore';
@@ -7,6 +6,7 @@ import { postJournalEntry } from '../accounting/journal.service';
 import { recordStockMovement } from '../inventory/inventory.service';
 import { getNextSequence } from '../sequence-service';
 import { createGiftCard } from '../crm/crm.service';
+import { initiateApprovalRequest } from '../approvals/approvals.service';
 
 export interface SalesItem {
   productId: string;
@@ -29,6 +29,7 @@ export interface SalesInvoicePayload {
   issueGiftCard?: boolean;
   giftCardAmount?: number;
   appliedPromoId?: string;
+  manualDiscount?: number;
 }
 
 /**
@@ -72,12 +73,45 @@ export async function createSalesInvoice(db: Firestore, institutionId: string, p
   // 1. Generate Sequence
   const invoiceNumber = await getNextSequence(db, institutionId, 'sales_invoice');
 
-  // 2. Initial Save as Draft (No Posting Yet)
+  // 2. CHECK FOR GOVERNANCE: Discount Approvals
+  const expectedTotal = payload.subtotal + payload.taxTotal;
+  const discountAmount = expectedTotal - payload.total;
+  const discountPercent = expectedTotal > 0 ? (discountAmount / expectedTotal) * 100 : 0;
+
+  let invoiceStatus = 'Draft';
+  let approvalRequestId = null;
+
+  // RULE: If discount > 5%, trigger Approval Workflow
+  if (discountPercent > 5) {
+    const approval = await initiateApprovalRequest(db, institutionId, {
+      module: 'Sales',
+      action: 'High Discount Authorization',
+      sourceDocId: 'pending', // Updated after creation
+      requestedBy: userId,
+      requestedByName: 'Sales Agent', 
+      amount: discountAmount,
+      data: {
+        invoiceNumber,
+        customerName: payload.customerName,
+        discountPercent: `${discountPercent.toFixed(1)}%`,
+        finalTotal: payload.total
+      },
+      justification: `Applied manual discount of ${discountPercent.toFixed(1)}% to institutional sale.`
+    });
+
+    if (approval.status === 'Pending') {
+      invoiceStatus = 'Pending Approval';
+      approvalRequestId = approval.requestId || null;
+    }
+  }
+
+  // 3. Initial Save
   const invoiceRef = collection(db, 'institutions', institutionId, 'sales_invoices');
   const newInvoice = await addDoc(invoiceRef, {
     ...payload,
     invoiceNumber,
-    status: 'Draft',
+    status: invoiceStatus,
+    approvalRequestId,
     isPaid: false,
     balance: payload.total,
     createdBy: userId,
@@ -85,7 +119,14 @@ export async function createSalesInvoice(db: Firestore, institutionId: string, p
     updatedAt: serverTimestamp()
   });
 
-  // 3. Optional: Issue Gift Card autonomously
+  // Link Approval Request to newly created Doc ID
+  if (approvalRequestId) {
+    await updateDoc(doc(db, 'institutions', institutionId, 'approval_requests', approvalRequestId), {
+      sourceDocId: newInvoice.id
+    });
+  }
+
+  // 4. Optional: Issue Gift Card autonomously
   if (payload.issueGiftCard && payload.giftCardAmount && payload.giftCardAmount > 0) {
     const gcCode = await getNextSequence(db, institutionId, 'gift_card');
     await createGiftCard(db, institutionId, {
@@ -99,7 +140,7 @@ export async function createSalesInvoice(db: Firestore, institutionId: string, p
     });
   }
 
-  return newInvoice;
+  return { id: newInvoice.id, status: invoiceStatus };
 }
 
 export async function finalizeInvoice(db: Firestore, institutionId: string, invoiceId: string) {
@@ -118,7 +159,14 @@ export async function finalizeInvoice(db: Firestore, institutionId: string, invo
     const inv = invSnap.data();
     const setup = setupSnap.data();
 
-    if (inv.status !== 'Draft') throw new Error("Only draft invoices can be finalized.");
+    // BLOCKER: Cannot finalize if awaiting approval
+    if (inv.status === 'Pending Approval') {
+      throw new Error("This invoice is locked awaiting governance authorization.");
+    }
+
+    if (inv.status !== 'Draft' && inv.status !== 'Approved') {
+      throw new Error("Only draft or approved invoices can be finalized.");
+    }
 
     const debitAccountId = inv.paymentMethod === 'Credit' 
       ? setup.accountsReceivableAccountId 

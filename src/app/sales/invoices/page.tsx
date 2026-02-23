@@ -31,13 +31,15 @@ import {
   ArrowRight,
   Gift,
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  AlertTriangle
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { createSalesInvoice, finalizeInvoice, type SalesItem } from "@/lib/sales/sales.service";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
 import { cn } from '@/lib/utils';
+import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 
 export default function SalesInvoicesPage() {
   const db = useFirestore();
@@ -52,12 +54,11 @@ export default function SalesInvoicesPage() {
   const [paymentMethod, setPaymentMethod] = useState<'Credit' | 'Cash' | 'Bank'>('Cash');
   const [issueGiftCard, setIssueGiftCard] = useState(false);
   const [giftCardAmount, setGiftCardAmount] = useState(0);
+  const [manualDiscount, setManualDiscount] = useState<number>(0);
 
   // Data Fetching
-  const instColRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
-  const { data: institutions } = useCollection(instColRef);
+  const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
-  // GATEKEEPER: Only Approved (Active) customers can be invoiced
   const customersQuery = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return query(collection(db, 'institutions', selectedInstId, 'customers'), where('status', '==', 'Active'));
@@ -76,7 +77,6 @@ export default function SalesInvoicesPage() {
   }, [db, selectedInstId]);
   const { data: products } = useCollection(productsRef);
 
-  // CRM Incentives Logic
   const crmSetupRef = useMemoFirebase(() => {
     if (!selectedInstId) return null;
     return doc(db, 'institutions', selectedInstId, 'settings', 'crm');
@@ -106,18 +106,14 @@ export default function SalesInvoicesPage() {
   const totals = useMemo(() => {
     const subtotal = items.reduce((sum, i) => sum + i.total, 0);
     const taxTotal = subtotal * 0.16;
-    return { subtotal, taxTotal, total: subtotal + taxTotal };
-  }, [items]);
+    const grossTotal = subtotal + taxTotal;
+    const finalTotal = Math.max(0, grossTotal - manualDiscount);
+    const discountPercent = grossTotal > 0 ? (manualDiscount / grossTotal) * 100 : 0;
+    
+    return { subtotal, taxTotal, grossTotal, total: finalTotal, discountPercent };
+  }, [items, manualDiscount]);
 
-  const qualifiedPromo = useMemo(() => {
-    if (!crmSetup?.autoAssignPromo || !crmSetup?.incentiveRules || crmSetup.incentiveRules.length === 0) return null;
-    const sortedRules = [...crmSetup.incentiveRules].sort((a, b) => b.threshold - a.threshold);
-    const winningRule = sortedRules.find(rule => totals.total >= rule.threshold);
-    if (winningRule) {
-      return promos?.find(p => p.id === winningRule.promoId);
-    }
-    return null;
-  }, [totals.total, crmSetup, promos]);
+  const requiresApproval = totals.discountPercent > 5;
 
   const handleSaveDraft = async () => {
     if (!selectedInstId || !user || isProcessing) return;
@@ -126,23 +122,33 @@ export default function SalesInvoicesPage() {
     const customer = activeCustomers?.find(c => c.id === selectedCustomerId);
 
     try {
-      await createSalesInvoice(db, selectedInstId, {
+      const result = await createSalesInvoice(db, selectedInstId, {
         customerId: selectedCustomerId,
         customerName: customer?.name || 'Unknown',
         items,
-        ...totals,
+        subtotal: totals.subtotal,
+        taxTotal: totals.taxTotal,
+        total: totals.total,
         paymentMethod,
         issueGiftCard,
         giftCardAmount: issueGiftCard ? giftCardAmount : 0,
-        appliedPromoId: qualifiedPromo?.id
+        manualDiscount
       }, user.uid);
 
-      logSystemEvent(db, selectedInstId, user, 'SALES', 'Create Invoice', `Invoice for ${customer?.name} initiated.`);
-      toast({ title: "Invoice Record Created" });
+      if (result?.status === 'Pending Approval') {
+        toast({ 
+          variant: "destructive", 
+          title: "Approval Required", 
+          description: `Discount of ${totals.discountPercent.toFixed(1)}% exceeds institutional threshold. Requisition sent to supervisor.` 
+        });
+      } else {
+        toast({ title: "Invoice Record Created" });
+      }
+
       setIsCreateOpen(false);
       setItems([]);
       setSelectedCustomerId("");
-      setIssueGiftCard(false);
+      setManualDiscount(0);
     } catch (err: any) {
       toast({ variant: "destructive", title: "Invoicing Failed" });
     } finally {
@@ -156,8 +162,8 @@ export default function SalesInvoicesPage() {
     try {
       await finalizeInvoice(db, selectedInstId, invoiceId);
       toast({ title: "Invoice Finalized", description: "Ledger updated and status locked." });
-    } catch (err) {
-      toast({ variant: "destructive", title: "Finalization Failed" });
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Finalization Locked", description: err.message });
     } finally {
       setIsProcessing(false);
     }
@@ -180,7 +186,7 @@ export default function SalesInvoicesPage() {
           <div className="flex gap-2 w-full md:w-auto">
             <Select value={selectedInstId} onValueChange={setSelectedInstId}>
               <SelectTrigger className="w-[240px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
-                <SelectValue placeholder="Select Institution" />
+                <SelectValue placeholder={instLoading ? "Validating..." : "Select Institution"} />
               </SelectTrigger>
               <SelectContent>
                 {institutions?.map(i => (
@@ -203,13 +209,13 @@ export default function SalesInvoicesPage() {
         ) : (
           <div className="space-y-6 animate-in fade-in duration-700">
             <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
-              <CardHeader className="py-3 px-6 border-b border-border/50 bg-secondary/10 flex flex-row items-center justify-between">
+              <CardHeader className="py-3 px-6 border-b border-border/50 bg-secondary/10 flex flex-row items-center justify-between gap-4">
                 <div className="relative max-w-sm w-full">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
                   <Input placeholder="Search invoice or customer..." className="pl-9 h-9 text-[10px] bg-secondary/20 border-none" />
                 </div>
                 <Badge variant="outline" className="text-[10px] font-black uppercase text-emerald-500 bg-emerald-500/5 border-emerald-500/20 px-3 h-7">
-                  Institutional Guard: ACTIVE
+                  Governance Guard: ACTIVE
                 </Badge>
               </CardHeader>
               <CardContent className="p-0 overflow-x-auto">
@@ -217,7 +223,7 @@ export default function SalesInvoicesPage() {
                   <TableHeader className="bg-secondary/20">
                     <TableRow>
                       <TableHead className="h-10 text-[10px] uppercase font-black pl-6">Invoice #</TableHead>
-                      <TableHead className="h-10 text-[10px] uppercase font-black">Verified Customer</TableHead>
+                      <TableHead className="h-10 text-[10px] uppercase font-black">Customer</TableHead>
                       <TableHead className="h-10 text-[10px] uppercase font-black text-center">Status</TableHead>
                       <TableHead className="h-10 text-[10px] uppercase font-black text-right">Settlement</TableHead>
                       <TableHead className="h-10 text-right text-[10px] uppercase font-black pr-6">Management</TableHead>
@@ -237,7 +243,9 @@ export default function SalesInvoicesPage() {
                         <TableCell className="text-xs font-black uppercase tracking-tight text-foreground/90">{inv.customerName}</TableCell>
                         <TableCell className="text-center">
                           <Badge variant="outline" className={cn("text-[8px] h-5 px-2 uppercase font-black border-none ring-1", 
-                            inv.status === 'Draft' ? 'bg-secondary text-muted-foreground ring-border' : 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20'
+                            inv.status === 'Pending Approval' ? 'bg-amber-500/10 text-amber-500 ring-amber-500/20 animate-pulse' :
+                            inv.status === 'Finalized' ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/20' : 
+                            'bg-secondary text-muted-foreground ring-border'
                           )}>
                             {inv.status}
                           </Badge>
@@ -268,13 +276,13 @@ export default function SalesInvoicesPage() {
         )}
 
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogContent className="max-w-4xl overflow-y-auto max-h-[95vh] shadow-2xl ring-1 ring-border">
+          <DialogContent className="max-w-4xl overflow-y-auto max-h-[95vh] shadow-2xl ring-1 ring-border rounded-[2rem]">
             <DialogHeader>
               <div className="flex items-center gap-2 mb-2">
                 <FileText className="size-5 text-primary" />
                 <DialogTitle className="text-xl font-headline font-bold">Issue Institutional Invoice</DialogTitle>
               </div>
-              <CardDescription className="text-xs uppercase font-black tracking-tight text-primary">Compliance: APPROVED CUSTOMERS ONLY</CardDescription>
+              <CardDescription className="text-xs uppercase font-black tracking-tight text-primary">Compliance: GOVERNANCE FIREWALL ACTIVE</CardDescription>
             </DialogHeader>
             
             <div className="grid gap-8 py-6 text-xs lg:grid-cols-12">
@@ -283,7 +291,7 @@ export default function SalesInvoicesPage() {
                   <div className="space-y-2">
                     <Label className="uppercase font-bold tracking-widest opacity-60">Verified Member Account</Label>
                     <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId} required>
-                      <SelectTrigger className="h-11 font-bold uppercase">
+                      <SelectTrigger className="h-11 font-bold uppercase bg-secondary/5 border-none ring-1 ring-border">
                         <SelectValue placeholder="Search Active Directory..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -298,7 +306,7 @@ export default function SalesInvoicesPage() {
                   <div className="space-y-2">
                     <Label className="uppercase font-bold tracking-widest opacity-60">Settlement Cycle</Label>
                     <Select value={paymentMethod} onValueChange={(v: any) => setPaymentMethod(v)}>
-                      <SelectTrigger className="h-11 font-bold uppercase"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="h-11 font-bold uppercase bg-secondary/5 border-none ring-1 ring-border"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Cash" className="font-bold uppercase text-[10px]">Physical Cash</SelectItem>
                         <SelectItem value="Bank" className="font-bold uppercase text-[10px]">Direct Bank / M-Pesa</SelectItem>
@@ -345,43 +353,74 @@ export default function SalesInvoicesPage() {
               </div>
 
               <div className="lg:col-span-4 space-y-6">
-                <Card className="border-none ring-1 ring-primary/20 bg-primary/5 overflow-hidden shadow-2xl">
-                  <CardContent className="p-6 space-y-4">
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-[10px] font-bold uppercase opacity-50">
-                        <span>Net Value</span>
-                        <span>KES {totals.subtotal.toLocaleString()}</span>
+                <Card className="border-none ring-1 ring-border bg-secondary/5 overflow-hidden shadow-inner">
+                  <CardHeader className="py-3 bg-secondary/20 border-b">
+                    <CardTitle className="text-[10px] font-black uppercase tracking-widest">Yield Protection</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6 space-y-6">
+                    <div className="space-y-2">
+                      <Label className="uppercase font-bold tracking-widest opacity-60 text-[9px]">Manual Discount Override</Label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-muted-foreground">KES</span>
+                        <Input 
+                          type="number" 
+                          value={manualDiscount} 
+                          onChange={(e) => setManualDiscount(parseFloat(e.target.value) || 0)}
+                          className="h-11 pl-12 font-black text-lg bg-background border-none ring-1 ring-border" 
+                        />
                       </div>
+                    </div>
+
+                    <div className="space-y-3">
                       <div className="flex justify-between text-[10px] font-bold uppercase opacity-50">
-                        <span>VAT Component (16%)</span>
-                        <span>KES {totals.taxTotal.toLocaleString()}</span>
+                        <span>Gross Value</span>
+                        <span>KES {totals.grossTotal.toLocaleString()}</span>
                       </div>
-                      <div className="pt-3 border-t border-primary/20 flex justify-between items-end">
-                        <span className="text-[11px] font-black uppercase tracking-widest text-primary pb-1">Settlement</span>
+                      <div className="flex justify-between text-[10px] font-bold uppercase text-primary">
+                        <span>Applied Disc.</span>
+                        <span className="font-black">-{manualDiscount.toLocaleString()}</span>
+                      </div>
+                      <div className="pt-3 border-t border-border/50 flex justify-between items-end">
+                        <span className="text-[11px] font-black uppercase tracking-widest text-primary pb-1">Final Total</span>
                         <div className="text-right">
-                          <p className="text-3xl font-black font-headline text-foreground leading-none">
+                          <p className="text-2xl font-black font-headline text-foreground leading-none">
                             {totals.total.toLocaleString()}
                           </p>
-                          <span className="text-[10px] font-mono font-bold opacity-40 uppercase">KES Total</span>
+                          <span className="text-[8px] font-mono font-bold opacity-40 uppercase">KES Settlement</span>
                         </div>
                       </div>
                     </div>
+
+                    {requiresApproval && (
+                      <div className="p-4 bg-amber-500/5 border border-amber-500/10 rounded-2xl flex gap-3 items-start animate-pulse">
+                        <ShieldAlert className="size-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="text-[9px] font-black uppercase text-amber-600">Approval Required</p>
+                          <p className="text-[10px] leading-tight text-muted-foreground italic">
+                            Discount of {totals.discountPercent.toFixed(1)}% exceeds the 5% threshold. This invoice will be locked awaiting sign-off.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     
                     <div className="pt-2">
                       <Button 
                         disabled={isProcessing || items.length === 0 || !selectedCustomerId} 
                         onClick={handleSaveDraft} 
-                        className="w-full h-12 font-black uppercase text-xs shadow-2xl shadow-primary/40 bg-primary hover:bg-primary/90 gap-3"
+                        className={cn(
+                          "w-full h-12 font-black uppercase text-xs shadow-2xl gap-3 rounded-xl transition-all active:scale-95",
+                          requiresApproval ? "bg-amber-600 hover:bg-amber-700 shadow-amber-900/20" : "bg-primary hover:bg-primary/90 shadow-primary/40"
+                        )}
                       >
                         {isProcessing ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-5" />} 
-                        Authorize & Commit
+                        {requiresApproval ? "Queue for Approval" : "Authorize & Commit"}
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
               </div>
             </div>
-          </DialogFooter>
+          </DialogContent>
         </Dialog>
       </div>
     </DashboardLayout>

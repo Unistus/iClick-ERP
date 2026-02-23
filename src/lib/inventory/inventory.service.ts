@@ -1,6 +1,6 @@
 'use client';
 
-import { Firestore, collection, doc, serverTimestamp, increment, runTransaction, getDoc, addDoc, setDoc } from 'firebase/firestore';
+import { Firestore, collection, doc, serverTimestamp, increment, runTransaction, getDoc, addDoc, setDoc, Transaction } from 'firebase/firestore';
 import { postJournalEntry } from '../accounting/journal.service';
 import { initiateApprovalRequest } from '../approvals/approvals.service';
 
@@ -55,14 +55,13 @@ export async function bootstrapInventoryFinancials(db: Firestore, institutionId:
 
 /**
  * Records an atomic stock movement. 
- * Note: If status is 'Pending', no actual stock increment/decrement occurs.
  */
-export async function recordStockMovement(db: Firestore, institutionId: string, payload: MovementPayload) {
+export async function recordStockMovement(db: Firestore, institutionId: string, payload: MovementPayload, existingTx?: Transaction) {
   const productRef = doc(db, 'institutions', institutionId, 'products', payload.productId);
   const movementsRef = collection(db, 'institutions', institutionId, 'movements');
   const setupRef = doc(db, 'institutions', institutionId, 'settings', 'accounting');
 
-  return runTransaction(db, async (transaction) => {
+  const movementLogic = async (transaction: Transaction) => {
     const productSnap = await transaction.get(productRef);
     const setupSnap = await transaction.get(setupRef);
 
@@ -75,7 +74,6 @@ export async function recordStockMovement(db: Firestore, institutionId: string, 
     else if (payload.type === 'Out' || payload.type === 'Damage') qtyChange = -payload.quantity;
     else if (payload.type === 'Adjustment') qtyChange = payload.quantity;
 
-    // IF PENDING: We only log the movement but DON'T update stock levels
     if (payload.status !== 'Pending') {
       transaction.update(productRef, {
         totalStock: increment(qtyChange),
@@ -90,7 +88,6 @@ export async function recordStockMovement(db: Firestore, institutionId: string, 
         });
       }
 
-      // Financials
       if (setup?.inventoryAssetAccountId) {
         const absQty = Math.abs(qtyChange);
         const totalAmount = absQty * (payload.unitCost || product.costPrice || 0);
@@ -133,13 +130,15 @@ export async function recordStockMovement(db: Firestore, institutionId: string, 
       status: payload.status || 'Completed',
       timestamp: serverTimestamp()
     });
-  });
+  };
+
+  if (existingTx) {
+    return movementLogic(existingTx);
+  } else {
+    return runTransaction(db, movementLogic);
+  }
 }
 
-/**
- * Handles stock write-offs with governance guards.
- * If loss value > 10,000, it creates a pending approval request.
- */
 export async function requestStockWriteOff(db: Firestore, institutionId: string, payload: MovementPayload, userId: string) {
   const productRef = doc(db, 'institutions', institutionId, 'products', payload.productId);
   const prodSnap = await getDoc(productRef);
@@ -149,7 +148,6 @@ export async function requestStockWriteOff(db: Firestore, institutionId: string,
   const lossValue = payload.quantity * (product.costPrice || 0);
   
   if (lossValue > 10000) {
-    // TRIGGER GOVERNANCE
     const approval = await initiateApprovalRequest(db, institutionId, {
       module: 'Inventory',
       action: 'High-Value Stock Write-off',

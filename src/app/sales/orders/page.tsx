@@ -19,20 +19,19 @@ import {
   History, 
   MoreVertical, 
   Loader2, 
-  Package, 
+  ShoppingCart, 
   CheckCircle2, 
   Zap,
   Trash2,
-  ShoppingCart,
   FileText,
   UserCircle,
   Truck,
-  ArrowRightLeft,
   ArrowRight,
   Activity
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { createSalesOrder, confirmSalesOrder, type SalesItem } from "@/lib/sales/sales.service";
+import { initializeDeliveryOrder } from "@/lib/delivery/delivery.service";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
 import { cn } from "@/lib/utils";
@@ -149,6 +148,20 @@ export default function SalesOrdersPage() {
     }
   };
 
+  const handleInitializeDispatch = async (order: any) => {
+    if (!selectedInstId || isProcessing) return;
+    setIsProcessing(true);
+    try {
+      await initializeDeliveryOrder(db, selectedInstId, order, user!.uid);
+      toast({ title: "Delivery Order Created", description: "Fulfillment cycle initialized in Logistics Hub." });
+      router.push('/delivery/orders');
+    } catch (err) {
+      toast({ variant: "destructive", title: "Initialization Failed" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const filteredOrders = orders?.filter(o => 
     o.orderNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     o.customerName?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -163,7 +176,7 @@ export default function SalesOrdersPage() {
               <ClipboardCheck className="size-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-headline font-bold">Sales Orders</h1>
+              <h1 className="text-2xl font-headline font-bold text-foreground">Sales Orders</h1>
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">Operational Fulfillment Pipeline</p>
             </div>
           </div>
@@ -302,7 +315,7 @@ export default function SalesOrdersPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end" className="w-56 shadow-2xl ring-1 ring-border">
                                 <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground">Logistics Command</DropdownMenuLabel>
-                                <DropdownMenuItem className="text-xs gap-3 font-bold" onClick={() => router.push('/delivery/dispatch')}>
+                                <DropdownMenuItem className="text-xs gap-3 font-bold" onClick={() => handleInitializeDispatch(o)}>
                                   <Truck className="size-3.5 text-primary" /> Initialize Dispatch Note
                                 </DropdownMenuItem>
                                 <DropdownMenuItem className="text-xs gap-3 font-bold">

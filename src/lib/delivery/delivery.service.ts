@@ -1,13 +1,11 @@
-
 'use client';
 
-import { Firestore, collection, doc, serverTimestamp, runTransaction, addDoc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
+import { Firestore, collection, doc, serverTimestamp, runTransaction, addDoc, getDoc, updateDoc, setDoc, increment } from 'firebase/firestore';
 import { recordStockMovement } from '../inventory/inventory.service';
 import { getNextSequence } from '../sequence-service';
-import { postJournalEntry } from '../accounting/journal.service';
 
 export interface DispatchPayload {
-  invoiceId: string;
+  deliveryId: string;
   driverId: string;
   vehicleId: string;
   warehouseId: string;
@@ -42,60 +40,87 @@ export async function bootstrapLogisticsFinancials(db: Firestore, institutionId:
   }, { merge: true });
 }
 
-export async function dispatchDelivery(db: Firestore, institutionId: string, payload: DispatchPayload, userId: string) {
+/**
+ * Initializes a Delivery Order from a confirmed Sales Order.
+ */
+export async function initializeDeliveryOrder(db: Firestore, institutionId: string, salesOrder: any, userId: string) {
   const deliveryNumber = await getNextSequence(db, institutionId, 'delivery_order');
+  const doRef = collection(db, 'institutions', institutionId, 'delivery_orders');
   
-  return runTransaction(db, async (transaction) => {
-    const invoiceRef = doc(db, 'institutions', institutionId, 'sales_invoices', payload.invoiceId);
-    const invSnap = await transaction.get(invoiceRef);
-    if (!invSnap.exists()) throw new Error("Invoice not found.");
-    const invoice = invSnap.data();
+  const data = {
+    deliveryNumber,
+    salesOrderId: salesOrder.id,
+    customerName: salesOrder.customerName,
+    customerId: salesOrder.customerId,
+    items: salesOrder.items,
+    status: 'Pending',
+    destinationAddress: '', 
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    createdBy: userId
+  };
 
-    for (const item of invoice.items) {
-      await recordStockMovement(db, institutionId, {
+  return addDoc(doRef, data);
+}
+
+/**
+ * Executes dispatch: Assigns fleet, deducts stock atomically.
+ */
+export async function dispatchDelivery(db: Firestore, institutionId: string, payload: DispatchPayload, userId: string) {
+  const deliveryRef = doc(db, 'institutions', institutionId, 'delivery_orders', payload.deliveryId);
+  const driverRef = doc(db, 'institutions', institutionId, 'drivers', payload.driverId);
+  const vehicleRef = doc(db, 'institutions', institutionId, 'vehicles', payload.vehicleId);
+
+  return runTransaction(db, async (transaction) => {
+    const delSnap = await transaction.get(deliveryRef);
+    if (!delSnap.exists()) throw new Error("Delivery Order not found.");
+    const delivery = delSnap.data();
+
+    // 1. Stock Deduction Logic
+    for (const item of delivery.items) {
+      const productRef = doc(db, 'institutions', institutionId, 'products', item.productId);
+      transaction.update(productRef, {
+        totalStock: increment(-item.qty),
+        updatedAt: serverTimestamp()
+      });
+      
+      const moveRef = doc(collection(db, 'institutions', institutionId, 'movements'));
+      transaction.set(moveRef, {
         productId: item.productId,
         warehouseId: payload.warehouseId,
         type: 'Out',
-        quantity: item.qty,
-        reference: `Logistics Dispatch: ${deliveryNumber}`,
-        unitCost: 0 
+        quantity: -item.qty,
+        reference: `Dispatch: ${delivery.deliveryNumber}`,
+        timestamp: serverTimestamp(),
+        status: 'Completed'
       });
     }
 
-    const deliveryRef = doc(collection(db, 'institutions', institutionId, 'delivery_orders'));
-    transaction.set(deliveryRef, {
-      ...payload,
-      deliveryNumber,
-      items: invoice.items,
+    // 2. Update Delivery Order
+    transaction.update(deliveryRef, {
+      driverId: payload.driverId,
+      vehicleId: payload.vehicleId,
+      warehouseId: payload.warehouseId,
+      destinationAddress: payload.destinationAddress,
       status: 'Dispatched',
       dispatchedAt: serverTimestamp(),
-      createdBy: userId,
       updatedAt: serverTimestamp()
     });
 
-    transaction.update(invoiceRef, { 
-      status: 'Dispatched', 
-      deliveryOrderId: deliveryRef.id,
-      updatedAt: serverTimestamp() 
-    });
-
-    const driverRef = doc(db, 'institutions', institutionId, 'drivers', payload.driverId);
-    const vehicleRef = doc(db, 'institutions', institutionId, 'vehicles', payload.vehicleId);
+    // 3. Update Fleet Status
     transaction.update(driverRef, { status: 'Busy', updatedAt: serverTimestamp() });
     transaction.update(vehicleRef, { status: 'On Trip', updatedAt: serverTimestamp() });
   });
 }
 
+/**
+ * Finalizes delivery: Completes cycle, frees fleet assets.
+ */
 export async function confirmDelivery(db: Firestore, institutionId: string, deliveryId: string) {
   const deliveryRef = doc(db, 'institutions', institutionId, 'delivery_orders', deliveryId);
-  const setupRef = doc(db, 'institutions', institutionId, 'settings', 'logistics');
 
   return runTransaction(db, async (transaction) => {
-    const [delSnap, setupSnap] = await Promise.all([
-      transaction.get(deliveryRef),
-      transaction.get(setupRef)
-    ]);
-
+    const delSnap = await transaction.get(deliveryRef);
     if (!delSnap.exists()) throw new Error("Delivery Order not found.");
     const delivery = delSnap.data();
 
@@ -105,16 +130,14 @@ export async function confirmDelivery(db: Firestore, institutionId: string, deli
       updatedAt: serverTimestamp() 
     });
 
-    const invoiceRef = doc(db, 'institutions', institutionId, 'sales_invoices', delivery.invoiceId);
-    transaction.update(invoiceRef, { 
-      status: 'Settled', 
-      updatedAt: serverTimestamp() 
-    });
-
-    const driverRef = doc(db, 'institutions', institutionId, 'drivers', delivery.driverId);
-    const vehicleRef = doc(db, 'institutions', institutionId, 'vehicles', delivery.vehicleId);
-    transaction.update(driverRef, { status: 'Available', updatedAt: serverTimestamp() });
-    transaction.update(vehicleRef, { status: 'Available', updatedAt: serverTimestamp() });
+    if (delivery.driverId) {
+      const driverRef = doc(db, 'institutions', institutionId, 'drivers', delivery.driverId);
+      transaction.update(driverRef, { status: 'Available', updatedAt: serverTimestamp() });
+    }
+    if (delivery.vehicleId) {
+      const vehicleRef = doc(db, 'institutions', institutionId, 'vehicles', delivery.vehicleId);
+      transaction.update(vehicleRef, { status: 'Available', updatedAt: serverTimestamp() });
+    }
   });
 }
 

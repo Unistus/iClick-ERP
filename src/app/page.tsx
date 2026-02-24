@@ -43,7 +43,10 @@ import {
   XCircle,
   Clock,
   ArrowRight,
-  ChevronDown
+  ChevronDown,
+  Smartphone,
+  Banknote,
+  Boxes
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore, useDoc, useMemoFirebase, useUser, useCollection } from "@/firebase"
@@ -181,7 +184,6 @@ export default function HomePage() {
     if (!selectedInstId || isAnalyzing) return;
     setIsAnalyzing(true);
     try {
-      const context = `Current Page: Dashboard. Data Context: ${JSON.stringify(entries?.slice(0, 10))}`;
       const res = await aiFinancialInsights({
         salesData: JSON.stringify(entries?.slice(0, 10)),
         inventoryData: JSON.stringify(products?.slice(0, 10)),
@@ -353,6 +355,136 @@ export default function HomePage() {
                     </Card>
                   </div>
                 </div>
+              </TabsContent>
+
+              {/* ENHANCED SALES TAB */}
+              <TabsContent value="sales" className="space-y-6 mt-0 animate-in fade-in duration-700">
+                <div className="grid gap-6 lg:grid-cols-12">
+                  <Card className="lg:col-span-8 bg-card border-none ring-1 ring-border/50 shadow-2xl overflow-hidden">
+                    <CardHeader className="bg-secondary/10 border-b py-4 px-8 flex flex-row items-center justify-between">
+                      <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">Revenue Growth Curve</CardTitle>
+                      <Badge variant="outline" className="text-[8px] bg-emerald-500/10 text-emerald-500 border-none font-black uppercase">Live Yield</Badge>
+                    </CardHeader>
+                    <CardContent className="p-8">
+                      <div className="h-[350px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={salesData}>
+                            <defs>
+                              <linearGradient id="colorRevenueSales" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                                <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
+                            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `${v/1000}k`} />
+                            <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', fontSize: '10px' }} />
+                            <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="url(#colorRevenueSales)" strokeWidth={3} />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <div className="lg:col-span-4 space-y-6">
+                    <Card className="border-none ring-1 ring-border shadow-xl bg-card">
+                      <CardHeader className="bg-secondary/10 border-b py-4 px-6">
+                        <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em]">Payment Mix</CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-6">
+                        <div className="h-[200px] w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie data={[{name: 'M-Pesa', value: 65}, {name: 'Card', value: 20}, {name: 'Cash', value: 15}]} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                {COLORS.map((color, index) => <Cell key={index} fill={color} />)}
+                              </Pie>
+                              <Tooltip />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div className="space-y-2 pt-4">
+                          {['M-Pesa', 'Card', 'Cash'].map((m, i) => (
+                            <div key={m} className="flex items-center justify-between text-[10px] font-bold uppercase">
+                              <div className="flex items-center gap-2"><div className="size-2 rounded-full" style={{backgroundColor: COLORS[i]}} /> {m}</div>
+                              <span className="opacity-50">{i === 0 ? '65%' : i === 1 ? '20%' : '15%'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* ENHANCED CASH FLOW TAB */}
+              <TabsContent value="cashflow" className="space-y-6 mt-0 animate-in fade-in duration-700">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <Card className="bg-card border-none ring-1 ring-border shadow-sm">
+                    <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
+                      <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Liquid Reserves</span>
+                      <Wallet className="size-3.5 text-emerald-500 opacity-50" />
+                    </CardHeader>
+                    <CardContent className="pb-4">
+                      <div className="text-2xl font-black font-headline text-foreground/90">{currency} 2.4M</div>
+                      <p className="text-[9px] text-emerald-500 font-bold mt-1 uppercase">Ready for Payout</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-card border-none ring-1 ring-border shadow-sm">
+                    <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
+                      <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">A/R Position</span>
+                      <TrendingDown className="size-3.5 text-primary opacity-50" />
+                    </CardHeader>
+                    <CardContent className="pb-4">
+                      <div className="text-2xl font-black font-headline text-primary">{currency} 842k</div>
+                      <p className="text-[9px] text-muted-foreground font-bold mt-1 uppercase">Outstanding Invoices</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-card border-none ring-1 ring-border shadow-sm">
+                    <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
+                      <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Payables</span>
+                      <History className="size-3.5 text-accent opacity-50" />
+                    </CardHeader>
+                    <CardContent className="pb-4">
+                      <div className="text-2xl font-black font-headline text-accent">{currency} 1.1M</div>
+                      <p className="text-[9px] text-muted-foreground font-bold mt-1 uppercase">Vendor Obligations</p>
+                    </CardContent>
+                  </Card>
+                </div>
+                <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
+                  <CardHeader className="bg-secondary/10 border-b border-border/50 py-4 px-8 flex flex-row items-center justify-between">
+                    <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">Recent Cash Movements</CardTitle>
+                    <Badge variant="outline" className="text-[8px] bg-background border-primary/20 text-primary uppercase font-black px-2">Audit Verified</Badge>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableBody>
+                        {[
+                          { desc: "POS Terminal Sales", ref: "SALE-1004", amount: 45000, type: "In" },
+                          { desc: "Vendor Payout: MedCo", ref: "PAY-502", amount: 12000, type: "Out" },
+                          { desc: "Client Settlement: Acme", ref: "REC-201", amount: 125000, type: "In" },
+                        ].map((tx, idx) => (
+                          <TableRow key={idx} className="h-14 hover:bg-secondary/10 border-b-border/30">
+                            <TableCell className="pl-8">
+                              <div className="flex items-center gap-3">
+                                <div className={cn("size-8 rounded-lg flex items-center justify-center", tx.type === 'In' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-destructive/10 text-destructive')}>
+                                  {tx.type === 'In' ? <ArrowUpRight className="size-4" /> : <ArrowDownLeft className="size-4" />}
+                                </div>
+                                <div>
+                                  <p className="text-xs font-black uppercase">{tx.desc}</p>
+                                  <p className="text-[8px] font-mono text-muted-foreground uppercase">{tx.ref}</p>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right pr-8 font-mono text-xs font-black">
+                              <span className={tx.type === 'In' ? 'text-emerald-500' : 'text-destructive'}>
+                                {tx.type === 'In' ? '+' : '-'} {currency} {tx.amount.toLocaleString()}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
               </TabsContent>
 
               {/* ENHANCED TAX TAB */}

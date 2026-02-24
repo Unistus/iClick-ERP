@@ -97,7 +97,9 @@ import {
   FileBadge,
   RefreshCw,
   PlayCircle,
-  GanttChart
+  GanttChart,
+  Building2,
+  Monitor
 } from "lucide-react"
 
 export interface NavSubmenu {
@@ -315,11 +317,12 @@ export const navConfig: NavItem[] = [
   { 
     title: "Administration", 
     icon: Settings, 
-    url: "/admin/settings", 
+    url: "/admin/institution-profile", 
     pattern: /^\/admin/,
     id: "admin",
     submenus: [
-      { title: "System Settings", icon: Sliders, url: "/admin/settings", id: "settings" },
+      { title: "Entity Profile", icon: Building2, url: "/admin/institution-profile", id: "entity_profile" },
+      { title: "System Console", icon: Monitor, url: "/admin/settings", id: "settings" },
       { title: "Institutions", icon: Store, url: "/admin/institutions", id: "institutions" },
       { title: "Branches", icon: MapPin, url: "/admin/branches", id: "branches" },
       { title: "Departments", icon: Briefcase, url: "/admin/departments", id: "departments" },

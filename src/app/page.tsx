@@ -3,7 +3,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import DashboardLayout from "@/components/layout/dashboard-layout"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   TrendingUp, 
   DollarSign, 
@@ -180,6 +181,7 @@ export default function HomePage() {
     if (!selectedInstId || isAnalyzing) return;
     setIsAnalyzing(true);
     try {
+      const context = `Current Page: Dashboard. Data Context: ${JSON.stringify(entries?.slice(0, 10))}`;
       const res = await aiFinancialInsights({
         salesData: JSON.stringify(entries?.slice(0, 10)),
         inventoryData: JSON.stringify(products?.slice(0, 10)),
@@ -534,7 +536,7 @@ export default function HomePage() {
               </TabsContent>
 
               {/* STRATEGIST TAB */}
-              <TabsContent value="strategist" className="mt-0 animate-in fade-in duration-700">
+              <TabsContent value="strategist" className="mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <Card className="border-none bg-gradient-to-br from-primary/10 via-background to-accent/10 ring-1 ring-primary/20 shadow-2xl overflow-hidden min-h-[500px]">
                   <CardContent className="p-12 flex flex-col items-center justify-center text-center gap-8">
                     <div className="size-32 rounded-[2.5rem] bg-background shadow-2xl flex items-center justify-center relative group">
@@ -590,7 +592,7 @@ export default function HomePage() {
                         </div>
                         <div className="flex items-center gap-4 pr-6">
                           <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 border-none font-black text-[10px] h-7 px-3">URGENT</Badge>
-                          <Link href="/approvals"><Button variant="ghost" size="sm" className="h-10 px-6 font-black uppercase text-[10px] gap-2 border ring-1 ring-border">Review <ChevronRight className="size-3" /></Button></Link>
+                          <Link href="/approvals"><Button variant="ghost" size="icon" className="h-10 px-6 font-black uppercase text-[10px] gap-2 border ring-1 ring-border">Review <ChevronRight className="size-3" /></Button></Link>
                         </div>
                       </div>
                     </Card>

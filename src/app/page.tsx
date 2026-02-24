@@ -53,7 +53,10 @@ import {
   ChevronDown,
   Smartphone,
   Banknote,
-  Boxes
+  Boxes,
+  Quote,
+  ClipboardCheck,
+  ShoppingCart
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { useFirestore, useDoc, useMemoFirebase, useUser, useCollection } from "@/firebase"
@@ -128,6 +131,25 @@ export default function HomePage() {
 
   const activePeriod = useMemo(() => periods?.find(p => p.id === selectedPeriodId), [periods, selectedPeriodId]);
 
+  // SALES MODULE SUMMARY DATA
+  const quotesQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'sales_quotations');
+  }, [db, selectedInstId]);
+  const { data: allQuotes } = useCollection(quotesQuery);
+
+  const salesOrdersQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'sales_orders');
+  }, [db, selectedInstId]);
+  const { data: allOrders } = useCollection(salesOrdersQuery);
+
+  const salesInvoicesQuery = useMemoFirebase(() => {
+    if (!selectedInstId) return null;
+    return collection(db, 'institutions', selectedInstId, 'sales_invoices');
+  }, [db, selectedInstId]);
+  const { data: allInvoices } = useCollection(salesInvoicesQuery);
+
   const entriesQuery = useMemoFirebase(() => {
     if (!selectedInstId || !activePeriod) return null;
     return query(collection(db, 'institutions', selectedInstId, 'journal_entries'), limit(100));
@@ -186,6 +208,18 @@ export default function HomePage() {
     const stock = products.reduce((sum, p) => sum + ((p.totalStock || 0) * (p.costPrice || 0)), 0);
     return { revenue: rev, profit: rev - exp, stock, trans: entries.length };
   }, [entries, coa, products]);
+
+  const salesSummaries = useMemo(() => {
+    const quoteVal = allQuotes?.reduce((sum, q) => sum + (q.total || 0), 0) || 0;
+    const orderVal = allOrders?.reduce((sum, o) => sum + (o.total || 0), 0) || 0;
+    const invoiceVal = allInvoices?.reduce((sum, i) => sum + (i.total || 0), 0) || 0;
+
+    return {
+      quotes: { count: allQuotes?.length || 0, val: quoteVal },
+      orders: { count: allOrders?.length || 0, val: orderVal },
+      invoices: { count: allInvoices?.length || 0, val: invoiceVal }
+    };
+  }, [allQuotes, allOrders, allInvoices]);
 
   const generateStrategistInsight = useCallback(async () => {
     if (!selectedInstId || isAnalyzing) return;
@@ -364,6 +398,41 @@ export default function HomePage() {
               </TabsContent>
 
               <TabsContent value="sales" className="space-y-4 mt-0 animate-in fade-in duration-700">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden group hover:ring-primary/30 transition-all">
+                    <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
+                      <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Quotes Hub</span>
+                      <Quote className="size-3.5 text-primary opacity-50" />
+                    </CardHeader>
+                    <CardContent className="pb-4">
+                      <div className="text-xl font-black font-headline">{salesSummaries.quotes.count} ISSUED</div>
+                      <p className="text-[10px] text-primary font-bold uppercase mt-1">{currency} {salesSummaries.quotes.val.toLocaleString()}</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden group hover:ring-accent/30 transition-all">
+                    <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
+                      <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Order Pipeline</span>
+                      <ClipboardCheck className="size-3.5 text-accent opacity-50" />
+                    </CardHeader>
+                    <CardContent className="pb-4">
+                      <div className="text-xl font-black font-headline">{salesSummaries.orders.count} ACTIVE</div>
+                      <p className="text-[10px] text-accent font-bold uppercase mt-1">{currency} {salesSummaries.orders.val.toLocaleString()}</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-card border-none ring-1 ring-border shadow-sm overflow-hidden group hover:ring-emerald-500/30 transition-all">
+                    <CardHeader className="pb-1 pt-3 flex flex-row items-center justify-between">
+                      <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Revenue Node</span>
+                      <ShoppingCart className="size-3.5 text-emerald-500 opacity-50" />
+                    </CardHeader>
+                    <CardContent className="pb-4">
+                      <div className="text-xl font-black font-headline">{salesSummaries.invoices.count} BILLED</div>
+                      <p className="text-[10px] text-emerald-500 font-bold uppercase mt-1">{currency} {salesSummaries.invoices.val.toLocaleString()}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
                 <div className="grid gap-4 lg:grid-cols-12">
                   <Card className="lg:col-span-8 bg-card border-none ring-1 ring-border/50 shadow-xl overflow-hidden">
                     <CardHeader className="bg-secondary/10 border-b border-border/10 py-3 px-6 flex flex-row items-center justify-between">
@@ -371,7 +440,7 @@ export default function HomePage() {
                       <Badge variant="outline" className="text-[7px] bg-emerald-500/10 text-emerald-500 border-none font-black uppercase">Live Yield</Badge>
                     </CardHeader>
                     <CardContent className="p-6">
-                      <div className="h-[300px] w-full">
+                      <div className="h-[250px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={salesData}>
                             <defs>
@@ -396,10 +465,10 @@ export default function HomePage() {
                         <CardTitle className="text-[9px] font-black uppercase tracking-[0.2em]">Payment Mix</CardTitle>
                       </CardHeader>
                       <CardContent className="p-6">
-                        <div className="h-[180px] w-full">
+                        <div className="h-[150px] w-full">
                           <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
-                              <Pie data={[{name: 'M-Pesa', value: 65}, {name: 'Card', value: 20}, {name: 'Cash', value: 15}]} innerRadius={55} outerRadius={70} paddingAngle={5} dataKey="value">
+                              <Pie data={[{name: 'M-Pesa', value: 65}, {name: 'Card', value: 20}, {name: 'Cash', value: 15}]} innerRadius={45} outerRadius={60} paddingAngle={5} dataKey="value">
                                 {COLORS.map((color, index) => <Cell key={index} fill={color} />)}
                               </Pie>
                               <Tooltip />
@@ -592,7 +661,7 @@ export default function HomePage() {
                   <Card className="lg:col-span-8 border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
                     <CardHeader className="bg-secondary/10 border-b py-3 px-6 flex flex-row items-center justify-between">
                       <CardTitle className="text-xs font-black uppercase tracking-[0.2em]">Cross-Branch Revenue Matrix</CardTitle>
-                      <Button variant="ghost" size="icon" className="size-8"><RefreshCw className="size-3 opacity-20" /></Button>
+                      <Button variant="ghost" size="icon" className="size-8"><RefreshCw className="size-3" opacity-20 /></Button>
                     </CardHeader>
                     <CardContent className="p-6">
                       <div className="h-[280px] w-full">

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   TrendingUp, 
+  TrendingDown,
   DollarSign, 
   Package2, 
   Activity,
@@ -266,7 +267,6 @@ export default function HomePage() {
             </div>
           ) : (
             <>
-              {/* OVERVIEW CONTENT */}
               <TabsContent value="overview" className="space-y-6 mt-0 animate-in fade-in duration-700">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                   {[
@@ -357,7 +357,6 @@ export default function HomePage() {
                 </div>
               </TabsContent>
 
-              {/* ENHANCED SALES TAB */}
               <TabsContent value="sales" className="space-y-6 mt-0 animate-in fade-in duration-700">
                 <div className="grid gap-6 lg:grid-cols-12">
                   <Card className="lg:col-span-8 bg-card border-none ring-1 ring-border/50 shadow-2xl overflow-hidden">
@@ -415,7 +414,60 @@ export default function HomePage() {
                 </div>
               </TabsContent>
 
-              {/* ENHANCED CASH FLOW TAB */}
+              <TabsContent value="inventory" className="space-y-6 mt-0 animate-in fade-in duration-700">
+                <div className="grid gap-6 lg:grid-cols-12">
+                  <div className="lg:col-span-4 space-y-6">
+                    <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
+                      <CardHeader className="bg-secondary/10 border-b py-4 px-6"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em]">Asset Composition</CardTitle></CardHeader>
+                      <CardContent className="p-6">
+                        <div className="h-[250px] w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie data={[{name: 'Pharmacy', value: 65}, {name: 'F&B', value: 20}, {name: 'Retail', value: 15}]} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                {COLORS.map((color, index) => <Cell key={index} fill={color} />)}
+                              </Pie>
+                              <Tooltip />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div className="space-y-2 pt-4">
+                          {['Pharmacy', 'F&B', 'Retail'].map((cat, i) => (
+                            <div key={cat} className="flex items-center justify-between text-[10px] font-bold uppercase">
+                              <div className="flex items-center gap-2"><div className="size-2 rounded-full" style={{backgroundColor: COLORS[i]}} /> {cat}</div>
+                              <span className="opacity-50">{i === 0 ? '65%' : i === 1 ? '20%' : '15%'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  <div className="lg:col-span-8 space-y-6">
+                    <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
+                      <CardHeader className="bg-secondary/10 border-b py-4 px-8 flex flex-row items-center justify-between">
+                        <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">Critical Supply Chain Alerts</CardTitle>
+                        <Link href="/inventory/reorder"><Button size="sm" variant="ghost" className="text-[10px] font-black uppercase gap-2 hover:bg-primary/10">Full Registry <ArrowRight className="size-3" /></Button></Link>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <Table>
+                          <TableHeader className="bg-secondary/20">
+                            <TableRow><TableHead className="h-12 text-[9px] font-black uppercase pl-8">Item Identity</TableHead><TableHead className="h-12 text-[9px] font-black uppercase text-center">Status</TableHead><TableHead className="h-12 text-[9px] font-black uppercase text-right pr-8">Risk Level</TableHead></TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {products?.filter(p => p.totalStock <= (p.reorderLevel || 0)).slice(0, 5).map(p => (
+                              <TableRow key={p.id} className="h-14 hover:bg-destructive/5 border-b-border/30 group">
+                                <TableCell className="pl-8 font-black text-xs uppercase tracking-tight">{p.name}</TableCell>
+                                <TableCell className="text-center"><Badge variant="outline" className="text-[8px] h-5 bg-destructive/10 text-destructive border-none font-black px-2">LOW STOCK: {p.totalStock}</Badge></TableCell>
+                                <TableCell className="text-right pr-8"><div className="size-2 rounded-full bg-destructive animate-pulse ml-auto" /></TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </TabsContent>
+
               <TabsContent value="cashflow" className="space-y-6 mt-0 animate-in fade-in duration-700">
                 <div className="grid gap-4 md:grid-cols-3">
                   <Card className="bg-card border-none ring-1 ring-border shadow-sm">
@@ -487,7 +539,6 @@ export default function HomePage() {
                 </Card>
               </TabsContent>
 
-              {/* ENHANCED TAX TAB */}
               <TabsContent value="tax" className="space-y-6 mt-0 animate-in fade-in duration-700">
                 <div className="grid gap-6 lg:grid-cols-12">
                   <div className="lg:col-span-8 grid gap-4 md:grid-cols-2">
@@ -530,7 +581,6 @@ export default function HomePage() {
                 </div>
               </TabsContent>
 
-              {/* ENHANCED BRANCHES TAB */}
               <TabsContent value="branches" className="space-y-6 mt-0 animate-in fade-in duration-700">
                 <div className="grid gap-6 lg:grid-cols-12">
                   <Card className="lg:col-span-8 border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
@@ -578,62 +628,6 @@ export default function HomePage() {
                 </div>
               </TabsContent>
 
-              {/* ENHANCED INVENTORY TAB */}
-              <TabsContent value="inventory" className="space-y-6 mt-0 animate-in fade-in duration-700">
-                <div className="grid gap-6 lg:grid-cols-12">
-                  <div className="lg:col-span-4 space-y-6">
-                    <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
-                      <CardHeader className="bg-secondary/10 border-b py-4 px-6"><CardTitle className="text-[10px] font-black uppercase tracking-[0.2em]">Asset Composition</CardTitle></CardHeader>
-                      <CardContent className="p-6">
-                        <div className="h-[250px] w-full">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <Pie data={[{name: 'Pharmacy', value: 65}, {name: 'F&B', value: 20}, {name: 'Retail', value: 15}]} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                                {COLORS.map((color, index) => <Cell key={index} fill={color} />)}
-                              </Pie>
-                              <Tooltip />
-                            </PieChart>
-                          </ResponsiveContainer>
-                        </div>
-                        <div className="space-y-2 pt-4">
-                          {['Pharmacy', 'F&B', 'Retail'].map((cat, i) => (
-                            <div key={cat} className="flex items-center justify-between text-[10px] font-bold uppercase">
-                              <div className="flex items-center gap-2"><div className="size-2 rounded-full" style={{backgroundColor: COLORS[i]}} /> {cat}</div>
-                              <span className="opacity-50">{i === 0 ? '65%' : i === 1 ? '20%' : '15%'}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                  <div className="lg:col-span-8 space-y-6">
-                    <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
-                      <CardHeader className="bg-secondary/10 border-b py-4 px-8 flex flex-row items-center justify-between">
-                        <CardTitle className="text-sm font-black uppercase tracking-[0.2em]">Critical Supply Chain Alerts</CardTitle>
-                        <Link href="/inventory/reorder"><Button size="sm" variant="ghost" className="text-[10px] font-black uppercase gap-2 hover:bg-primary/10">Full Registry <ArrowRight className="size-3" /></Button></Link>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        <Table>
-                          <TableHeader className="bg-secondary/20">
-                            <TableRow><TableHead className="h-10 text-[9px] font-black uppercase pl-8">Item Identity</TableHead><TableHead className="h-10 text-[9px] font-black uppercase text-center">Status</TableHead><TableHead className="h-10 text-[9px] font-black uppercase text-right pr-8">Risk Level</TableHead></TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {products?.filter(p => p.totalStock <= (p.reorderLevel || 0)).slice(0, 5).map(p => (
-                              <TableRow key={p.id} className="h-14 hover:bg-destructive/5 border-b-border/30 group">
-                                <TableCell className="pl-8 font-black text-xs uppercase tracking-tight">{p.name}</TableCell>
-                                <TableCell className="text-center"><Badge variant="outline" className="text-[8px] h-5 bg-destructive/10 text-destructive border-none font-black px-2">LOW STOCK: {p.totalStock}</Badge></TableCell>
-                                <TableCell className="text-right pr-8"><div className="size-2 rounded-full bg-destructive animate-pulse ml-auto" /></TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              </TabsContent>
-
-              {/* ENHANCED STAFF TAB */}
               <TabsContent value="staff" className="space-y-6 mt-0 animate-in fade-in duration-700">
                 <div className="grid gap-6 lg:grid-cols-12">
                   <Card className="lg:col-span-7 border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
@@ -667,7 +661,6 @@ export default function HomePage() {
                 </div>
               </TabsContent>
 
-              {/* STRATEGIST TAB */}
               <TabsContent value="strategist" className="mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <Card className="border-none bg-gradient-to-br from-primary/10 via-background to-accent/10 ring-1 ring-primary/20 shadow-2xl overflow-hidden min-h-[500px]">
                   <CardContent className="p-12 flex flex-col items-center justify-center text-center gap-8">
@@ -703,7 +696,6 @@ export default function HomePage() {
                 </Card>
               </TabsContent>
 
-              {/* ALERTS TAB */}
               <TabsContent value="alerts" className="mt-0 animate-in fade-in duration-700">
                 <div className="space-y-3">
                   {(!alerts || alerts.length === 0) ? (

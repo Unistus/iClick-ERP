@@ -25,32 +25,35 @@ import {
   Globe,
   Monitor,
   ShieldCheck,
-  Server
+  Server,
+  Activity
 } from "lucide-react";
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection, doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { toast } from "@/hooks/use-toast";
 import { logSystemEvent } from "@/lib/audit-service";
+import { usePermittedInstitutions } from "@/hooks/use-permitted-institutions";
 
 export default function SystemSettingsPage() {
   const db = useFirestore();
   const { user } = useUser();
-  const [selectedInstitutionId, setSelectedInstitutionId] = useState<string>("");
+  const [selectedInstId, setSelectedInstId] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
 
-  const instCollectionRef = useMemoFirebase(() => collection(db, 'institutions'), [db]);
-  const { data: institutions } = useCollection(instCollectionRef);
+  // 1. Authorization: Fetch permitted institutions
+  const { institutions, isLoading: instLoading } = usePermittedInstitutions();
 
+  // 2. Data Fetching: Specific Settings Node
   const settingsRef = useMemoFirebase(() => {
-    if (!selectedInstitutionId) return null;
-    return doc(db, 'institutions', selectedInstitutionId, 'settings', 'global');
-  }, [db, selectedInstitutionId]);
+    if (!selectedInstId) return null;
+    return doc(db, 'institutions', selectedInstId, 'settings', 'global');
+  }, [db, selectedInstId]);
 
-  const { data: settings } = useDoc(settingsRef);
+  const { data: settings, isLoading: settingsLoading } = useDoc(settingsRef);
 
   const handleSave = async (category: string, e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!selectedInstitutionId) return;
+    if (!selectedInstId || !settingsRef) return;
 
     setIsSaving(true);
     const formData = new FormData(e.currentTarget);
@@ -64,7 +67,7 @@ export default function SystemSettingsPage() {
     });
 
     try {
-      await setDoc(settingsRef!, {
+      await setDoc(settingsRef, {
         [category]: {
           ...currentCategoryData,
           ...updates
@@ -72,7 +75,7 @@ export default function SystemSettingsPage() {
         updatedAt: serverTimestamp(),
       }, { merge: true });
 
-      logSystemEvent(db, selectedInstitutionId, user, 'SETTINGS', `Update ${category}`, `Institutional settings for ${category} were modified.`);
+      logSystemEvent(db, selectedInstId, user, 'SETTINGS', `Update ${category}`, `Institutional settings for ${category} were modified.`);
       toast({ title: "Settings Saved", description: `${category.toUpperCase()} configuration has been deployed.` });
     } catch (err) {
       toast({ variant: "destructive", title: "Save Failed", description: "You might not have permission to modify global settings." });
@@ -83,18 +86,22 @@ export default function SystemSettingsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-4">
+      <div className="space-y-6">
+        {/* Header Bar */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-1.5 rounded bg-primary/20 text-primary">
-              <Settings className="size-5" />
+            <div className="p-2.5 rounded-xl bg-primary/20 text-primary shadow-inner border border-primary/10">
+              <Settings className="size-6" />
             </div>
-            <h1 className="text-2xl font-headline font-bold">Institutional Control</h1>
+            <div>
+              <h1 className="text-3xl font-headline font-bold text-foreground">Control Panel</h1>
+              <p className="text-[10px] text-muted-foreground uppercase font-black tracking-[0.2em] mt-1">Global Institutional Configuration & Policy</p>
+            </div>
           </div>
           
-          <Select value={selectedInstitutionId} onValueChange={setSelectedInstitutionId}>
-            <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold">
-              <SelectValue placeholder="Select Institution" />
+          <Select value={selectedInstId} onValueChange={setSelectedInstId}>
+            <SelectTrigger className="w-[280px] h-10 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
+              <SelectValue placeholder={instLoading ? "Validating Access..." : "Select Institution Node"} />
             </SelectTrigger>
             <SelectContent>
               {institutions?.map(i => (
@@ -104,335 +111,312 @@ export default function SystemSettingsPage() {
           </Select>
         </div>
 
-        {!selectedInstitutionId ? (
-          <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed rounded-2xl bg-secondary/5">
-            <Monitor className="size-12 text-muted-foreground opacity-20 mb-3" />
-            <p className="text-sm font-medium text-muted-foreground">Select an institution to configure its environment.</p>
+        {!selectedInstId ? (
+          <div className="flex flex-col items-center justify-center py-32 border-2 border-dashed rounded-[2rem] bg-secondary/5">
+            <Monitor className="size-16 text-muted-foreground opacity-10 mb-4 animate-pulse" />
+            <p className="text-sm font-medium text-muted-foreground text-center px-6">Select an institution to configure its operational perimeter.</p>
           </div>
         ) : (
           <Tabs defaultValue="general" className="w-full">
-            <TabsList className="bg-secondary/20 h-auto p-1 mb-6 flex-wrap justify-start gap-1">
-              <TabsTrigger value="general" className="text-xs gap-2"><Globe className="size-3.5" /> General</TabsTrigger>
-              <TabsTrigger value="pos" className="text-xs gap-2"><ShoppingCart className="size-3.5" /> POS</TabsTrigger>
-              <TabsTrigger value="payments" className="text-xs gap-2"><CreditCard className="size-3.5" /> Payments</TabsTrigger>
-              <TabsTrigger value="sms" className="text-xs gap-2"><MessageSquare className="size-3.5" /> SMS</TabsTrigger>
-              <TabsTrigger value="email" className="text-xs gap-2"><Mail className="size-3.5" /> Email Center</TabsTrigger>
-              <TabsTrigger value="branding" className="text-xs gap-2"><Palette className="size-3.5" /> Branding</TabsTrigger>
-              <TabsTrigger value="maintenance" className="text-xs gap-2"><Database className="size-3.5" /> Maintenance</TabsTrigger>
+            <TabsList className="bg-secondary/20 h-auto p-1 mb-8 flex-wrap justify-start gap-1 bg-transparent border-b rounded-none w-full">
+              <TabsTrigger value="general" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Globe className="size-3.5" /> General</TabsTrigger>
+              <TabsTrigger value="pos" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><ShoppingCart className="size-3.5" /> Terminal</TabsTrigger>
+              <TabsTrigger value="payments" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><CreditCard className="size-3.5" /> Gateways</TabsTrigger>
+              <TabsTrigger value="email" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Mail className="size-3.5" /> Communications</TabsTrigger>
+              <TabsTrigger value="branding" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Palette className="size-3.5" /> Identity</TabsTrigger>
+              <TabsTrigger value="maintenance" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent"><Database className="size-3.5" /> Persistence</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="general">
+            <TabsContent value="general" className="mt-0 animate-in fade-in duration-500">
               <form onSubmit={(e) => handleSave('general', e)}>
-                <Card className="border-none ring-1 ring-border shadow-xl">
-                  <CardHeader>
-                    <CardTitle>Regional & Fiscal</CardTitle>
-                    <CardDescription>Core institutional defaults for accounting and localization.</CardDescription>
+                <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
+                  <CardHeader className="bg-secondary/10 border-b py-4 px-8">
+                    <CardTitle className="text-sm font-black uppercase tracking-widest text-primary">Localization & Fiscal Cycles</CardTitle>
+                    <CardDescription className="text-[10px]">Core institutional defaults for accounting and timezone management.</CardDescription>
                   </CardHeader>
-                  <CardContent className="grid gap-6">
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Operational Timezone</Label>
-                        <Select name="timezone" defaultValue={settings?.general?.timezone || "Africa/Nairobi"}>
-                          <SelectTrigger className="h-9 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Africa/Nairobi">Nairobi (GMT+3)</SelectItem>
-                            <SelectItem value="UTC">UTC</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Fiscal Year Start</Label>
-                        <Select name="fiscalYearStart" defaultValue={settings?.general?.fiscalYearStart || "January"}>
-                          <SelectTrigger className="h-9 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="January">January 1st</SelectItem>
-                            <SelectItem value="July">July 1st</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                  <CardContent className="p-8 grid gap-8 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label className="uppercase font-black text-[9px] tracking-widest opacity-60">Operational Timezone</Label>
+                      <Select name="timezone" defaultValue={settings?.general?.timezone || "Africa/Nairobi"}>
+                        <SelectTrigger className="h-11 font-bold bg-secondary/5 border-none ring-1 ring-border shadow-inner">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Africa/Nairobi" className="text-xs font-bold uppercase">Nairobi (GMT+3)</SelectItem>
+                          <SelectItem value="UTC" className="text-xs font-bold uppercase">Universal UTC</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <Button type="submit" disabled={isSaving} className="w-fit gap-2 h-9 px-6 font-bold uppercase text-[10px]">
-                      {isSaving ? <Loader2 className="size-3 animate-spin" /> : <Save className="size-3" />} Commit General
-                    </Button>
+                    <div className="space-y-2">
+                      <Label className="uppercase font-black text-[9px] tracking-widest opacity-60">Fiscal Year Inception</Label>
+                      <Select name="fiscalYearStart" defaultValue={settings?.general?.fiscalYearStart || "January"}>
+                        <SelectTrigger className="h-11 font-bold bg-secondary/5 border-none ring-1 ring-border shadow-inner">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="January" className="text-xs font-bold uppercase">January 1st</SelectItem>
+                          <SelectItem value="July" className="text-xs font-bold uppercase">July 1st</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </CardContent>
+                  <CardFooter className="bg-secondary/5 border-t p-6 flex justify-end">
+                    <Button type="submit" disabled={isSaving} className="h-11 px-10 font-black uppercase text-xs shadow-xl shadow-primary/40 bg-primary hover:bg-primary/90 transition-all active:scale-95">
+                      {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Commit Localization
+                    </Button>
+                  </CardFooter>
                 </Card>
               </form>
             </TabsContent>
 
-            <TabsContent value="pos">
+            <TabsContent value="pos" className="mt-0 animate-in fade-in duration-500">
               <form onSubmit={(e) => handleSave('pos', e)}>
-                <Card className="border-none ring-1 ring-border shadow-xl">
-                  <CardHeader>
-                    <CardTitle>Terminal Behavior</CardTitle>
-                    <CardDescription>Configure how point-of-sale stations operate at this institution.</CardDescription>
+                <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
+                  <CardHeader className="bg-secondary/10 border-b py-4 px-8">
+                    <CardTitle className="text-sm font-black uppercase tracking-widest text-primary">Terminal Behavior</CardTitle>
+                    <CardDescription className="text-[10px]">Configure how point-of-sale stations operate at this institution.</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid gap-4 py-2 border rounded-lg p-4 bg-secondary/10">
-                      <div className="flex items-center justify-between">
+                  <CardContent className="p-8 space-y-8">
+                    <div className="grid gap-6 py-4 border-2 border-dashed rounded-[2rem] p-8 bg-secondary/5 shadow-inner">
+                      <div className="flex items-center justify-between group">
                         <div className="space-y-0.5">
-                          <Label>Require Customer for Sale</Label>
-                          <p className="text-[10px] text-muted-foreground">Force staff to select/create a customer before closing any sale.</p>
+                          <Label className="text-sm font-bold uppercase tracking-tight">Identity Enforcement</Label>
+                          <p className="text-[10px] text-muted-foreground italic">Force staff to select/create a customer before closing any sale.</p>
                         </div>
                         <Switch name="requireCustomerForSale" defaultChecked={settings?.pos?.requireCustomerForSale} />
                       </div>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between group">
                         <div className="space-y-0.5">
-                          <Label>Auto-Print Receipts</Label>
-                          <p className="text-[10px] text-muted-foreground">Trigger print dialog immediately upon transaction completion.</p>
+                          <Label className="text-sm font-bold uppercase tracking-tight">Immediate Printing</Label>
+                          <p className="text-[10px] text-muted-foreground italic">Trigger print dialog immediately upon transaction completion.</p>
                         </div>
                         <Switch name="printReceiptOnComplete" defaultChecked={settings?.pos?.printReceiptOnComplete} />
                       </div>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between group border-t pt-6 border-border/50">
                         <div className="space-y-0.5">
-                          <Label>Allow Manual Discounts</Label>
-                          <p className="text-[10px] text-muted-foreground">Allow staff to override prices with ad-hoc discounts.</p>
+                          <Label className="text-sm font-bold uppercase tracking-tight">Ad-hoc Discounting</Label>
+                          <p className="text-[10px] text-muted-foreground italic">Allow staff to override catalog prices with manual discounts.</p>
                         </div>
                         <Switch name="allowCustomDiscounts" defaultChecked={settings?.pos?.allowCustomDiscounts} />
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label>Receipt Footer Message</Label>
+                      <Label className="uppercase font-black text-[9px] tracking-widest opacity-60">Legal Receipt Footer</Label>
                       <Textarea 
                         name="receiptFooter" 
                         defaultValue={settings?.pos?.receiptFooter}
-                        placeholder="Thank you for shopping with us! No returns after 24h."
-                        className="min-h-[80px] text-xs bg-secondary/5"
+                        placeholder="e.g. Thank you for shopping with us! No returns after 24h."
+                        className="min-h-[100px] text-xs bg-secondary/5 font-medium border-none ring-1 ring-border"
                       />
                     </div>
-                    <Button type="submit" className="w-fit gap-2 h-9 px-6 font-bold uppercase text-[10px]">
-                      <Save className="size-3" /> Commit POS Config
-                    </Button>
                   </CardContent>
+                  <CardFooter className="bg-secondary/5 border-t p-6 flex justify-end">
+                    <Button type="submit" disabled={isSaving} className="h-11 px-10 font-black uppercase text-xs shadow-xl shadow-primary/40 bg-primary hover:bg-primary/90 transition-all active:scale-95">
+                      {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Deploy Terminal Rules
+                    </Button>
+                  </CardFooter>
                 </Card>
               </form>
             </TabsContent>
 
-            <TabsContent value="payments">
+            <TabsContent value="payments" className="mt-0 animate-in fade-in duration-500">
               <form onSubmit={(e) => handleSave('gateways', e)}>
-                <Card className="border-none ring-1 ring-border shadow-xl">
-                  <CardHeader>
-                    <CardTitle>Financial Gateways</CardTitle>
-                    <CardDescription>Connect M-Pesa STK Push and card processing services.</CardDescription>
+                <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
+                  <CardHeader className="bg-secondary/10 border-b py-4 px-8">
+                    <CardTitle className="text-sm font-black uppercase tracking-widest text-primary">Financial Gateways</CardTitle>
+                    <CardDescription className="text-[10px]">Connect M-Pesa STK Push and card processing services.</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-4">
-                      <h3 className="text-xs font-bold text-primary flex items-center gap-2">
-                        <CheckCircle2 className="size-3" /> M-Pesa Integration (Safaricom)
+                  <CardContent className="p-8 space-y-10">
+                    <div className="space-y-6">
+                      <h3 className="text-[10px] font-black text-emerald-500 uppercase flex items-center gap-2 tracking-[0.2em]">
+                        <CheckCircle2 className="size-4" /> M-Pesa Integration (Safaricom)
                       </h3>
-                      <div className="grid md:grid-cols-3 gap-4">
+                      <div className="grid md:grid-cols-3 gap-6">
                         <div className="space-y-1.5">
-                          <Label className="text-[10px] uppercase font-bold text-muted-foreground">Consumer Key</Label>
-                          <Input name="mpesaConsumerKey" defaultValue={settings?.gateways?.mpesaConsumerKey} className="h-8 text-xs font-mono" />
+                          <Label className="text-[9px] uppercase font-bold text-muted-foreground opacity-60 tracking-widest">Consumer Key</Label>
+                          <Input name="mpesaConsumerKey" defaultValue={settings?.gateways?.mpesaConsumerKey} className="h-10 text-xs font-mono bg-secondary/5 border-none ring-1 ring-border" />
                         </div>
                         <div className="space-y-1.5">
-                          <Label className="text-[10px] uppercase font-bold text-muted-foreground">Consumer Secret</Label>
-                          <Input name="mpesaConsumerSecret" type="password" defaultValue={settings?.gateways?.mpesaConsumerSecret} className="h-8 text-xs font-mono" />
+                          <Label className="text-[9px] uppercase font-bold text-muted-foreground opacity-60 tracking-widest">Consumer Secret</Label>
+                          <Input name="mpesaConsumerSecret" type="password" defaultValue={settings?.gateways?.mpesaConsumerSecret} className="h-10 text-xs font-mono bg-secondary/5 border-none ring-1 ring-border" />
                         </div>
                         <div className="space-y-1.5">
-                          <Label className="text-[10px] uppercase font-bold text-muted-foreground">Till/Paybill</Label>
-                          <Input name="mpesaShortcode" defaultValue={settings?.gateways?.mpesaShortcode} className="h-8 text-xs font-mono" />
+                          <Label className="text-[9px] uppercase font-bold text-muted-foreground opacity-60 tracking-widest">Till/Paybill</Label>
+                          <Input name="mpesaShortcode" defaultValue={settings?.gateways?.mpesaShortcode} className="h-10 text-xs font-mono bg-secondary/5 border-none ring-1 ring-border" />
                         </div>
                       </div>
                     </div>
-                    <div className="space-y-4 pt-4 border-t">
-                      <h3 className="text-xs font-bold text-blue-500 flex items-center gap-2">
-                        <CreditCard className="size-3" /> Card Processor (Stripe/Pesapal)
+                    <div className="space-y-6 pt-8 border-t border-border/50">
+                      <h3 className="text-[10px] font-black text-blue-500 uppercase flex items-center gap-2 tracking-[0.2em]">
+                        <CreditCard className="size-4" /> Card Processor (Stripe/Pesapal)
                       </h3>
                       <div className="space-y-1.5 max-w-md">
-                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Public/Client Key</Label>
-                        <Input name="stripePublicKey" defaultValue={settings?.gateways?.stripePublicKey} className="h-8 text-xs font-mono" />
+                        <Label className="text-[9px] uppercase font-bold text-muted-foreground opacity-60 tracking-widest">Public/Client API Key</Label>
+                        <Input name="stripePublicKey" defaultValue={settings?.gateways?.stripePublicKey} className="h-10 text-xs font-mono bg-secondary/5 border-none ring-1 ring-border" />
                       </div>
                     </div>
-                    <Button type="submit" className="w-fit gap-2 h-9 px-6 font-bold uppercase text-[10px]">
-                      <Save className="size-3" /> Commit Gateways
-                    </Button>
                   </CardContent>
+                  <CardFooter className="bg-secondary/5 border-t p-6 flex justify-end">
+                    <Button type="submit" disabled={isSaving} className="h-11 px-10 font-black uppercase text-xs shadow-xl shadow-primary/40 bg-primary hover:bg-primary/90 transition-all active:scale-95">
+                      {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Deploy Gateways
+                    </Button>
+                  </CardFooter>
                 </Card>
               </form>
             </TabsContent>
 
-            <TabsContent value="sms">
+            <TabsContent value="email" className="mt-0 animate-in fade-in duration-500">
               <form onSubmit={(e) => handleSave('comms', e)}>
-                <Card className="border-none ring-1 ring-border shadow-xl">
-                  <CardHeader>
-                    <CardTitle>SMS Gateway</CardTitle>
-                    <CardDescription>Configure bulk messaging provider for receipts and alerts.</CardDescription>
+                <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
+                  <CardHeader className="bg-secondary/10 border-b py-4 px-8">
+                    <CardTitle className="text-sm font-black uppercase tracking-widest text-primary">Communications Hub</CardTitle>
+                    <CardDescription className="text-[10px]">Configure secure SMTP channels for receipts and institutional alerts.</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid md:grid-cols-2 gap-4">
+                  <CardContent className="p-8 space-y-10">
+                    <div className="grid md:grid-cols-2 gap-8">
                       <div className="space-y-2">
-                        <Label>SMS Provider</Label>
-                        <Select name="smsProvider" defaultValue={settings?.comms?.smsProvider || "AfricasTalking"}>
-                          <SelectTrigger className="h-9 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="AfricasTalking">Africa's Talking</SelectItem>
-                            <SelectItem value="Twilio">Twilio</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <Label className="uppercase font-black text-[9px] tracking-widest opacity-60">Sender Name / Entity</Label>
+                        <Input name="emailFromAddress" defaultValue={settings?.comms?.emailFromAddress} placeholder="e.g. iClick Nairobi Accounts" className="h-11 font-bold bg-secondary/5 border-none ring-1 ring-border" />
                       </div>
                       <div className="space-y-2">
-                        <Label>Provider API Key</Label>
-                        <Input name="smsApiKey" type="password" defaultValue={settings?.comms?.smsApiKey} className="h-9 text-xs font-mono" />
-                      </div>
-                    </div>
-                    <Button type="submit" className="w-fit gap-2 h-9 px-6 font-bold uppercase text-[10px]">
-                      <Save className="size-3" /> Commit SMS Setup
-                    </Button>
-                  </CardContent>
-                </Card>
-              </form>
-            </TabsContent>
-
-            <TabsContent value="email">
-              <form onSubmit={(e) => handleSave('comms', e)}>
-                <Card className="border-none ring-1 ring-border shadow-xl">
-                  <CardHeader>
-                    <CardTitle>SMTP & Mail Gateway</CardTitle>
-                    <CardDescription>Configure the system to send emails directly using institutional mail servers.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label>From Name / Entity</Label>
-                        <Input name="emailFromAddress" defaultValue={settings?.comms?.emailFromAddress} placeholder="e.g. iClick Nairobi Accounts" className="h-9 text-xs" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Service Provider</Label>
+                        <Label className="uppercase font-black text-[9px] tracking-widest opacity-60">Delivery Engine</Label>
                         <Select name="emailProvider" defaultValue={settings?.comms?.emailProvider || "SMTP"}>
-                          <SelectTrigger className="h-9 text-xs">
+                          <SelectTrigger className="h-11 font-bold bg-secondary/5 border-none ring-1 ring-border">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="SMTP">Custom SMTP</SelectItem>
-                            <SelectItem value="SendGrid">SendGrid API</SelectItem>
-                            <SelectItem value="Resend">Resend API</SelectItem>
+                            <SelectItem value="SMTP" className="text-xs font-bold uppercase">Custom Institutional SMTP</SelectItem>
+                            <SelectItem value="SendGrid" className="text-xs font-bold uppercase">SendGrid API Node</SelectItem>
+                            <SelectItem value="Resend" className="text-xs font-bold uppercase">Resend API Node</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
 
-                    <div className="p-4 bg-secondary/10 rounded-lg border space-y-4">
-                      <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-widest">
-                        <Server className="size-3.5" /> Connection Parameters
+                    <div className="p-8 bg-secondary/10 rounded-[2rem] border border-border/50 space-y-8 shadow-inner">
+                      <div className="flex items-center gap-3 text-primary font-black text-[10px] uppercase tracking-[0.3em] pb-2 border-b border-primary/10">
+                        <Server className="size-4" /> Transport Layer Parameters
                       </div>
-                      <div className="grid md:grid-cols-3 gap-4">
+                      <div className="grid md:grid-cols-3 gap-6">
                         <div className="space-y-1.5">
-                          <Label className="text-[10px] font-bold opacity-60">SMTP HOST</Label>
-                          <Input name="smtpHost" defaultValue={settings?.comms?.smtpHost} placeholder="smtp.gmail.com" className="h-8 text-xs font-mono" />
+                          <Label className="text-[9px] font-black uppercase opacity-40">SMTP Host</Label>
+                          <Input name="smtpHost" defaultValue={settings?.comms?.smtpHost} placeholder="smtp.gmail.com" className="h-10 text-xs font-mono bg-background" />
                         </div>
                         <div className="space-y-1.5">
-                          <Label className="text-[10px] font-bold opacity-60">SMTP PORT</Label>
-                          <Input name="smtpPort" type="number" defaultValue={settings?.comms?.smtpPort} placeholder="465" className="h-8 text-xs font-mono" />
+                          <Label className="text-[9px] font-black uppercase opacity-40">Port Node</Label>
+                          <Input name="smtpPort" type="number" defaultValue={settings?.comms?.smtpPort} placeholder="465" className="h-10 text-xs font-mono bg-background" />
                         </div>
-                        <div className="flex items-center gap-2 pt-6">
+                        <div className="flex items-center gap-3 pt-6 group">
                           <Switch name="smtpSecure" defaultChecked={settings?.comms?.smtpSecure} />
-                          <Label className="text-[10px] font-bold opacity-60">USE SSL/TLS</Label>
+                          <Label className="text-[9px] font-black uppercase opacity-40 group-hover:opacity-100 transition-opacity">Enable SSL/TLS</Label>
                         </div>
                       </div>
-                      <div className="grid md:grid-cols-2 gap-4">
+                      <div className="grid md:grid-cols-2 gap-6">
                         <div className="space-y-1.5">
-                          <Label className="text-[10px] font-bold opacity-60">AUTH USERNAME</Label>
-                          <Input name="smtpUser" defaultValue={settings?.comms?.smtpUser} placeholder="erp@company.com" className="h-8 text-xs font-mono" />
+                          <Label className="text-[9px] font-black uppercase opacity-40">Auth Principal (User)</Label>
+                          <Input name="smtpUser" defaultValue={settings?.comms?.smtpUser} placeholder="erp@company.com" className="h-10 text-xs font-mono bg-background" />
                         </div>
                         <div className="space-y-1.5">
-                          <Label className="text-[10px] font-bold opacity-60">AUTH PASSWORD</Label>
-                          <Input name="smtpPass" type="password" defaultValue={settings?.comms?.smtpPass} className="h-8 text-xs font-mono" />
+                          <Label className="text-[9px] font-black uppercase opacity-40">Auth Secret (Pass)</Label>
+                          <Input name="smtpPass" type="password" defaultValue={settings?.comms?.smtpPass} className="h-10 text-xs font-mono bg-background" />
                         </div>
                       </div>
                     </div>
-
-                    <Button type="submit" className="w-fit gap-2 h-9 px-6 font-bold uppercase text-[10px]">
-                      <Save className="size-3" /> Save SMTP Setup
-                    </Button>
                   </CardContent>
+                  <CardFooter className="bg-secondary/5 border-t p-6 flex justify-end">
+                    <Button type="submit" disabled={isSaving} className="h-11 px-10 font-black uppercase text-xs shadow-xl shadow-primary/40 bg-primary hover:bg-primary/90 transition-all active:scale-95">
+                      {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Deploy Communication Node
+                    </Button>
+                  </CardFooter>
                 </Card>
               </form>
             </TabsContent>
 
-            <TabsContent value="branding">
+            <TabsContent value="branding" className="mt-0 animate-in fade-in duration-500">
               <form onSubmit={(e) => handleSave('branding', e)}>
-                <Card className="border-none ring-1 ring-border shadow-xl">
-                  <CardHeader>
-                    <CardTitle>Theme & Visual Identity</CardTitle>
-                    <CardDescription>Customize the ERP interface to match institution colors.</CardDescription>
+                <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
+                  <CardHeader className="bg-secondary/10 border-b py-4 px-8">
+                    <CardTitle className="text-sm font-black uppercase tracking-widest text-primary">Institutional Identity</CardTitle>
+                    <CardDescription className="text-[10px]">Customize the ERP interface to align with brand guidelines.</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid md:grid-cols-3 gap-6">
-                      <div className="space-y-2">
-                        <Label>Primary Brand Color</Label>
-                        <div className="flex gap-2">
-                          <Input name="primaryColor" defaultValue={settings?.branding?.primaryColor || "#008080"} className="h-9 text-xs font-mono uppercase" />
-                          <div className="size-9 rounded border shrink-0" style={{ backgroundColor: settings?.branding?.primaryColor || '#008080' }} />
+                  <CardContent className="p-8 space-y-10">
+                    <div className="grid md:grid-cols-3 gap-12">
+                      <div className="space-y-3">
+                        <Label className="uppercase font-black text-[9px] tracking-widest opacity-60">Primary Brand Node</Label>
+                        <div className="flex gap-3">
+                          <Input name="primaryColor" defaultValue={settings?.branding?.primaryColor || "#008080"} className="h-12 font-black text-lg bg-secondary/5 border-none ring-1 ring-border uppercase font-mono" />
+                          <div className="size-12 rounded-2xl border-2 border-white/10 shrink-0 shadow-lg" style={{ backgroundColor: settings?.branding?.primaryColor || '#008080' }} />
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label>Accent Action Color</Label>
-                        <div className="flex gap-2">
-                          <Input name="accentColor" defaultValue={settings?.branding?.accentColor || "#FF4500"} className="h-9 text-xs font-mono uppercase" />
-                          <div className="size-9 rounded border shrink-0" style={{ backgroundColor: settings?.branding?.accentColor || '#FF4500' }} />
+                      <div className="space-y-3">
+                        <Label className="uppercase font-black text-[9px] tracking-widest opacity-60">Accent Action Node</Label>
+                        <div className="flex gap-3">
+                          <Input name="accentColor" defaultValue={settings?.branding?.accentColor || "#FF4500"} className="h-12 font-black text-lg bg-secondary/5 border-none ring-1 ring-border uppercase font-mono" />
+                          <div className="size-12 rounded-2xl border-2 border-white/10 shrink-0 shadow-lg" style={{ backgroundColor: settings?.branding?.accentColor || '#FF4500' }} />
                         </div>
                       </div>
-                      <div className="flex items-center justify-between pt-8">
-                        <Label>UI Compact Mode</Label>
+                      <div className="flex items-center justify-between p-6 rounded-[2rem] bg-primary/5 border border-primary/10 shadow-inner">
+                        <div className="space-y-0.5">
+                          <Label className="text-xs font-black uppercase">UI Density</Label>
+                          <p className="text-[9px] text-muted-foreground">Enable compact workspace mode.</p>
+                        </div>
                         <Switch name="compactMode" defaultChecked={settings?.branding?.compactMode} />
                       </div>
                     </div>
-                    <Button type="submit" className="w-fit gap-2 h-9 px-6 font-bold uppercase text-[10px]">
-                      <Save className="size-3" /> Apply Branding
-                    </Button>
                   </CardContent>
+                  <CardFooter className="bg-secondary/5 border-t p-6 flex justify-end">
+                    <Button type="submit" disabled={isSaving} className="h-11 px-10 font-black uppercase text-xs shadow-xl shadow-primary/40 bg-primary hover:bg-primary/90 transition-all active:scale-95">
+                      {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Apply Brand Guidelines
+                    </Button>
+                  </CardFooter>
                 </Card>
               </form>
             </TabsContent>
 
-            <TabsContent value="maintenance">
+            <TabsContent value="maintenance" className="mt-0 animate-in fade-in duration-700">
               <form onSubmit={(e) => handleSave('maintenance', e)}>
-                <Card className="border-none ring-1 ring-border shadow-xl">
-                  <CardHeader>
-                    <CardTitle>Data Integrity</CardTitle>
-                    <CardDescription>Configure automated backup policies and data retention.</CardDescription>
+                <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
+                  <CardHeader className="bg-secondary/10 border-b py-4 px-8">
+                    <CardTitle className="text-sm font-black uppercase tracking-widest text-primary">Data Persistence & Vaults</CardTitle>
+                    <CardDescription className="text-[10px]">Configure automated backup cycles and cold-storage retention.</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="p-4 bg-amber-500/5 border border-amber-500/20 rounded-lg flex items-start gap-3">
-                      <Database className="size-5 text-amber-500 shrink-0 mt-0.5" />
+                  <CardContent className="p-8 space-y-10">
+                    <div className="p-6 bg-amber-500/5 border border-amber-500/10 rounded-[2rem] flex items-start gap-4 shadow-inner">
+                      <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-600"><Database className="size-6" /></div>
                       <div className="space-y-1">
-                        <p className="text-xs font-bold text-amber-500">Database Consistency Check</p>
-                        <p className="text-[10px] text-muted-foreground leading-relaxed">
-                          iClick ERP automatically snapshots data hourly at the edge. These settings control secondary institutional archives for compliance.
+                        <p className="text-xs font-black uppercase text-amber-600 tracking-widest">Consistency Protocol active</p>
+                        <p className="text-[11px] text-muted-foreground leading-relaxed italic font-medium">
+                          "iClick ERP performs real-time shadowing of every transaction node. These settings control secondary institutional archives for labor and financial compliance."
                         </p>
                       </div>
                     </div>
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div className="flex items-center justify-between p-4 border rounded-lg bg-secondary/10">
+                    <div className="grid md:grid-cols-2 gap-8">
+                      <div className="flex items-center justify-between p-6 bg-secondary/5 border border-border/50 rounded-[2rem] shadow-inner">
                         <div className="space-y-0.5">
-                          <Label>Automated Cloud Backups</Label>
-                          <p className="text-[10px] text-muted-foreground">Export full state to secure institutional bucket.</p>
+                          <Label className="text-sm font-bold uppercase tracking-tight">Automated Cloud Snapshots</Label>
+                          <p className="text-[10px] text-muted-foreground italic">Export full institutional state to encrypted cold-storage.</p>
                         </div>
                         <Switch name="autoBackup" defaultChecked={settings?.maintenance?.autoBackup} />
                       </div>
                       <div className="space-y-2">
-                        <Label>Backup Frequency</Label>
+                        <Label className="uppercase font-black text-[9px] tracking-widest opacity-60">Snapshot Frequency</Label>
                         <Select name="backupFrequency" defaultValue={settings?.maintenance?.backupFrequency || "Daily"}>
-                          <SelectTrigger className="h-9 text-xs">
+                          <SelectTrigger className="h-11 font-bold bg-secondary/5 border-none ring-1 ring-border">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Daily">Daily at 02:00 AM</SelectItem>
-                            <SelectItem value="Weekly">Weekly (Sunday)</SelectItem>
+                            <SelectItem value="Daily" className="text-xs font-bold uppercase">Daily Cycle (02:00 AM)</SelectItem>
+                            <SelectItem value="Weekly" className="text-xs font-bold uppercase">Weekly Deep Archive (Sun)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                     </div>
-                    <Button type="submit" className="w-fit gap-2 h-9 px-6 font-bold uppercase text-[10px]">
-                      <Save className="size-3" /> Commit Maintenance
-                    </Button>
                   </CardContent>
+                  <CardFooter className="bg-secondary/5 border-t p-6 flex justify-end">
+                    <Button type="submit" disabled={isSaving} className="h-11 px-10 font-black uppercase text-xs shadow-xl shadow-primary/40 bg-primary hover:bg-primary/90 transition-all active:scale-95">
+                      {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Commit Persistence Policy
+                    </Button>
+                  </CardFooter>
                 </Card>
               </form>
             </TabsContent>

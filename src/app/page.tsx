@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -70,6 +69,24 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
 const COLORS = ['#008080', '#FF4500', '#10b981', '#f59e0b'];
+
+// Sample data for visualizations
+const salesData = [
+  { name: 'Mon', revenue: 45000, profit: 12000 },
+  { name: 'Tue', revenue: 52000, profit: 15000 },
+  { name: 'Wed', revenue: 48000, profit: 11000 },
+  { name: 'Thu', revenue: 61000, profit: 18000 },
+  { name: 'Fri', revenue: 55000, profit: 14000 },
+  { name: 'Sat', revenue: 67000, profit: 21000 },
+  { name: 'Sun', revenue: 42000, profit: 9000 },
+];
+
+const branchPerf = [
+  { name: 'HQ', value: 45 },
+  { name: 'Westlands', value: 25 },
+  { name: 'Mombasa', value: 20 },
+  { name: 'Eldoret', value: 10 },
+];
 
 export default function HomePage() {
   const db = useFirestore()
@@ -206,7 +223,7 @@ export default function HomePage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Select value={selectedInstId} onValueChange={(val) => { setSelectedInstId(val); setSelectedPeriodId(""); }}>
-              <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold">
+              <SelectTrigger className="w-[240px] h-9 bg-card border-none ring-1 ring-border text-xs font-bold shadow-sm">
                 <SelectValue placeholder={instLoading ? "Loading Access..." : "Select Institution"} />
               </SelectTrigger>
               <SelectContent>

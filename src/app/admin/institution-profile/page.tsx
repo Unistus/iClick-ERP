@@ -112,9 +112,24 @@ export default function InstitutionProfilePage() {
         ) : (
           <Tabs defaultValue="branding" className="w-full">
             <TabsList className="bg-secondary/20 h-auto p-1 mb-8 flex-wrap justify-start gap-1 bg-transparent border-b rounded-none w-full">
-              <TabsTrigger value="branding" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent font-bold uppercase"><Palette className="size-3.5" /> Visual Branding</TabsTrigger>
-              <TabsTrigger value="localization" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent font-bold uppercase"><Globe className="size-3.5" /> Localization</TabsTrigger>
-              <TabsTrigger value="email" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent font-bold uppercase"><Mail className="size-3.5" /> Comms (SMTP)</TabsTrigger>
+              <TabsTrigger 
+                value="branding" 
+                className="text-sm gap-2.5 px-8 py-3.5 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent font-bold uppercase transition-all"
+              >
+                <Palette className="size-4" /> Visual Branding
+              </TabsTrigger>
+              <TabsTrigger 
+                value="localization" 
+                className="text-sm gap-2.5 px-8 py-3.5 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent font-bold uppercase transition-all"
+              >
+                <Globe className="size-4" /> Localization
+              </TabsTrigger>
+              <TabsTrigger 
+                value="email" 
+                className="text-sm gap-2.5 px-8 py-3.5 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent font-bold uppercase transition-all"
+              >
+                <Mail className="size-4" /> Comms (SMTP)
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="branding" className="mt-0 animate-in fade-in duration-500">

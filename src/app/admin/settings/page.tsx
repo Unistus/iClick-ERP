@@ -99,10 +99,30 @@ export default function GlobalSystemSettingsPage() {
 
         <Tabs defaultValue="infra" className="w-full">
           <TabsList className="bg-secondary/20 h-auto p-1 mb-8 flex-wrap justify-start gap-1 bg-transparent border-b rounded-none w-full">
-            <TabsTrigger value="infra" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent uppercase font-bold tracking-widest"><Globe className="size-3.5" /> Infrastructure</TabsTrigger>
-            <TabsTrigger value="security" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent uppercase font-bold tracking-widest"><ShieldCheck className="size-3.5" /> Security Policy</TabsTrigger>
-            <TabsTrigger value="comms" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent uppercase font-bold tracking-widest"><Mail className="size-3.5" /> Global Mail</TabsTrigger>
-            <TabsTrigger value="maintenance" className="text-xs gap-2 px-6 py-3 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent uppercase font-bold tracking-widest"><Activity className="size-3.5" /> Maintenance</TabsTrigger>
+            <TabsTrigger 
+              value="infra" 
+              className="text-sm gap-2.5 px-8 py-3.5 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent uppercase font-bold tracking-widest transition-all"
+            >
+              <Globe className="size-4" /> Infrastructure
+            </TabsTrigger>
+            <TabsTrigger 
+              value="security" 
+              className="text-sm gap-2.5 px-8 py-3.5 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent uppercase font-bold tracking-widest transition-all"
+            >
+              <ShieldCheck className="size-4" /> Security Policy
+            </TabsTrigger>
+            <TabsTrigger 
+              value="comms" 
+              className="text-sm gap-2.5 px-8 py-3.5 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent uppercase font-bold tracking-widest transition-all"
+            >
+              <Mail className="size-4" /> Global Mail
+            </TabsTrigger>
+            <TabsTrigger 
+              value="maintenance" 
+              className="text-sm gap-2.5 px-8 py-3.5 data-[state=active]:bg-primary/10 rounded-none border-b-2 data-[state=active]:border-primary border-transparent uppercase font-bold tracking-widest transition-all"
+            >
+              <Activity className="size-4" /> Maintenance
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="infra" className="space-y-6 animate-in fade-in duration-500">

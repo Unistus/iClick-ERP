@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useEffect } from "react"
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useUser } from "@/firebase"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { AIStrategistFab } from "@/components/ai/ai-strategist-fab"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser()
@@ -113,6 +115,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </footer>
         </div>
       </div>
+      <AIStrategistFab />
     </SidebarProvider>
   )
 }

@@ -181,6 +181,60 @@ export default function GlobalSystemSettingsPage() {
             </form>
           </TabsContent>
 
+          <TabsContent value="comms" className="space-y-6 animate-in fade-in duration-500">
+            <form onSubmit={(e) => handleSave('comms', e)}>
+              <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">
+                <CardHeader className="bg-secondary/10 border-b py-4 px-8">
+                  <CardTitle className="text-sm font-black uppercase tracking-widest text-primary">Global Communication Hub</CardTitle>
+                  <CardDescription className="text-[10px]">Root SMTP gateway for system-level notifications and institutional fallbacks.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-8 space-y-8">
+                  <div className="grid md:grid-cols-2 gap-8">
+                    <div className="space-y-2">
+                      <Label className="uppercase font-black text-[9px] tracking-widest opacity-60">System Sender Identity</Label>
+                      <Input name="senderName" defaultValue={systemConfig?.comms?.senderName || "iClick System"} className="h-11 font-bold bg-secondary/5 border-none ring-1 ring-border" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="uppercase font-black text-[9px] tracking-widest opacity-60">System Reply-To Address</Label>
+                      <Input name="senderEmail" type="email" defaultValue={systemConfig?.comms?.senderEmail || "noreply@iclick.systems"} className="h-11 bg-secondary/5 border-none ring-1 ring-border" />
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-3 gap-6 pt-4 border-t border-border/50">
+                    <div className="space-y-1.5">
+                      <Label className="text-[9px] font-black uppercase opacity-40">SMTP Primary Host</Label>
+                      <Input name="smtpHost" defaultValue={systemConfig?.comms?.smtpHost} placeholder="smtp.postmarkapp.com" className="h-10 text-xs font-mono" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[9px] font-black uppercase opacity-40">Network Port</Label>
+                      <Input name="smtpPort" type="number" defaultValue={systemConfig?.comms?.smtpPort} placeholder="587" className="h-10 text-xs font-mono" />
+                    </div>
+                    <div className="flex items-center gap-3 pt-6">
+                      <Switch name="smtpSecure" defaultChecked={systemConfig?.comms?.smtpSecure} />
+                      <Label className="text-[9px] font-black uppercase opacity-40">Enforce TLS/SSL</Label>
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-1.5">
+                      <Label className="text-[9px] font-black uppercase opacity-40">Primary Auth (User)</Label>
+                      <Input name="smtpUser" defaultValue={systemConfig?.comms?.smtpUser} className="h-10 text-xs font-mono" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[9px] font-black uppercase opacity-40">Auth Secret (Pass)</Label>
+                      <Input name="smtpPass" type="password" defaultValue={systemConfig?.comms?.smtpPass} className="h-10 text-xs font-mono" />
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter className="bg-secondary/5 border-t p-6 flex justify-end">
+                  <Button type="submit" disabled={isSaving} className="h-11 px-10 font-black uppercase text-xs shadow-xl shadow-primary/40 bg-primary hover:bg-primary/90 transition-all active:scale-95">
+                    {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Commit Global Mail Node
+                  </Button>
+                </CardFooter>
+              </Card>
+            </form>
+          </TabsContent>
+
           <TabsContent value="maintenance" className="space-y-6 animate-in fade-in duration-500">
             <form onSubmit={(e) => handleSave('maintenance', e)}>
               <Card className="border-none ring-1 ring-border shadow-2xl bg-card overflow-hidden">

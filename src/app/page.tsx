@@ -225,12 +225,13 @@ export default function HomePage() {
     if (!selectedInstId || isAnalyzing) return;
     setIsAnalyzing(true);
     try {
+      const context = `Current Page: /. Data Context: ${JSON.stringify(coa?.slice(0, 5) || [])}`;
       const res = await aiFinancialInsights({
-        salesData: JSON.stringify(entries?.slice(0, 10)),
-        inventoryData: JSON.stringify(products?.slice(0, 10)),
-        accountingData: JSON.stringify(coa?.slice(0, 10)),
+        salesData: "[]",
+        inventoryData: "[]",
+        accountingData: context,
         budgetData: "[]",
-        agingData: JSON.stringify({ period: activePeriod?.name }),
+        agingData: "[]",
         userQuery: "Examine cross-departmental efficiency and fiscal ceilings."
       });
       setAiInsight(res);
@@ -240,7 +241,7 @@ export default function HomePage() {
     } finally {
       setIsAnalyzing(false);
     }
-  }, [selectedInstId, entries, products, coa, activePeriod, isAnalyzing]);
+  }, [selectedInstId, coa, activePeriod, isAnalyzing]);
 
   useEffect(() => {
     if (selectedInstId && entries && coa) generateStrategistInsight();
@@ -661,7 +662,7 @@ export default function HomePage() {
                   <Card className="lg:col-span-8 border-none ring-1 ring-border shadow-xl bg-card overflow-hidden">
                     <CardHeader className="bg-secondary/10 border-b py-3 px-6 flex flex-row items-center justify-between">
                       <CardTitle className="text-xs font-black uppercase tracking-[0.2em]">Cross-Branch Revenue Matrix</CardTitle>
-                      <Button variant="ghost" size="icon" className="size-8"><RefreshCw className="size-3" opacity-20 /></Button>
+                      <Button variant="ghost" size="icon" className="size-8"><RefreshCw className="size-3 opacity-20" /></Button>
                     </CardHeader>
                     <CardContent className="p-6">
                       <div className="h-[280px] w-full">
